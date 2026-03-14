@@ -22,6 +22,7 @@
     var legacyMode = payload.contentMode === "sequence" ? resolveLegacyTextMode(payload.textSequenceRef) : null;
     return {
       id: payload.id || Utils.uid("text"),
+      name: payload.name || "Text",
       x: asCoordinate(payload.x, 0),
       y: asCoordinate(payload.y, 0),
       width: asSize(payload.width, 0.5),
@@ -116,7 +117,9 @@
         payload.width,
         payload.enabled === true ? 1 : 0
       ),
-      color: isHexColor(payload.color) ? payload.color : "#111111"
+      colorMode: payload.colorMode === "sequence" ? "sequence" : "manual",
+      color: isHexColor(payload.color) ? payload.color : "#111111",
+      colorSequenceRef: payload.colorSequenceRef || null
     };
   }
 
@@ -208,6 +211,10 @@
       face.texts.forEach(function (component) {
         if (component.colorMode === "sequence" && component.colorSequenceRef) {
           lengths.push({ kind: "color", sequenceId: component.colorSequenceRef });
+        }
+
+        if (component.textBorder && component.textBorder.colorMode === "sequence" && component.textBorder.colorSequenceRef) {
+          lengths.push({ kind: "color", sequenceId: component.textBorder.colorSequenceRef });
         }
       });
 

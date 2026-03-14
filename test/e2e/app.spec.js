@@ -26,6 +26,7 @@ test("can create and manipulate a token template", async ({ page }) => {
 
   await page.getByRole("button", { name: "Add Text" }).click();
   await expect(page.getByRole("heading", { name: "Selected Component" })).toBeVisible();
+  await expect(page.locator('form[data-form="text-component-settings"] input[name="name"]')).toHaveValue("Text #1");
   await expect(page.locator('form[data-form="text-component-settings"] select[name="contentMode"]')).toHaveValue("custom");
   await expect(page.locator('form[data-form="text-component-settings"] input[name="customText"]')).toBeVisible();
   await expect(page.locator('form[data-form="text-component-settings"] input[name="sequenceStart"]')).toBeHidden();
@@ -64,24 +65,31 @@ test("can create and manipulate a token template", async ({ page }) => {
 
   await expect(page.locator('form[data-form="text-component-settings"] input[name="width"]')).not.toHaveValue("0.50");
 
+  await page.locator('[data-preview-stage]').click({ position: { x: 20, y: 20 } });
+  await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toBeVisible();
+
   await page.reload();
   await page.locator('select[name="selectedComponentKey"]').selectOption("");
   await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toHaveValue("Untitled Token");
 });
 
-test("back face supports built-in components and image transforms", async ({ page }) => {
+test("token settings own appearance controls and color sequences show in preview", async ({ page }) => {
   await page.getByRole("button", { name: "Create Token" }).click();
-  await page.getByRole("button", { name: "Back" }).click();
-
   const componentOptions = await page.locator('select[name="selectedComponentKey"] option').allTextContents();
-  expect(componentOptions).toContain("Background");
-  expect(componentOptions).toContain("Border");
+  expect(componentOptions).not.toContain("Background");
+  expect(componentOptions).not.toContain("Border");
 
-  await page.locator('select[name="selectedComponentKey"]').selectOption({ label: "Border" });
-  await expect(page.locator('form[data-form="border-component-settings"] input[name="borderWidthRatio"]')).toHaveAttribute("max", "0.25");
+  await expect(page.locator('form[data-form="token-settings"] input[name="borderWidthRatio"]')).toHaveAttribute("max", "0.25");
+  const tokenBorderPicker = page.locator('.color-picker-field').filter({ hasText: "Token border" });
+  await tokenBorderPicker.locator("summary").click();
+  await page.locator('select[name="borderColorMode"]').selectOption("sequence");
+  await tokenBorderPicker.locator("summary").click();
+  await page.locator('select[name="borderColorSequenceRef"]').selectOption({ label: "Rainbow" });
 
-  await page.locator('select[name="selectedComponentKey"]').selectOption({ label: "Background" });
-  await expect(page.locator('form[data-form="background-component-settings"]')).toBeVisible();
+  await expect(page.locator('[data-preview-stage] svg circle[stroke="#ff0000"]')).toHaveCount(1);
+
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(page.locator('form[data-form="token-settings"]')).toBeVisible();
 
   await page.getByRole("button", { name: "Add Image" }).click();
   await page.locator('[data-image-upload-input]').setInputFiles({
@@ -121,7 +129,10 @@ test("built-in text modes and color sequences drive the editor and print limits"
   await expect(page.locator('form[data-form="text-component-settings"] input[name="sequenceStart"]')).toBeVisible();
   await expect(page.locator('form[data-form="text-component-settings"] input[name="sequencePad"]')).toBeVisible();
   await expect(page.locator('form[data-form="text-component-settings"] input[name="customText"]')).toBeHidden();
+  const textColorPicker = page.locator('form[data-form="text-component-settings"] .color-picker-field').filter({ hasText: "Text color" });
+  await textColorPicker.locator("summary").click();
   await page.locator('form[data-form="text-component-settings"] select[name="colorMode"]').selectOption("sequence");
+  await textColorPicker.locator("summary").click();
   await page.locator('form[data-form="text-component-settings"] select[name="colorSequenceRef"]').selectOption({ label: "Two Colors" });
 
   await page.locator('form[data-form="text-component-settings"] select[name="contentMode"]').selectOption("alphabetic");

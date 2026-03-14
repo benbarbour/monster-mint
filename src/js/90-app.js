@@ -212,7 +212,7 @@
       '    <div class="drawer-body">',
       '      <section class="drawer-section">',
       "        <h3>" + (selectedComponent ? "Selected Component" : "Token") + "</h3>",
-      (selectedComponent ? renderSelectedComponentForm(selectedComponent, selection, state.project) : renderTokenForm(token)),
+      (selectedComponent ? renderSelectedComponentForm(selectedComponent, selection, state.project) : renderTokenForm(token, state.project, selection.faceName)),
       "      </section>",
       "    </div>",
       "  </aside>",
@@ -257,24 +257,13 @@
   }
 
   function getComponentItems(face, faceName) {
-    var items = [
-      { type: "background", id: faceName + "-background", label: "Background" }
-    ];
-
-    items.push({ type: "border", id: faceName + "-border", label: "Border" });
-
-    return items.concat(face.images.map(function (component) {
+    return face.images.map(function (component) {
       return { type: "image", id: component.id, label: component.name || "Image" };
-    })).concat(face.texts.map(function (component) {
-      var label = component.contentMode === "numeric"
-        ? "Number sequence"
-        : component.contentMode === "alphabetic"
-          ? "Alphabet sequence"
-          : (component.customText || "Custom text");
+    }).concat(face.texts.map(function (component) {
       return {
         type: "text",
         id: component.id,
-        label: label
+        label: component.name || "Text"
       };
     }));
   }
@@ -290,50 +279,41 @@
     return selection.selectedComponentType === "image" || selection.selectedComponentType === "text";
   }
 
-  function renderTokenForm(token) {
+  function renderTokenForm(token, project, faceName) {
+    var face = token[faceName];
     return [
       '<form class="form-grid" data-form="token-settings">',
       '  <label class="field">Name<input name="name" value="' + escapeHtml(token.name) + '" required></label>',
-      '  <label class="field">Diameter<select name="diameterIn">' + Schema.TOKEN_SIZES.map(function (size) {
+      '  <div class="field-row two-up">',
+      '    <label class="field">Diameter<select name="diameterIn">' + Schema.TOKEN_SIZES.map(function (size) {
         return '<option value="' + size + '"' + (size === token.diameterIn ? " selected" : "") + ">" + size + '&quot;</option>';
       }).join("") + "</select></label>",
-      '  <label class="field">Back face<select name="backEnabled"><option value="true"' + (token.back.enabled ? " selected" : "") + '>Enabled</option><option value="false"' + (!token.back.enabled ? " selected" : "") + '>Disabled</option></select></label>',
+      '    <label class="field">Back face<select name="backEnabled"><option value="true"' + (token.back.enabled ? " selected" : "") + '>Enabled</option><option value="false"' + (!token.back.enabled ? " selected" : "") + '>Disabled</option></select></label>',
+      "  </div>",
       '  <label class="field checkbox-field"><input type="checkbox" name="borderUnderContent"' + (token.borderUnderContent ? " checked" : "") + '>Render border under images and text</label>',
+      '  <p class="field-help">Editing ' + escapeHtml(faceName === "front" ? "front" : "back") + ' face appearance.</p>',
+      renderColorPicker({
+        label: "Background",
+        modeName: "backgroundColorMode",
+        colorName: "backgroundColor",
+        sequenceName: "backgroundColorSequenceRef",
+        currentMode: face.backgroundColorMode,
+        currentColor: face.backgroundColor,
+        currentSequenceRef: face.backgroundColorSequenceRef,
+        sequences: project.sequences.color
+      }),
+      '  <label class="field">Border width<input type="range" min="0" max="0.25" step="0.01" name="borderWidthRatio" value="' + face.border.widthRatio.toFixed(2) + '"><span class="field-help">' + Math.round(face.border.widthRatio * 100) + '% of token width</span></label>',
+      renderColorPicker({
+        label: "Token border",
+        modeName: "borderColorMode",
+        colorName: "borderColor",
+        sequenceName: "borderColorSequenceRef",
+        currentMode: face.border.colorMode,
+        currentColor: face.border.color,
+        currentSequenceRef: face.border.colorSequenceRef,
+        sequences: project.sequences.color
+      }),
       '  <p class="field-help">Changes save automatically.</p>',
-      "</form>"
-    ].join("");
-  }
-
-  function renderFaceForm(token, project, faceName) {
-    var face = token[faceName];
-    return [
-      '<form class="form-grid" data-form="face-settings">',
-      faceName === "back"
-        ? '<label class="field"><span>Back enabled</span><select name="enabled"><option value="true"' + (face.enabled ? " selected" : "") + '>Enabled</option><option value="false"' + (!face.enabled ? " selected" : "") + '>Disabled</option></select></label>'
-        : "",
-      '<label class="field">Background color mode<select name="backgroundColorMode">' +
-        renderColorModeOptions(face.backgroundColorMode) +
-        "</select></label>",
-      face.backgroundColorMode === "manual"
-        ? '<label class="field">Background color<input type="color" name="backgroundColor" value="' + escapeHtml(face.backgroundColor) + '"></label>'
-        : '<label class="field">Background sequence<select name="backgroundColorSequenceRef">' + renderSequenceOptions(project.sequences.color, face.backgroundColorSequenceRef, "No sequence") + "</select></label>",
-      faceName === "front"
-        ? [
-          '<label class="field">Border enabled<select name="borderEnabled">',
-          '<option value="true"' + (face.border.enabled ? " selected" : "") + '>Enabled</option>',
-          '<option value="false"' + (!face.border.enabled ? " selected" : "") + '>Disabled</option>',
-          "</select></label>",
-          face.border.enabled ? '<label class="field">Border width (pt)<input type="number" min="0.5" step="0.5" name="borderWidthPt" value="' + face.border.widthPt + '"></label>' : "",
-          face.border.enabled ? '<label class="field">Border color mode<select name="borderColorMode">' + renderColorModeOptions(face.border.colorMode) + "</select></label>" : "",
-          face.border.enabled && face.border.colorMode === "manual"
-            ? '<label class="field">Border color<input type="color" name="borderColor" value="' + escapeHtml(face.border.color) + '"></label>'
-            : "",
-          face.border.enabled && face.border.colorMode === "sequence"
-            ? '<label class="field">Border sequence<select name="borderColorSequenceRef">' + renderSequenceOptions(project.sequences.color, face.border.colorSequenceRef, "No sequence") + "</select></label>"
-            : ""
-        ].join("")
-        : "",
-      '  <div class="button-row"><button class="button button-primary" type="submit">Save Face</button></div>',
       "</form>"
     ].join("");
   }
@@ -343,14 +323,6 @@
       return '<div class="empty-state">Select a component to edit it.</div>';
     }
 
-    if (selection.selectedComponentType === "background") {
-      return renderBackgroundComponentForm(component, project);
-    }
-
-    if (selection.selectedComponentType === "border") {
-      return renderBorderComponentForm(component, project);
-    }
-
     if (selection.selectedComponentType === "text") {
       return renderTextComponentForm(component, project);
     }
@@ -358,34 +330,10 @@
     return renderImageComponentForm(component);
   }
 
-  function renderBackgroundComponentForm(face, project) {
-    return [
-      '<form class="form-grid" data-form="background-component-settings">',
-      '  <label class="field">Color mode<select name="backgroundColorMode">' + renderColorModeOptions(face.backgroundColorMode) + "</select></label>",
-      face.backgroundColorMode === "manual"
-        ? '<label class="field">Background color<input type="color" name="backgroundColor" value="' + escapeHtml(face.backgroundColor) + '"></label>'
-        : '<label class="field">Background sequence<select name="backgroundColorSequenceRef">' + renderSequenceOptions(project.sequences.color, face.backgroundColorSequenceRef, "No sequence") + "</select></label>",
-      '  <p class="field-help">The background is built in and always clipped to the token circle.</p>',
-      "</form>"
-    ].join("");
-  }
-
-  function renderBorderComponentForm(border, project) {
-    return [
-      '<form class="form-grid" data-form="border-component-settings">',
-      '  <label class="field">Border width<input type="range" min="0" max="0.25" step="0.01" name="borderWidthRatio" value="' + border.widthRatio.toFixed(2) + '"><span class="field-help">' + Math.round(border.widthRatio * 100) + '% of token width</span></label>',
-      '  <label class="field">Color mode<select name="borderColorMode">' + renderColorModeOptions(border.colorMode) + "</select></label>",
-      border.colorMode === "manual"
-        ? '<label class="field">Border color<input type="color" name="borderColor" value="' + escapeHtml(border.color) + '"></label>'
-        : '<label class="field">Border sequence<select name="borderColorSequenceRef">' + renderSequenceOptions(project.sequences.color, border.colorSequenceRef, "No sequence") + "</select></label>",
-      '  <p class="field-help">Set the slider to 0% to hide the border.</p>',
-      "</form>"
-    ].join("");
-  }
-
   function renderTextComponentForm(component, project) {
     return [
       '<form class="form-grid" data-form="text-component-settings">',
+      '  <label class="field">Label<input name="name" value="' + escapeHtml(component.name || "Text") + '"></label>',
       '  <label class="field">Content mode<select name="contentMode">' + renderTextContentModeOptions(component.contentMode) + "</select></label>",
       renderConditionalField("contentMode:custom", component.contentMode === "custom", 'Text<input name="customText" value="' + escapeHtml(component.customText) + '">'),
       renderConditionalBlock("contentMode:numeric|alphabetic", component.contentMode === "numeric" || component.contentMode === "alphabetic", [
@@ -400,11 +348,18 @@
       '    <label class="field">Font family<input name="fontFamily" value="' + escapeHtml(component.fontFamily) + '"></label>',
       '    <label class="field">Font weight<select name="fontWeight">' + renderFontWeightOptions(component.fontWeight) + "</select></label>",
       "  </div>",
-      '  <label class="field">Text color mode<select name="colorMode">' + renderColorModeOptions(component.colorMode) + "</select></label>",
-      renderConditionalField("colorMode:manual", component.colorMode === "manual", 'Text color<input type="color" name="color" value="' + escapeHtml(component.color) + '">'),
-      renderConditionalField("colorMode:sequence", component.colorMode === "sequence", 'Color sequence<select name="colorSequenceRef">' + renderSequenceOptions(project.sequences.color, component.colorSequenceRef, "No sequence") + "</select>"),
+      renderColorPicker({
+        label: "Text color",
+        modeName: "colorMode",
+        colorName: "color",
+        sequenceName: "colorSequenceRef",
+        currentMode: component.colorMode,
+        currentColor: component.color,
+        currentSequenceRef: component.colorSequenceRef,
+        sequences: project.sequences.color
+      }),
       renderBoundsFields(component),
-      renderTextBorderFields(component.textBorder),
+      renderTextBorderFields(component.textBorder, project),
       '  <p class="field-help">Changes save automatically.</p>',
       "</form>"
     ].join("");
@@ -450,11 +405,42 @@
     ].join("");
   }
 
-  function renderTextBorderFields(textBorder) {
+  function renderTextBorderFields(textBorder, project) {
     return [
-      '<div class="field-row two-up">',
-      '  <label class="field">Text border<input type="number" min="0" max="8" step="0.1" name="textBorderWidth" value="' + textBorder.width + '"><span class="field-help">0 turns it off.</span></label>',
-      '  <label class="field">Border color<input type="color" name="textBorderColor" value="' + normalizeColorInput(textBorder.color) + '"></label>',
+      '<label class="field">Text border<input type="number" min="0" max="8" step="0.1" name="textBorderWidth" value="' + textBorder.width + '"><span class="field-help">0 turns it off.</span></label>',
+      renderColorPicker({
+        label: "Text border color",
+        modeName: "textBorderColorMode",
+        colorName: "textBorderColor",
+        sequenceName: "textBorderColorSequenceRef",
+        currentMode: textBorder.colorMode,
+        currentColor: textBorder.color,
+        currentSequenceRef: textBorder.colorSequenceRef,
+        sequences: project.sequences.color
+      })
+    ].join("");
+  }
+
+  function renderColorPicker(config) {
+    var mode = config.currentMode === "sequence" ? "sequence" : "manual";
+    var summary = mode === "sequence"
+      ? "Sequence: " + getSequenceName(config.sequences, config.currentSequenceRef)
+      : (config.currentColor || "#000000");
+    var swatch = mode === "manual"
+      ? (config.currentColor || "#000000")
+      : (config.currentColor || "#ffffff");
+
+    return [
+      '<div class="field color-picker-field">',
+      '  <span>' + escapeHtml(config.label) + "</span>",
+      '  <details class="color-picker" data-color-picker>',
+      '    <summary class="color-picker-summary"><span class="color-picker-swatch" style="--swatch:' + escapeHtml(swatch) + '"></span><span>' + escapeHtml(summary) + "</span></summary>",
+      '    <div class="color-picker-panel">',
+      '      <label class="field">Source<select name="' + config.modeName + '">' + renderColorModeOptions(mode) + "</select></label>",
+      renderConditionalField(config.modeName + ':manual', mode === "manual", 'Custom color<input type="color" name="' + config.colorName + '" value="' + normalizeColorInput(config.currentColor) + '">'),
+      renderConditionalField(config.modeName + ':sequence', mode === "sequence", 'Sequence<select name="' + config.sequenceName + '">' + renderSequenceOptions(config.sequences, config.currentSequenceRef, "No sequence") + "</select>"),
+      "    </div>",
+      "  </details>",
       "</div>"
     ].join("");
   }
@@ -707,6 +693,18 @@
 
     var tokenForm = appElement.querySelector("[data-form='token-settings']");
     if (tokenForm) {
+      tokenForm.querySelectorAll('select[name="backgroundColorMode"], select[name="borderColorMode"]').forEach(function (element) {
+        element.addEventListener("change", function () {
+          syncConditionalFields(tokenForm, {
+            backgroundColorMode: tokenForm.querySelector('[name="backgroundColorMode"]').value,
+            borderColorMode: tokenForm.querySelector('[name="borderColorMode"]').value
+          });
+        });
+      });
+      syncConditionalFields(tokenForm, {
+        backgroundColorMode: tokenForm.querySelector('[name="backgroundColorMode"]').value,
+        borderColorMode: tokenForm.querySelector('[name="borderColorMode"]').value
+      });
       tokenForm.addEventListener("change", function () {
         var selection = getDesignerSelection(store.getState());
         if (!selection.token) {
@@ -715,10 +713,18 @@
         var formData = new FormData(tokenForm);
         store.updateProject(function (project) {
           var token = findToken(project, selection.token.id);
+          var face = token[selection.faceName];
           token.name = String(formData.get("name")) || token.name;
           token.diameterIn = Number(formData.get("diameterIn")) || token.diameterIn;
           token.back.enabled = String(formData.get("backEnabled")) === "true";
           token.borderUnderContent = formData.get("borderUnderContent") === "on";
+          face.backgroundColorMode = String(formData.get("backgroundColorMode") || face.backgroundColorMode);
+          face.backgroundColor = String(formData.get("backgroundColor") || face.backgroundColor);
+          face.backgroundColorSequenceRef = nullableValue(formData.get("backgroundColorSequenceRef"));
+          face.border.widthRatio = toNumberOrDefault(formData.get("borderWidthRatio"), face.border.widthRatio);
+          face.border.colorMode = String(formData.get("borderColorMode") || face.border.colorMode);
+          face.border.color = String(formData.get("borderColor") || face.border.color);
+          face.border.colorSequenceRef = nullableValue(formData.get("borderColorSequenceRef"));
         });
       });
     }
@@ -729,7 +735,10 @@
         if (!selection.token) {
           return;
         }
-        var component = Tokens.createTextComponent({});
+        var face = selection.token[selection.faceName];
+        var component = Tokens.createTextComponent({
+          name: "Text #" + (face.texts.length + 1)
+        });
         store.updateProject(function (project) {
           var token = findToken(project, selection.token.id);
           token[selection.faceName].texts.push(component);
@@ -821,12 +830,14 @@
       var syncTextComponentVisibility = function () {
         var contentModeField = textComponentForm.querySelector('[name="contentMode"]');
         var colorModeField = textComponentForm.querySelector('[name="colorMode"]');
+        var textBorderColorModeField = textComponentForm.querySelector('[name="textBorderColorMode"]');
         syncConditionalFields(textComponentForm, {
           contentMode: contentModeField ? contentModeField.value : null,
-          colorMode: colorModeField ? colorModeField.value : null
+          colorMode: colorModeField ? colorModeField.value : null,
+          textBorderColorMode: textBorderColorModeField ? textBorderColorModeField.value : null
         });
       };
-      textComponentForm.querySelectorAll('select[name="contentMode"], select[name="colorMode"]').forEach(function (element) {
+      textComponentForm.querySelectorAll('select[name="contentMode"], select[name="colorMode"], select[name="textBorderColorMode"]').forEach(function (element) {
         element.addEventListener("change", syncTextComponentVisibility);
       });
       syncTextComponentVisibility();
@@ -842,6 +853,7 @@
           if (!component) {
             return;
           }
+          component.name = String(formData.get("name") || component.name);
           component.contentMode = String(formData.get("contentMode"));
           component.customText = String(formData.get("customText") || "");
           component.sequenceStart = toIntegerOrDefault(formData.get("sequenceStart"), component.sequenceStart);
@@ -853,44 +865,9 @@
           component.colorSequenceRef = nullableValue(formData.get("colorSequenceRef"));
           applyBoundsFromForm(component, formData);
           component.textBorder.width = toNumberOrDefault(formData.get("textBorderWidth"), component.textBorder.width);
+          component.textBorder.colorMode = String(formData.get("textBorderColorMode") || component.textBorder.colorMode);
           component.textBorder.color = String(formData.get("textBorderColor") || component.textBorder.color);
-        });
-      });
-    }
-
-    var backgroundComponentForm = appElement.querySelector("[data-form='background-component-settings']");
-    if (backgroundComponentForm) {
-      backgroundComponentForm.addEventListener("change", function () {
-        var selection = getDesignerSelection(store.getState());
-        if (!selection.token || selection.selectedComponentType !== "background") {
-          return;
-        }
-        var formData = new FormData(backgroundComponentForm);
-        store.updateProject(function (project) {
-          var token = findToken(project, selection.token.id);
-          var face = token[selection.faceName];
-          face.backgroundColorMode = String(formData.get("backgroundColorMode"));
-          face.backgroundColor = String(formData.get("backgroundColor") || face.backgroundColor);
-          face.backgroundColorSequenceRef = nullableValue(formData.get("backgroundColorSequenceRef"));
-        });
-      });
-    }
-
-    var borderComponentForm = appElement.querySelector("[data-form='border-component-settings']");
-    if (borderComponentForm) {
-      borderComponentForm.addEventListener("change", function () {
-        var selection = getDesignerSelection(store.getState());
-        if (!selection.token || selection.selectedComponentType !== "border") {
-          return;
-        }
-        var formData = new FormData(borderComponentForm);
-        store.updateProject(function (project) {
-          var token = findToken(project, selection.token.id);
-          var border = token[selection.faceName].border;
-          border.widthRatio = toNumberOrDefault(formData.get("borderWidthRatio"), border.widthRatio);
-          border.colorMode = String(formData.get("borderColorMode") || border.colorMode);
-          border.color = String(formData.get("borderColor") || border.color);
-          border.colorSequenceRef = nullableValue(formData.get("borderColorSequenceRef"));
+          component.textBorder.colorSequenceRef = nullableValue(formData.get("textBorderColorSequenceRef"));
         });
       });
     }
@@ -998,6 +975,19 @@
         });
       });
     });
+
+    var previewStage = appElement.querySelector("[data-preview-stage]");
+    if (previewStage) {
+      previewStage.addEventListener("click", function (event) {
+        if (event.target.closest("[data-component-id]")) {
+          return;
+        }
+        store.updateUi(function (ui) {
+          ui.selectedComponentType = null;
+          ui.selectedComponentId = null;
+        });
+      });
+    }
   }
 
   function bindPrintEvents(appElement, store) {
@@ -1401,6 +1391,13 @@
     return sequences.find(function (sequence) {
       return sequence.id === selectedId;
     }) || sequences[0] || null;
+  }
+
+  function getSequenceName(sequences, selectedId) {
+    var sequence = sequences.find(function (candidate) {
+      return candidate.id === selectedId;
+    });
+    return sequence ? sequence.name : "No sequence";
   }
 
   function normalizeColorInput(value) {
