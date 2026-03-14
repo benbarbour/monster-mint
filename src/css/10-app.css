@@ -1,7 +1,7 @@
 .app-shell {
   width: min(1200px, calc(100vw - 2rem));
   margin: 0 auto;
-  padding: var(--space-4) 0 var(--space-5);
+  padding: var(--space-3) 0 var(--space-4);
 }
 
 .app-header {
@@ -10,7 +10,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
 .app-title {
@@ -79,7 +79,7 @@
 .tabs {
   display: flex;
   gap: 0.5rem;
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-2);
 }
 
 .tab-button {
@@ -101,7 +101,7 @@
   background: rgba(251, 247, 239, 0.92);
   border: 1px solid var(--panel-border);
   border-radius: var(--radius);
-  padding: var(--space-4);
+  padding: var(--space-3);
   box-shadow: 0 18px 36px var(--shadow);
 }
 
@@ -112,14 +112,14 @@
 .panel-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .panel-card {
   background: rgba(255, 255, 255, 0.55);
   border: 1px solid rgba(184, 171, 150, 0.85);
   border-radius: var(--radius);
-  padding: var(--space-3);
+  padding: var(--space-2);
 }
 
 .panel-card h2,
@@ -144,11 +144,10 @@
 @media (max-width: 720px) {
   .app-shell {
     width: min(100vw - 1rem, 1200px);
-    padding-top: var(--space-3);
+    padding-top: var(--space-2);
   }
 
   .tabs {
     overflow-x: auto;
   }
 }
-

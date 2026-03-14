@@ -35,7 +35,7 @@
 }
 
 .field textarea {
-  min-height: 7rem;
+  min-height: 5.25rem;
   resize: vertical;
 }
 
@@ -109,4 +109,3 @@
     grid-template-columns: 1fr;
   }
 }
-
