@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Monster Mint</title>
+    <style>
+:root {
+  --bg: #f3efe5;
+  --panel: #fbf7ef;
+  --panel-strong: #e8dcc8;
+  --panel-border: #b8ab96;
+  --ink: #2b2419;
+  --ink-muted: #6a5f4f;
+  --accent: #9d3f1d;
+  --accent-strong: #7f2f12;
+  --shadow: rgba(43, 36, 25, 0.15);
+  --radius: 14px;
+  --radius-sm: 8px;
+  --space-1: 0.4rem;
+  --space-2: 0.7rem;
+  --space-3: 1rem;
+  --space-4: 1.4rem;
+  --space-5: 2rem;
+  --font-body: Georgia, "Times New Roman", serif;
+  --font-ui: "Trebuchet MS", Verdana, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.85), transparent 40%),
+    linear-gradient(180deg, #efe5d0 0%, var(--bg) 100%);
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+
+
+.app-shell {
+  width: min(1200px, calc(100vw - 2rem));
+  margin: 0 auto;
+  padding: var(--space-4) 0 var(--space-5);
+}
+
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.app-title {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1;
+}
+
+.app-subtitle {
+  margin: 0.35rem 0 0;
+  color: var(--ink-muted);
+  font-family: var(--font-ui);
+}
+
+.project-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  background: rgba(251, 247, 239, 0.92);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  box-shadow: 0 8px 20px var(--shadow);
+}
+
+.project-meta label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+}
+
+.project-name-input {
+  min-width: 220px;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-sm);
+  background: #fffdfa;
+}
+
+.status-pill {
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  background: var(--panel-strong);
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+}
+
+.button {
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  padding: 0.6rem 0.95rem;
+  background: #fffdfa;
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+
+.button-primary {
+  background: var(--accent);
+  border-color: var(--accent-strong);
+  color: #fff8f0;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: var(--space-3);
+}
+
+.tab-button {
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 253, 250, 0.75);
+  border-radius: 999px;
+  padding: 0.8rem 1rem;
+  font-family: var(--font-ui);
+}
+
+.tab-button.is-active {
+  background: var(--panel);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.tab-panel {
+  display: none;
+  background: rgba(251, 247, 239, 0.92);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  box-shadow: 0 18px 36px var(--shadow);
+}
+
+.tab-panel.is-active {
+  display: block;
+}
+
+.panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-3);
+}
+
+.panel-card {
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(184, 171, 150, 0.85);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+}
+
+.panel-card h2,
+.panel-card h3 {
+  margin-top: 0;
+}
+
+.placeholder-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--ink-muted);
+}
+
+.empty-state {
+  padding: var(--space-4);
+  border: 1px dashed var(--panel-border);
+  border-radius: var(--radius);
+  text-align: center;
+  color: var(--ink-muted);
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    width: min(100vw - 1rem, 1200px);
+    padding-top: var(--space-3);
+  }
+
+  .tabs {
+    overflow-x: auto;
+  }
+}
+
+
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+(function (global, factory) {
+  var api = factory();
+  global.MonsterMintSchema = api;
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = api;
+  }
+})(typeof globalThis !== "undefined" ? globalThis : window, function () {
+  var STORAGE_KEY = "monster-mint.project.v1";
+  var UI_STORAGE_KEY = "monster-mint.ui.v1";
+  var PROJECT_VERSION = 1;
+  var PAGE_PRESETS = [
+    { id: "letter", label: "US Letter", widthIn: 8.5, heightIn: 11 },
+    { id: "a4", label: "A4", widthIn: 8.27, heightIn: 11.69 }
+  ];
+  var TOKEN_SIZES = [0.5, 1, 2, 3, 4, 5];
+
+  function timestamp() {
+    return new Date().toISOString();
+  }
+
+  function createDefaultProject() {
+    return {
+      version: PROJECT_VERSION,
+      meta: {
+        name: "Untitled Project",
+        updatedAt: timestamp()
+      },
+      settings: {
+        pagePresetId: "letter",
+        pageOrientation: "portrait",
+        pageMarginIn: 0.25,
+        bleedIn: 0.0625,
+        guideStyle: "cut-and-punch"
+      },
+      sequences: {
+        text: [],
+        color: []
+      },
+      tokens: [],
+      printSelections: []
+    };
+  }
+
+  function normalizeProject(inputProject) {
+    var project = inputProject && typeof inputProject === "object" ? inputProject : {};
+    var defaults = createDefaultProject();
+    return {
+      version: PROJECT_VERSION,
+      meta: {
+        name: typeof project.meta?.name === "string" && project.meta.name.trim() ? project.meta.name : defaults.meta.name,
+        updatedAt: typeof project.meta?.updatedAt === "string" ? project.meta.updatedAt : timestamp()
+      },
+      settings: {
+        pagePresetId: findPagePreset(project.settings?.pagePresetId) ? project.settings.pagePresetId : defaults.settings.pagePresetId,
+        pageOrientation: project.settings?.pageOrientation === "landscape" ? "landscape" : "portrait",
+        pageMarginIn: asPositiveNumber(project.settings?.pageMarginIn, defaults.settings.pageMarginIn),
+        bleedIn: asPositiveNumber(project.settings?.bleedIn, defaults.settings.bleedIn),
+        guideStyle: typeof project.settings?.guideStyle === "string" ? project.settings.guideStyle : defaults.settings.guideStyle
+      },
+      sequences: {
+        text: Array.isArray(project.sequences?.text) ? project.sequences.text : [],
+        color: Array.isArray(project.sequences?.color) ? project.sequences.color : []
+      },
+      tokens: Array.isArray(project.tokens) ? project.tokens : [],
+      printSelections: Array.isArray(project.printSelections) ? project.printSelections : []
+    };
+  }
+
+  function findPagePreset(pagePresetId) {
+    return PAGE_PRESETS.find(function (preset) {
+      return preset.id === pagePresetId;
+    }) || null;
+  }
+
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function asPositiveNumber(value, fallback) {
+    return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
+  }
+
+  return {
+    STORAGE_KEY: STORAGE_KEY,
+    UI_STORAGE_KEY: UI_STORAGE_KEY,
+    PROJECT_VERSION: PROJECT_VERSION,
+    PAGE_PRESETS: PAGE_PRESETS,
+    TOKEN_SIZES: TOKEN_SIZES,
+    clone: clone,
+    createDefaultProject: createDefaultProject,
+    normalizeProject: normalizeProject,
+    findPagePreset: findPagePreset
+  };
+});
+
+
+
+(function (global, factory) {
+  var api = factory(global.MonsterMintSchema);
+  global.MonsterMintStorage = api;
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = api;
+  }
+})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema) {
+  function loadProject(storage) {
+    if (!storage) {
+      return Schema.createDefaultProject();
+    }
+
+    try {
+      var raw = storage.getItem(Schema.STORAGE_KEY);
+      if (!raw) {
+        return Schema.createDefaultProject();
+      }
+
+      return Schema.normalizeProject(JSON.parse(raw));
+    } catch (error) {
+      console.warn("Failed to load saved project", error);
+      return Schema.createDefaultProject();
+    }
+  }
+
+  function saveProject(storage, project) {
+    if (!storage) {
+      return false;
+    }
+
+    try {
+      storage.setItem(Schema.STORAGE_KEY, JSON.stringify(project));
+      return true;
+    } catch (error) {
+      console.warn("Failed to save project", error);
+      return false;
+    }
+  }
+
+  function loadUiState(storage) {
+    if (!storage) {
+      return { activeTab: "settings" };
+    }
+
+    try {
+      var raw = storage.getItem(Schema.UI_STORAGE_KEY);
+      if (!raw) {
+        return { activeTab: "settings" };
+      }
+
+      var parsed = JSON.parse(raw);
+      return {
+        activeTab: typeof parsed.activeTab === "string" ? parsed.activeTab : "settings"
+      };
+    } catch (error) {
+      console.warn("Failed to load UI state", error);
+      return { activeTab: "settings" };
+    }
+  }
+
+  function saveUiState(storage, uiState) {
+    if (!storage) {
+      return false;
+    }
+
+    try {
+      storage.setItem(Schema.UI_STORAGE_KEY, JSON.stringify(uiState));
+      return true;
+    } catch (error) {
+      console.warn("Failed to save UI state", error);
+      return false;
+    }
+  }
+
+  return {
+    loadProject: loadProject,
+    saveProject: saveProject,
+    loadUiState: loadUiState,
+    saveUiState: saveUiState
+  };
+});
+
+
+
+(function (global, factory) {
+  var api = factory(global.MonsterMintSchema, global.MonsterMintStorage);
+  global.MonsterMintState = api;
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = api;
+  }
+})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, Storage) {
+  function createStore(options) {
+    var storage = options && options.storage ? options.storage : null;
+    var listeners = [];
+    var state = {
+      project: Storage.loadProject(storage),
+      ui: Storage.loadUiState(storage),
+      autosaveStatus: "Loaded",
+      lastSavedAt: null
+    };
+
+    function emit() {
+      listeners.forEach(function (listener) {
+        listener(state);
+      });
+    }
+
+    function save() {
+      state.project.meta.updatedAt = new Date().toISOString();
+      Storage.saveProject(storage, state.project);
+      Storage.saveUiState(storage, state.ui);
+      state.autosaveStatus = "Saved";
+      state.lastSavedAt = state.project.meta.updatedAt;
+    }
+
+    function updateProject(mutator) {
+      var nextProject = Schema.clone(state.project);
+      mutator(nextProject);
+      state.project = Schema.normalizeProject(nextProject);
+      save();
+      emit();
+    }
+
+    function replaceProject(project) {
+      state.project = Schema.normalizeProject(project);
+      save();
+      emit();
+    }
+
+    function setActiveTab(activeTab) {
+      state.ui.activeTab = activeTab;
+      Storage.saveUiState(storage, state.ui);
+      emit();
+    }
+
+    return {
+      getState: function () {
+        return state;
+      },
+      subscribe: function (listener) {
+        listeners.push(listener);
+        return function unsubscribe() {
+          listeners = listeners.filter(function (candidate) {
+            return candidate !== listener;
+          });
+        };
+      },
+      updateProject: updateProject,
+      replaceProject: replaceProject,
+      setActiveTab: setActiveTab
+    };
+  }
+
+  return {
+    createStore: createStore
+  };
+});
+
+
+
+(function (global, factory) {
+  var api = factory(global.MonsterMintSchema, global.MonsterMintState);
+  global.MonsterMintApp = api;
+})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, State) {
+  var TAB_CONFIG = [
+    { id: "settings", label: "Settings" },
+    { id: "designer", label: "Designer" },
+    { id: "print", label: "Print" }
+  ];
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll("\"", "&quot;");
+  }
+
+  function render(appElement, store) {
+    var state = store.getState();
+    var activeTab = state.ui.activeTab;
+
+    appElement.innerHTML = [
+      '<main class="app-shell">',
+      '  <header class="app-header">',
+      '    <div>',
+      '      <h1 class="app-title">Monster Mint</h1>',
+      '      <p class="app-subtitle">Design printable tabletop token sheets in one self-contained browser app.</p>',
+      "    </div>",
+      '    <div class="project-meta">',
+      '      <label>Project name<input class="project-name-input" name="project-name" value="' + escapeHtml(state.project.meta.name) + '"></label>',
+      '      <span class="status-pill">' + escapeHtml(state.autosaveStatus) + "</span>",
+      '      <button class="button" type="button" data-action="reset-project">Reset Project</button>',
+      "    </div>",
+      "  </header>",
+      '  <nav class="tabs" aria-label="Main tabs">',
+      TAB_CONFIG.map(function (tab) {
+        return '<button class="tab-button' + (tab.id === activeTab ? " is-active" : "") + '" type="button" data-tab="' + tab.id + '">' + tab.label + "</button>";
+      }).join(""),
+      "  </nav>",
+      renderPanel("settings", activeTab, renderSettingsPanel(state)),
+      renderPanel("designer", activeTab, renderDesignerPanel(state)),
+      renderPanel("print", activeTab, renderPrintPanel(state)),
+      "</main>"
+    ].join("");
+
+    attachEvents(appElement, store);
+  }
+
+  function renderPanel(tabId, activeTab, content) {
+    return '<section class="tab-panel' + (tabId === activeTab ? " is-active" : "") + '" data-panel="' + tabId + '">' + content + "</section>";
+  }
+
+  function renderSettingsPanel(state) {
+    var preset = Schema.findPagePreset(state.project.settings.pagePresetId);
+    return [
+      '<div class="panel-grid">',
+      '  <section class="panel-card">',
+      "    <h2>Foundation</h2>",
+      "    <p>This slice includes project persistence, the final tab structure, and the source/build pipeline.</p>",
+      "    <ul class=\"placeholder-list\">",
+      "      <li>Current page preset: " + escapeHtml(preset ? preset.label : "Unknown") + "</li>",
+      "      <li>Token templates: " + state.project.tokens.length + "</li>",
+      "      <li>Saved print selections: " + state.project.printSelections.length + "</li>",
+      "    </ul>",
+      "  </section>",
+      '  <section class="panel-card">',
+      "    <h2>Next up</h2>",
+      "    <p>Sequence and import/export controls will land in the next increment.</p>",
+      "  </section>",
+      "</div>"
+    ].join("");
+  }
+
+  function renderDesignerPanel(state) {
+    return [
+      '<div class="empty-state">',
+      "  <h2>Designer foundation ready</h2>",
+      "  <p>The token editor will appear here once the sequence and template layers are in place.</p>",
+      "  <p>Autosave is already active. Updated: " + escapeHtml(new Date(state.project.meta.updatedAt).toLocaleString()) + "</p>",
+      "</div>"
+    ].join("");
+  }
+
+  function renderPrintPanel() {
+    return [
+      '<div class="empty-state">',
+      "  <h2>Print pipeline pending</h2>",
+      "  <p>Page layout, previews, and print rendering will be added after the designer is in place.</p>",
+      "</div>"
+    ].join("");
+  }
+
+  function attachEvents(appElement, store) {
+    appElement.querySelectorAll("[data-tab]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        store.setActiveTab(button.getAttribute("data-tab"));
+      });
+    });
+
+    var nameInput = appElement.querySelector("[name='project-name']");
+    if (nameInput) {
+      nameInput.addEventListener("input", function () {
+        store.updateProject(function (project) {
+          project.meta.name = nameInput.value || "Untitled Project";
+        });
+      });
+    }
+
+    var resetButton = appElement.querySelector("[data-action='reset-project']");
+    if (resetButton) {
+      resetButton.addEventListener("click", function () {
+        if (!global.confirm("Reset the current project? This clears saved tokens and sequences.")) {
+          return;
+        }
+
+        store.replaceProject(Schema.createDefaultProject());
+      });
+    }
+  }
+
+  function mount() {
+    var appElement = document.getElementById("app");
+    var store = State.createStore({ storage: global.localStorage });
+    store.subscribe(function () {
+      render(appElement, store);
+    });
+    render(appElement, store);
+  }
+
+  if (typeof document !== "undefined") {
+    document.addEventListener("DOMContentLoaded", mount);
+  }
+
+  return {
+    mount: mount
+  };
+});
+
+
+    </script>
+  </body>
+</html>
+
