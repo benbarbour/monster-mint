@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const HOST = "127.0.0.1";
+const HOST = process.env.HOST || "0.0.0.0";
 const START_PORT = Number.parseInt(process.env.PORT || "4173", 10) || 4173;
 const MAX_PORT_ATTEMPTS = 25;
 const DIST_DIR = resolve(fileURLToPath(new URL("..", import.meta.url)), "dist");

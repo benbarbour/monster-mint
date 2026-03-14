@@ -23,7 +23,7 @@ tasks:
       - npm run test:e2e
 
   serve:
-    desc: Build the app and serve dist/ locally on the first free port starting at 4173
+    desc: Build the app and serve dist/ on HOST or 0.0.0.0 using the first free port starting at 4173
     deps:
       - build
     cmds:
