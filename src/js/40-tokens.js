@@ -11,6 +11,7 @@
       id: payload.id || Utils.uid("token"),
       name: payload.name || "Untitled Token",
       diameterIn: normalizeDiameter(payload.diameterIn),
+      borderUnderContent: payload.borderUnderContent === true,
       front: normalizeFace(payload.front),
       back: normalizeBackFace(payload.back)
     };
@@ -20,10 +21,10 @@
     var payload = input || {};
     return {
       id: payload.id || Utils.uid("text"),
-      x: asUnit(payload.x, 0.18),
-      y: asUnit(payload.y, 0.4),
-      width: asSize(payload.width, 0.64),
-      height: asSize(payload.height, 0.18),
+      x: asCoordinate(payload.x, 0),
+      y: asCoordinate(payload.y, 0),
+      width: asSize(payload.width, 0.5),
+      height: asSize(payload.height, 0.2),
       contentMode: payload.contentMode === "sequence" ? "sequence" : "custom",
       customText: payload.customText || "Token",
       textSequenceRef: payload.textSequenceRef || null,
@@ -40,11 +41,13 @@
     var payload = input || {};
     return {
       id: payload.id || Utils.uid("image"),
-      x: asUnit(payload.x, 0.15),
-      y: asUnit(payload.y, 0.15),
-      width: asSize(payload.width, 0.7),
-      height: asSize(payload.height, 0.7),
-      fit: payload.fit === "contain" || payload.fit === "stretch" ? payload.fit : "cover",
+      x: asCoordinate(payload.x, 0),
+      y: asCoordinate(payload.y, 0),
+      scale: asScale(payload.scale, 0.5),
+      aspectRatio: asAspectRatio(payload.aspectRatio, 1),
+      rotationDeg: asSigned(payload.rotationDeg, 0),
+      mirrorX: payload.mirrorX === true,
+      mirrorY: payload.mirrorY === true,
       source: payload.source || "",
       name: payload.name || "Uploaded image"
     };
@@ -74,13 +77,24 @@
 
   function normalizeBackFace(input) {
     var payload = input || {};
+    var legacyWidthPt = payload.border && Number(payload.border.widthPt);
     return {
       enabled: payload.enabled === true,
       backgroundColorMode: payload.backgroundColorMode === "sequence" ? "sequence" : "manual",
       backgroundColor: payload.backgroundColor || "#ffffff",
       backgroundColorSequenceRef: payload.backgroundColorSequenceRef || null,
       images: Array.isArray(payload.images) ? payload.images.map(createImageComponent) : [],
-      texts: Array.isArray(payload.texts) ? payload.texts.map(createTextComponent) : []
+      texts: Array.isArray(payload.texts) ? payload.texts.map(createTextComponent) : [],
+      border: {
+        enabled: !payload.border || payload.border.enabled !== false,
+        widthRatio: asRatio(
+          payload.border && payload.border.widthRatio,
+          payload.border && payload.border.enabled === false ? 0 : (Number.isFinite(legacyWidthPt) ? legacyWidthPt / 72 : 0)
+        ),
+        colorMode: payload.border && payload.border.colorMode === "sequence" ? "sequence" : "manual",
+        color: payload.border && payload.border.color ? payload.border.color : "#000000",
+        colorSequenceRef: payload.border && payload.border.colorSequenceRef ? payload.border.colorSequenceRef : null
+      }
     };
   }
 
@@ -105,10 +119,10 @@
   }
 
   function clampRect(rect) {
-    var width = clamp(rect.width, 0.05, 2.5);
-    var height = clamp(rect.height, 0.05, 2.5);
-    var x = clamp(rect.x, -1.5, 1.5);
-    var y = clamp(rect.y, -1.5, 1.5);
+    var width = clamp(rect.width, 0.05, 4);
+    var height = clamp(rect.height, 0.05, 4);
+    var x = asCoordinate(rect.x, 0);
+    var y = asCoordinate(rect.y, 0);
 
     return {
       x: x,
@@ -125,6 +139,31 @@
     component.width = nextRect.width;
     component.height = nextRect.height;
     return component;
+  }
+
+  function updateImageComponent(component, payload) {
+    component.x = asCoordinate(payload.x, component.x);
+    component.y = asCoordinate(payload.y, component.y);
+    component.scale = asScale(payload.scale, component.scale);
+    component.rotationDeg = asSigned(payload.rotationDeg, component.rotationDeg);
+    component.mirrorX = payload.mirrorX === true;
+    component.mirrorY = payload.mirrorY === true;
+    return component;
+  }
+
+  function getImageDimensions(component) {
+    var largest = component.scale;
+    if (component.aspectRatio >= 1) {
+      return {
+        width: largest,
+        height: largest / component.aspectRatio
+      };
+    }
+
+    return {
+      width: largest * component.aspectRatio,
+      height: largest
+    };
   }
 
   function getTextValue(component, textSequences, index) {
@@ -182,12 +221,24 @@
     return lengths;
   }
 
-  function asUnit(value, fallback) {
-    return clamp(Number(value), 0, 1) || fallback;
+  function asCoordinate(value, fallback) {
+    var parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
   }
 
   function asSize(value, fallback) {
-    return clamp(Number(value), 0.05, 1) || fallback;
+    var parsed = Number(value);
+    return Number.isFinite(parsed) ? clamp(parsed, 0.05, 4) : fallback;
+  }
+
+  function asScale(value, fallback) {
+    var parsed = Number(value);
+    return Number.isFinite(parsed) ? clamp(parsed, 0.05, 2) : fallback;
+  }
+
+  function asAspectRatio(value, fallback) {
+    var parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   }
 
   function asPositive(value, fallback) {
@@ -197,7 +248,7 @@
 
   function asRatio(value, fallback) {
     var parsed = Number(value);
-    return Number.isFinite(parsed) ? clamp(parsed, 0, 0.5) : fallback;
+    return Number.isFinite(parsed) ? clamp(parsed, 0, 0.25) : fallback;
   }
 
   function asSigned(value, fallback) {
@@ -220,6 +271,8 @@
     normalizeToken: normalizeToken,
     clampRect: clampRect,
     updateComponentRect: updateComponentRect,
+    updateImageComponent: updateImageComponent,
+    getImageDimensions: getImageDimensions,
     getTextValue: getTextValue,
     getColorValue: getColorValue,
     collectBoundedSequenceLengths: collectBoundedSequenceLengths

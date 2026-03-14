@@ -218,7 +218,7 @@
         selectedComponentId: selection.selectedComponentId
       }),
       "      </div>",
-      '      <p class="preview-note">Drag to move. Use the lower-right handle to resize. All content clips to the token circle.</p>',
+      '      <p class="preview-note">Drag to move. Resize from the lower-right handle. Images keep aspect ratio, and all content clips to the token circle.</p>',
       "    </section>",
       "  </section>",
       '  <aside class="editor-drawer designer-drawer">',
@@ -280,9 +280,7 @@
       { type: "background", id: faceName + "-background", label: "Background" }
     ];
 
-    if (faceName === "front") {
-      items.push({ type: "border", id: faceName + "-border", label: "Border" });
-    }
+    items.push({ type: "border", id: faceName + "-border", label: "Border" });
 
     return items.concat(face.images.map(function (component) {
       return { type: "image", id: component.id, label: component.name || "Image" };
@@ -314,6 +312,7 @@
         return '<option value="' + size + '"' + (size === token.diameterIn ? " selected" : "") + ">" + size + '&quot;</option>';
       }).join("") + "</select></label>",
       '  <label class="field">Back face<select name="backEnabled"><option value="true"' + (token.back.enabled ? " selected" : "") + '>Enabled</option><option value="false"' + (!token.back.enabled ? " selected" : "") + '>Disabled</option></select></label>',
+      '  <label class="field checkbox-field"><input type="checkbox" name="borderUnderContent"' + (token.borderUnderContent ? " checked" : "") + '>Render border under images and text</label>',
       '  <p class="field-help">Changes save automatically.</p>',
       "</form>"
     ].join("");
@@ -388,7 +387,7 @@
   function renderBorderComponentForm(border, project) {
     return [
       '<form class="form-grid" data-form="border-component-settings">',
-      '  <label class="field">Border width<input type="range" min="0" max="0.5" step="0.01" name="borderWidthRatio" value="' + border.widthRatio.toFixed(2) + '"><span class="field-help">' + Math.round(border.widthRatio * 100) + '% of token width</span></label>',
+      '  <label class="field">Border width<input type="range" min="0" max="0.25" step="0.01" name="borderWidthRatio" value="' + border.widthRatio.toFixed(2) + '"><span class="field-help">' + Math.round(border.widthRatio * 100) + '% of token width</span></label>',
       '  <label class="field">Color mode<select name="borderColorMode">' + renderColorModeOptions(border.colorMode) + "</select></label>",
       border.colorMode === "manual"
         ? '<label class="field">Border color<input type="color" name="borderColor" value="' + escapeHtml(border.color) + '"></label>'
@@ -422,8 +421,13 @@
     return [
       '<form class="form-grid" data-form="image-component-settings">',
       '  <label class="field">Label<input name="name" value="' + escapeHtml(component.name) + '"></label>',
-      '  <label class="field">Fit<select name="fit">' + renderImageFitOptions(component.fit) + "</select></label>",
-      renderBoundsFields(component),
+      renderPositionFields(component),
+      '  <label class="field">Scale<input type="number" min="0.05" max="2" step="0.01" name="scale" value="' + component.scale.toFixed(2) + '"><span class="field-help">' + Math.round(component.scale * 100) + '% of max circle diameter</span></label>',
+      '  <label class="field">Rotation<input type="number" step="1" name="rotationDeg" value="' + Number(component.rotationDeg || 0) + '"><span class="field-help">Degrees clockwise.</span></label>',
+      '  <div class="field-row two-up">',
+      '    <label class="field checkbox-field"><input type="checkbox" name="mirrorX"' + (component.mirrorX ? " checked" : "") + '>Mirror horizontally</label>',
+      '    <label class="field checkbox-field"><input type="checkbox" name="mirrorY"' + (component.mirrorY ? " checked" : "") + '>Mirror vertically</label>',
+      "  </div>",
       '  <div class="button-row">',
       '    <button class="button" type="button" data-action="replace-image">Replace Image</button>',
       '    <input class="visually-hidden" type="file" accept="image/*" data-replace-image-input>',
@@ -433,12 +437,19 @@
     ].join("");
   }
 
-  function renderBoundsFields(component) {
+  function renderPositionFields(component) {
     return [
       '<div class="field-row two-up">',
-      '  <label class="field">X<input type="number" min="-1.5" max="1.5" step="0.01" name="x" value="' + component.x.toFixed(2) + '"></label>',
-      '  <label class="field">Y<input type="number" min="-1.5" max="1.5" step="0.01" name="y" value="' + component.y.toFixed(2) + '"></label>',
+      '  <label class="field">Center X<input type="number" step="0.01" name="x" value="' + component.x.toFixed(2) + '"></label>',
+      '  <label class="field">Center Y<input type="number" step="0.01" name="y" value="' + component.y.toFixed(2) + '"></label>',
       "</div>",
+      '  <p class="field-help">0, 0 is the center of the token.</p>'
+    ].join("");
+  }
+
+  function renderBoundsFields(component) {
+    return [
+      renderPositionFields(component),
       '<div class="field-row two-up">',
       '  <label class="field">Width<input type="number" min="0.05" max="2.5" step="0.01" name="width" value="' + component.width.toFixed(2) + '"></label>',
       '  <label class="field">Height<input type="number" min="0.05" max="2.5" step="0.01" name="height" value="' + component.height.toFixed(2) + '"></label>',
@@ -808,6 +819,7 @@
           token.name = String(formData.get("name")) || token.name;
           token.diameterIn = Number(formData.get("diameterIn")) || token.diameterIn;
           token.back.enabled = String(formData.get("backEnabled")) === "true";
+          token.borderUnderContent = formData.get("borderUnderContent") === "on";
         });
       });
     }
@@ -846,20 +858,27 @@
         if (!file || !selection.token) {
           return;
         }
-        var source = await Utils.readDataUrlFile(file);
-        var component = Tokens.createImageComponent({
-          source: source,
-          name: file.name
-        });
-        store.updateProject(function (project) {
-          var token = findToken(project, selection.token.id);
-          token[selection.faceName].images.push(component);
-        });
-        store.updateUi(function (ui) {
-          ui.selectedComponentType = "image";
-          ui.selectedComponentId = component.id;
-        });
-        addImageInput.value = "";
+        try {
+          var imageAsset = await Utils.readImageAssetFile(file);
+          var component = Tokens.createImageComponent({
+            source: imageAsset.source,
+            name: file.name,
+            aspectRatio: imageAsset.width / imageAsset.height
+          });
+          store.updateProject(function (project) {
+            var token = findToken(project, selection.token.id);
+            token[selection.faceName].images.push(component);
+          });
+          store.updateUi(function (ui) {
+            ui.selectedComponentType = "image";
+            ui.selectedComponentId = component.id;
+          });
+        } catch (error) {
+          runtimeGlobal.alert("Image import failed.");
+          console.error(error);
+        } finally {
+          addImageInput.value = "";
+        }
       });
     }
 
@@ -942,6 +961,43 @@
       });
     }
 
+    var backgroundComponentForm = appElement.querySelector("[data-form='background-component-settings']");
+    if (backgroundComponentForm) {
+      backgroundComponentForm.addEventListener("change", function () {
+        var selection = getDesignerSelection(store.getState());
+        if (!selection.token || selection.selectedComponentType !== "background") {
+          return;
+        }
+        var formData = new FormData(backgroundComponentForm);
+        store.updateProject(function (project) {
+          var token = findToken(project, selection.token.id);
+          var face = token[selection.faceName];
+          face.backgroundColorMode = String(formData.get("backgroundColorMode"));
+          face.backgroundColor = String(formData.get("backgroundColor") || face.backgroundColor);
+          face.backgroundColorSequenceRef = nullableValue(formData.get("backgroundColorSequenceRef"));
+        });
+      });
+    }
+
+    var borderComponentForm = appElement.querySelector("[data-form='border-component-settings']");
+    if (borderComponentForm) {
+      borderComponentForm.addEventListener("change", function () {
+        var selection = getDesignerSelection(store.getState());
+        if (!selection.token || selection.selectedComponentType !== "border") {
+          return;
+        }
+        var formData = new FormData(borderComponentForm);
+        store.updateProject(function (project) {
+          var token = findToken(project, selection.token.id);
+          var border = token[selection.faceName].border;
+          border.widthRatio = toNumberOrDefault(formData.get("borderWidthRatio"), border.widthRatio);
+          border.colorMode = String(formData.get("borderColorMode") || border.colorMode);
+          border.color = String(formData.get("borderColor") || border.color);
+          border.colorSequenceRef = nullableValue(formData.get("borderColorSequenceRef"));
+        });
+      });
+    }
+
     var imageComponentForm = appElement.querySelector("[data-form='image-component-settings']");
     if (imageComponentForm) {
       imageComponentForm.addEventListener("change", function () {
@@ -956,8 +1012,14 @@
             return;
           }
           component.name = String(formData.get("name") || component.name);
-          component.fit = String(formData.get("fit") || component.fit);
-          applyBoundsFromForm(component, formData);
+          Tokens.updateImageComponent(component, {
+            x: toNumberOrDefault(formData.get("x"), component.x),
+            y: toNumberOrDefault(formData.get("y"), component.y),
+            scale: toNumberOrDefault(formData.get("scale"), component.scale),
+            rotationDeg: toNumberOrDefault(formData.get("rotationDeg"), component.rotationDeg),
+            mirrorX: formData.get("mirrorX") === "on",
+            mirrorY: formData.get("mirrorY") === "on"
+          });
         });
       });
 
@@ -973,15 +1035,22 @@
           if (!file || !selection.token || selection.selectedComponentType !== "image") {
             return;
           }
-          var source = await Utils.readDataUrlFile(file);
-          store.updateProject(function (project) {
-            var component = findComponent(project, selection, "image");
-            if (component) {
-              component.source = source;
-              component.name = file.name;
-            }
-          });
-          replaceImageInput.value = "";
+          try {
+            var imageAsset = await Utils.readImageAssetFile(file);
+            store.updateProject(function (project) {
+              var component = findComponent(project, selection, "image");
+              if (component) {
+                component.source = imageAsset.source;
+                component.name = file.name;
+                component.aspectRatio = imageAsset.width / imageAsset.height;
+              }
+            });
+          } catch (error) {
+            runtimeGlobal.alert("Image import failed.");
+            console.error(error);
+          } finally {
+            replaceImageInput.value = "";
+          }
         });
       }
     }
@@ -1020,7 +1089,9 @@
             x: component.x,
             y: component.y,
             width: component.width,
-            height: component.height
+            height: component.height,
+            scale: component.scale,
+            aspectRatio: component.aspectRatio
           }
         };
 
@@ -1047,43 +1118,6 @@
 
         store.updateProject(function (project) {
           project.printSelections = Print.normalizeSelections(project, rows);
-        });
-      });
-    }
-
-    var backgroundComponentForm = appElement.querySelector("[data-form='background-component-settings']");
-    if (backgroundComponentForm) {
-      backgroundComponentForm.addEventListener("change", function () {
-        var selection = getDesignerSelection(store.getState());
-        if (!selection.token || selection.selectedComponentType !== "background") {
-          return;
-        }
-        var formData = new FormData(backgroundComponentForm);
-        store.updateProject(function (project) {
-          var token = findToken(project, selection.token.id);
-          var face = token[selection.faceName];
-          face.backgroundColorMode = String(formData.get("backgroundColorMode"));
-          face.backgroundColor = String(formData.get("backgroundColor") || face.backgroundColor);
-          face.backgroundColorSequenceRef = nullableValue(formData.get("backgroundColorSequenceRef"));
-        });
-      });
-    }
-
-    var borderComponentForm = appElement.querySelector("[data-form='border-component-settings']");
-    if (borderComponentForm) {
-      borderComponentForm.addEventListener("change", function () {
-        var selection = getDesignerSelection(store.getState());
-        if (!selection.token || selection.selectedComponentType !== "border") {
-          return;
-        }
-        var formData = new FormData(borderComponentForm);
-        store.updateProject(function (project) {
-          var token = findToken(project, selection.token.id);
-          var border = token.front.border;
-          border.widthRatio = Number(formData.get("borderWidthRatio")) || 0;
-          border.colorMode = String(formData.get("borderColorMode") || border.colorMode);
-          border.color = String(formData.get("borderColor") || border.color);
-          border.colorSequenceRef = nullableValue(formData.get("borderColorSequenceRef"));
         });
       });
     }
@@ -1142,19 +1176,45 @@
       }
 
       if (designerInteraction.mode === "resize") {
-        Tokens.updateComponentRect(component, {
-          x: designerInteraction.startRect.x,
-          y: designerInteraction.startRect.y,
-          width: designerInteraction.startRect.width + deltaX,
-          height: designerInteraction.startRect.height + deltaY
-        });
+        if (designerInteraction.componentType === "image") {
+          var startDimensions = Tokens.getImageDimensions(designerInteraction.startRect);
+          var widthRatio = (startDimensions.width / 2 + deltaX) / Math.max(startDimensions.width / 2, 0.001);
+          var heightRatio = (startDimensions.height / 2 + deltaY) / Math.max(startDimensions.height / 2, 0.001);
+          var nextScale = designerInteraction.startRect.scale * Math.max(0.1, widthRatio, heightRatio);
+          Tokens.updateImageComponent(component, {
+            x: designerInteraction.startRect.x,
+            y: designerInteraction.startRect.y,
+            scale: nextScale,
+            rotationDeg: component.rotationDeg,
+            mirrorX: component.mirrorX,
+            mirrorY: component.mirrorY
+          });
+        } else {
+          Tokens.updateComponentRect(component, {
+            x: designerInteraction.startRect.x,
+            y: designerInteraction.startRect.y,
+            width: designerInteraction.startRect.width + deltaX * 2,
+            height: designerInteraction.startRect.height + deltaY * 2
+          });
+        }
       } else {
-        Tokens.updateComponentRect(component, {
-          x: designerInteraction.startRect.x + deltaX,
-          y: designerInteraction.startRect.y + deltaY,
-          width: designerInteraction.startRect.width,
-          height: designerInteraction.startRect.height
-        });
+        if (designerInteraction.componentType === "image") {
+          Tokens.updateImageComponent(component, {
+            x: designerInteraction.startRect.x + deltaX,
+            y: designerInteraction.startRect.y + deltaY,
+            scale: designerInteraction.startRect.scale,
+            rotationDeg: component.rotationDeg,
+            mirrorX: component.mirrorX,
+            mirrorY: component.mirrorY
+          });
+        } else {
+          Tokens.updateComponentRect(component, {
+            x: designerInteraction.startRect.x + deltaX,
+            y: designerInteraction.startRect.y + deltaY,
+            width: designerInteraction.startRect.width,
+            height: designerInteraction.startRect.height
+          });
+        }
       }
     }, { persist: false });
   }
@@ -1226,11 +1286,16 @@
 
   function applyBoundsFromForm(component, formData) {
     Tokens.updateComponentRect(component, {
-      x: Number(formData.get("x")),
-      y: Number(formData.get("y")),
-      width: Number(formData.get("width")),
-      height: Number(formData.get("height"))
+      x: toNumberOrDefault(formData.get("x"), component.x),
+      y: toNumberOrDefault(formData.get("y"), component.y),
+      width: toNumberOrDefault(formData.get("width"), component.width),
+      height: toNumberOrDefault(formData.get("height"), component.height)
     });
+  }
+
+  function toNumberOrDefault(value, fallback) {
+    var parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
   }
 
   function upsertById(collection, value) {

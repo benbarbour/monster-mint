@@ -181,6 +181,51 @@ test("clampRect allows components to extend outside the token square", () => {
   });
 });
 
+test("text components preserve zero-centered coordinates", () => {
+  const component = Tokens.createTextComponent({
+    x: 0,
+    y: 0,
+    width: 0.5,
+    height: 0.2
+  });
+
+  assert.equal(component.x, 0);
+  assert.equal(component.y, 0);
+  assert.equal(component.width, 0.5);
+  assert.equal(component.height, 0.2);
+});
+
+test("image components use centered defaults and aspect-based scaling", () => {
+  const component = Tokens.createImageComponent({
+    aspectRatio: 2
+  });
+
+  assert.equal(component.x, 0);
+  assert.equal(component.y, 0);
+  assert.equal(component.scale, 0.5);
+  assert.equal(component.rotationDeg, 0);
+  assert.equal(component.mirrorX, false);
+  assert.equal(component.mirrorY, false);
+  assert.deepEqual(Tokens.getImageDimensions(component), {
+    width: 0.5,
+    height: 0.25
+  });
+});
+
+test("token templates cap border width ratio at twenty-five percent", () => {
+  const token = Tokens.createTokenTemplate({
+    borderUnderContent: true,
+    front: {
+      border: {
+        widthRatio: 0.5
+      }
+    }
+  });
+
+  assert.equal(token.borderUnderContent, true);
+  assert.equal(token.front.border.widthRatio, 0.25);
+});
+
 test("print max copies are capped by the shortest bounded sequence", () => {
   const project = Schema.createDefaultProject();
   const textSequence = Sequences.createTextSequence({

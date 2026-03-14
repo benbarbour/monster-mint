@@ -792,12 +792,38 @@ button {
     });
   }
 
+  function loadImageDimensions(source) {
+    return new Promise(function (resolve, reject) {
+      var image = new Image();
+      image.onload = function () {
+        resolve({
+          width: image.naturalWidth || image.width || 1,
+          height: image.naturalHeight || image.height || 1
+        });
+      };
+      image.onerror = reject;
+      image.src = source;
+    });
+  }
+
+  async function readImageAssetFile(file) {
+    var source = await readDataUrlFile(file);
+    var dimensions = await loadImageDimensions(source);
+    return {
+      source: source,
+      width: dimensions.width,
+      height: dimensions.height
+    };
+  }
+
   return {
     uid: uid,
     parseLineList: parseLineList,
     downloadTextFile: downloadTextFile,
     readTextFile: readTextFile,
-    readDataUrlFile: readDataUrlFile
+    readDataUrlFile: readDataUrlFile,
+    loadImageDimensions: loadImageDimensions,
+    readImageAssetFile: readImageAssetFile
   };
 });
 
@@ -1158,6 +1184,7 @@ button {
       id: payload.id || Utils.uid("token"),
       name: payload.name || "Untitled Token",
       diameterIn: normalizeDiameter(payload.diameterIn),
+      borderUnderContent: payload.borderUnderContent === true,
       front: normalizeFace(payload.front),
       back: normalizeBackFace(payload.back)
     };
@@ -1167,10 +1194,10 @@ button {
     var payload = input || {};
     return {
       id: payload.id || Utils.uid("text"),
-      x: asUnit(payload.x, 0.18),
-      y: asUnit(payload.y, 0.4),
-      width: asSize(payload.width, 0.64),
-      height: asSize(payload.height, 0.18),
+      x: asCoordinate(payload.x, 0),
+      y: asCoordinate(payload.y, 0),
+      width: asSize(payload.width, 0.5),
+      height: asSize(payload.height, 0.2),
       contentMode: payload.contentMode === "sequence" ? "sequence" : "custom",
       customText: payload.customText || "Token",
       textSequenceRef: payload.textSequenceRef || null,
@@ -1187,11 +1214,13 @@ button {
     var payload = input || {};
     return {
       id: payload.id || Utils.uid("image"),
-      x: asUnit(payload.x, 0.15),
-      y: asUnit(payload.y, 0.15),
-      width: asSize(payload.width, 0.7),
-      height: asSize(payload.height, 0.7),
-      fit: payload.fit === "contain" || payload.fit === "stretch" ? payload.fit : "cover",
+      x: asCoordinate(payload.x, 0),
+      y: asCoordinate(payload.y, 0),
+      scale: asScale(payload.scale, 0.5),
+      aspectRatio: asAspectRatio(payload.aspectRatio, 1),
+      rotationDeg: asSigned(payload.rotationDeg, 0),
+      mirrorX: payload.mirrorX === true,
+      mirrorY: payload.mirrorY === true,
       source: payload.source || "",
       name: payload.name || "Uploaded image"
     };
@@ -1221,13 +1250,24 @@ button {
 
   function normalizeBackFace(input) {
     var payload = input || {};
+    var legacyWidthPt = payload.border && Number(payload.border.widthPt);
     return {
       enabled: payload.enabled === true,
       backgroundColorMode: payload.backgroundColorMode === "sequence" ? "sequence" : "manual",
       backgroundColor: payload.backgroundColor || "#ffffff",
       backgroundColorSequenceRef: payload.backgroundColorSequenceRef || null,
       images: Array.isArray(payload.images) ? payload.images.map(createImageComponent) : [],
-      texts: Array.isArray(payload.texts) ? payload.texts.map(createTextComponent) : []
+      texts: Array.isArray(payload.texts) ? payload.texts.map(createTextComponent) : [],
+      border: {
+        enabled: !payload.border || payload.border.enabled !== false,
+        widthRatio: asRatio(
+          payload.border && payload.border.widthRatio,
+          payload.border && payload.border.enabled === false ? 0 : (Number.isFinite(legacyWidthPt) ? legacyWidthPt / 72 : 0)
+        ),
+        colorMode: payload.border && payload.border.colorMode === "sequence" ? "sequence" : "manual",
+        color: payload.border && payload.border.color ? payload.border.color : "#000000",
+        colorSequenceRef: payload.border && payload.border.colorSequenceRef ? payload.border.colorSequenceRef : null
+      }
     };
   }
 
@@ -1252,10 +1292,10 @@ button {
   }
 
   function clampRect(rect) {
-    var width = clamp(rect.width, 0.05, 2.5);
-    var height = clamp(rect.height, 0.05, 2.5);
-    var x = clamp(rect.x, -1.5, 1.5);
-    var y = clamp(rect.y, -1.5, 1.5);
+    var width = clamp(rect.width, 0.05, 4);
+    var height = clamp(rect.height, 0.05, 4);
+    var x = asCoordinate(rect.x, 0);
+    var y = asCoordinate(rect.y, 0);
 
     return {
       x: x,
@@ -1272,6 +1312,31 @@ button {
     component.width = nextRect.width;
     component.height = nextRect.height;
     return component;
+  }
+
+  function updateImageComponent(component, payload) {
+    component.x = asCoordinate(payload.x, component.x);
+    component.y = asCoordinate(payload.y, component.y);
+    component.scale = asScale(payload.scale, component.scale);
+    component.rotationDeg = asSigned(payload.rotationDeg, component.rotationDeg);
+    component.mirrorX = payload.mirrorX === true;
+    component.mirrorY = payload.mirrorY === true;
+    return component;
+  }
+
+  function getImageDimensions(component) {
+    var largest = component.scale;
+    if (component.aspectRatio >= 1) {
+      return {
+        width: largest,
+        height: largest / component.aspectRatio
+      };
+    }
+
+    return {
+      width: largest * component.aspectRatio,
+      height: largest
+    };
   }
 
   function getTextValue(component, textSequences, index) {
@@ -1329,12 +1394,24 @@ button {
     return lengths;
   }
 
-  function asUnit(value, fallback) {
-    return clamp(Number(value), 0, 1) || fallback;
+  function asCoordinate(value, fallback) {
+    var parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
   }
 
   function asSize(value, fallback) {
-    return clamp(Number(value), 0.05, 1) || fallback;
+    var parsed = Number(value);
+    return Number.isFinite(parsed) ? clamp(parsed, 0.05, 4) : fallback;
+  }
+
+  function asScale(value, fallback) {
+    var parsed = Number(value);
+    return Number.isFinite(parsed) ? clamp(parsed, 0.05, 2) : fallback;
+  }
+
+  function asAspectRatio(value, fallback) {
+    var parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   }
 
   function asPositive(value, fallback) {
@@ -1344,7 +1421,7 @@ button {
 
   function asRatio(value, fallback) {
     var parsed = Number(value);
-    return Number.isFinite(parsed) ? clamp(parsed, 0, 0.5) : fallback;
+    return Number.isFinite(parsed) ? clamp(parsed, 0, 0.25) : fallback;
   }
 
   function asSigned(value, fallback) {
@@ -1367,6 +1444,8 @@ button {
     normalizeToken: normalizeToken,
     clampRect: clampRect,
     updateComponentRect: updateComponentRect,
+    updateImageComponent: updateImageComponent,
+    getImageDimensions: getImageDimensions,
     getTextValue: getTextValue,
     getColorValue: getColorValue,
     collectBoundedSequenceLengths: collectBoundedSequenceLengths
@@ -1398,22 +1477,23 @@ button {
     var selectedComponentType = opts.selectedComponentType;
     var selectedComponentId = opts.selectedComponentId;
     var tokenSlug = token.id.replace(/[^a-z0-9_-]/gi, "");
-
     var svgAttributes = opts.svgAttributes ? " " + opts.svgAttributes : "";
+    var borderMarkup = renderBorder(face, colorSequences, sequenceIndex);
 
     return [
       '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" data-preview-svg' + svgAttributes + '>',
-      '  <defs>',
+      "  <defs>",
       '    <clipPath id="token-clip-' + tokenSlug + '"><circle cx="50" cy="50" r="50"></circle></clipPath>',
       renderTextClipPaths(face.texts, tokenSlug),
-      '  </defs>',
+      "  </defs>",
       '  <rect x="0" y="0" width="100" height="100" fill="#f6efe2"></rect>',
       '  <circle cx="50" cy="50" r="50" fill="' + escapeAttr(background) + '"></circle>',
+      token.borderUnderContent ? borderMarkup : "",
       '  <g clip-path="url(#token-clip-' + tokenSlug + ')">',
       renderImageComponents(face.images),
       renderTextComponents(face.texts, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive),
       "  </g>",
-      faceName === "front" ? renderBorder(face, colorSequences, sequenceIndex) : "",
+      token.borderUnderContent ? "" : borderMarkup,
       opts.interactive
         ? renderInteractiveOverlays(face, selectedComponentType, selectedComponentId)
         : "",
@@ -1423,16 +1503,18 @@ button {
 
   function renderImageComponents(images) {
     return images.map(function (component) {
-      var x = component.x * 100;
-      var y = component.y * 100;
-      var width = component.width * 100;
-      var height = component.height * 100;
-      var preserveAspectRatio = component.fit === "contain"
-        ? "xMidYMid meet"
-        : component.fit === "stretch"
-          ? "none"
-          : "xMidYMid slice";
-      return '<image href="' + escapeAttr(component.source) + '" x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" preserveAspectRatio="' + preserveAspectRatio + '"></image>';
+      var box = toSvgRect(component, "image");
+      var centerX = box.x + box.width / 2;
+      var centerY = box.y + box.height / 2;
+      var scaleX = component.mirrorX ? -1 : 1;
+      var scaleY = component.mirrorY ? -1 : 1;
+      var transform = [
+        "translate(" + centerX + " " + centerY + ")",
+        "rotate(" + Number(component.rotationDeg || 0) + ")",
+        "scale(" + scaleX + " " + scaleY + ")",
+        "translate(" + (-box.width / 2) + " " + (-box.height / 2) + ")"
+      ].join(" ");
+      return '<image href="' + escapeAttr(component.source) + '" width="' + box.width + '" height="' + box.height + '" preserveAspectRatio="none" transform="' + transform + '"></image>';
     }).join("");
   }
 
@@ -1440,6 +1522,7 @@ button {
     if (!face.border || face.border.widthRatio <= 0) {
       return "";
     }
+
     var color = Tokens.getColorValue(
       face.border.colorMode,
       face.border.color,
@@ -1464,7 +1547,7 @@ button {
         colorSequences,
         sequenceIndex
       );
-      var box = toSvgRect(component);
+      var box = toSvgRect(component, "text");
       var fontSize = fitFontSize(value, component.fontFamily, component.fontWeight, box.width, box.height);
       var shadow = component.shadow.enabled
         ? ' style="filter: drop-shadow(' + component.shadow.dx + 'px ' + component.shadow.dy + 'px ' + component.shadow.blur + 'px ' + escapeAttr(component.shadow.color) + ')"'
@@ -1502,7 +1585,7 @@ button {
 
   function renderTextClipPaths(components, tokenSlug) {
     return components.map(function (component) {
-      var box = toSvgRect(component);
+      var box = toSvgRect(component, "text");
       return '<clipPath id="text-clip-' + tokenSlug + "-" + component.id + '"><rect x="' + box.x + '" y="' + box.y + '" width="' + box.width + '" height="' + box.height + '"></rect></clipPath>';
     }).join("");
   }
@@ -1522,7 +1605,7 @@ button {
   }
 
   function renderOverlay(component, type, selectedComponentType, selectedComponentId) {
-    var box = toSvgRect(component);
+    var box = toSvgRect(component, type);
     var isSelected = selectedComponentType === type && selectedComponentId === component.id;
     var stroke = isSelected ? "#9d3f1d" : "rgba(43, 36, 25, 0.45)";
     var handleX = box.x + box.width - 2;
@@ -1564,12 +1647,19 @@ button {
     return Math.max(3, Number(best.toFixed(2)));
   }
 
-  function toSvgRect(component) {
+  function toSvgRect(component, type) {
+    var dimensions = type === "image"
+      ? Tokens.getImageDimensions(component)
+      : { width: component.width, height: component.height };
+    var width = dimensions.width * 100;
+    var height = dimensions.height * 100;
+    var centerX = 50 + component.x * 100;
+    var centerY = 50 + component.y * 100;
     return {
-      x: component.x * 100,
-      y: component.y * 100,
-      width: component.width * 100,
-      height: component.height * 100
+      x: centerX - width / 2,
+      y: centerY - height / 2,
+      width: width,
+      height: height
     };
   }
 
@@ -1986,7 +2076,7 @@ button {
         selectedComponentId: selection.selectedComponentId
       }),
       "      </div>",
-      '      <p class="preview-note">Drag to move. Use the lower-right handle to resize. All content clips to the token circle.</p>',
+      '      <p class="preview-note">Drag to move. Resize from the lower-right handle. Images keep aspect ratio, and all content clips to the token circle.</p>',
       "    </section>",
       "  </section>",
       '  <aside class="editor-drawer designer-drawer">',
@@ -2048,9 +2138,7 @@ button {
       { type: "background", id: faceName + "-background", label: "Background" }
     ];
 
-    if (faceName === "front") {
-      items.push({ type: "border", id: faceName + "-border", label: "Border" });
-    }
+    items.push({ type: "border", id: faceName + "-border", label: "Border" });
 
     return items.concat(face.images.map(function (component) {
       return { type: "image", id: component.id, label: component.name || "Image" };
@@ -2082,6 +2170,7 @@ button {
         return '<option value="' + size + '"' + (size === token.diameterIn ? " selected" : "") + ">" + size + '&quot;</option>';
       }).join("") + "</select></label>",
       '  <label class="field">Back face<select name="backEnabled"><option value="true"' + (token.back.enabled ? " selected" : "") + '>Enabled</option><option value="false"' + (!token.back.enabled ? " selected" : "") + '>Disabled</option></select></label>',
+      '  <label class="field checkbox-field"><input type="checkbox" name="borderUnderContent"' + (token.borderUnderContent ? " checked" : "") + '>Render border under images and text</label>',
       '  <p class="field-help">Changes save automatically.</p>',
       "</form>"
     ].join("");
@@ -2156,7 +2245,7 @@ button {
   function renderBorderComponentForm(border, project) {
     return [
       '<form class="form-grid" data-form="border-component-settings">',
-      '  <label class="field">Border width<input type="range" min="0" max="0.5" step="0.01" name="borderWidthRatio" value="' + border.widthRatio.toFixed(2) + '"><span class="field-help">' + Math.round(border.widthRatio * 100) + '% of token width</span></label>',
+      '  <label class="field">Border width<input type="range" min="0" max="0.25" step="0.01" name="borderWidthRatio" value="' + border.widthRatio.toFixed(2) + '"><span class="field-help">' + Math.round(border.widthRatio * 100) + '% of token width</span></label>',
       '  <label class="field">Color mode<select name="borderColorMode">' + renderColorModeOptions(border.colorMode) + "</select></label>",
       border.colorMode === "manual"
         ? '<label class="field">Border color<input type="color" name="borderColor" value="' + escapeHtml(border.color) + '"></label>'
@@ -2190,8 +2279,13 @@ button {
     return [
       '<form class="form-grid" data-form="image-component-settings">',
       '  <label class="field">Label<input name="name" value="' + escapeHtml(component.name) + '"></label>',
-      '  <label class="field">Fit<select name="fit">' + renderImageFitOptions(component.fit) + "</select></label>",
-      renderBoundsFields(component),
+      renderPositionFields(component),
+      '  <label class="field">Scale<input type="number" min="0.05" max="2" step="0.01" name="scale" value="' + component.scale.toFixed(2) + '"><span class="field-help">' + Math.round(component.scale * 100) + '% of max circle diameter</span></label>',
+      '  <label class="field">Rotation<input type="number" step="1" name="rotationDeg" value="' + Number(component.rotationDeg || 0) + '"><span class="field-help">Degrees clockwise.</span></label>',
+      '  <div class="field-row two-up">',
+      '    <label class="field checkbox-field"><input type="checkbox" name="mirrorX"' + (component.mirrorX ? " checked" : "") + '>Mirror horizontally</label>',
+      '    <label class="field checkbox-field"><input type="checkbox" name="mirrorY"' + (component.mirrorY ? " checked" : "") + '>Mirror vertically</label>',
+      "  </div>",
       '  <div class="button-row">',
       '    <button class="button" type="button" data-action="replace-image">Replace Image</button>',
       '    <input class="visually-hidden" type="file" accept="image/*" data-replace-image-input>',
@@ -2201,12 +2295,19 @@ button {
     ].join("");
   }
 
-  function renderBoundsFields(component) {
+  function renderPositionFields(component) {
     return [
       '<div class="field-row two-up">',
-      '  <label class="field">X<input type="number" min="-1.5" max="1.5" step="0.01" name="x" value="' + component.x.toFixed(2) + '"></label>',
-      '  <label class="field">Y<input type="number" min="-1.5" max="1.5" step="0.01" name="y" value="' + component.y.toFixed(2) + '"></label>',
+      '  <label class="field">Center X<input type="number" step="0.01" name="x" value="' + component.x.toFixed(2) + '"></label>',
+      '  <label class="field">Center Y<input type="number" step="0.01" name="y" value="' + component.y.toFixed(2) + '"></label>',
       "</div>",
+      '  <p class="field-help">0, 0 is the center of the token.</p>'
+    ].join("");
+  }
+
+  function renderBoundsFields(component) {
+    return [
+      renderPositionFields(component),
       '<div class="field-row two-up">',
       '  <label class="field">Width<input type="number" min="0.05" max="2.5" step="0.01" name="width" value="' + component.width.toFixed(2) + '"></label>',
       '  <label class="field">Height<input type="number" min="0.05" max="2.5" step="0.01" name="height" value="' + component.height.toFixed(2) + '"></label>',
@@ -2576,6 +2677,7 @@ button {
           token.name = String(formData.get("name")) || token.name;
           token.diameterIn = Number(formData.get("diameterIn")) || token.diameterIn;
           token.back.enabled = String(formData.get("backEnabled")) === "true";
+          token.borderUnderContent = formData.get("borderUnderContent") === "on";
         });
       });
     }
@@ -2614,20 +2716,27 @@ button {
         if (!file || !selection.token) {
           return;
         }
-        var source = await Utils.readDataUrlFile(file);
-        var component = Tokens.createImageComponent({
-          source: source,
-          name: file.name
-        });
-        store.updateProject(function (project) {
-          var token = findToken(project, selection.token.id);
-          token[selection.faceName].images.push(component);
-        });
-        store.updateUi(function (ui) {
-          ui.selectedComponentType = "image";
-          ui.selectedComponentId = component.id;
-        });
-        addImageInput.value = "";
+        try {
+          var imageAsset = await Utils.readImageAssetFile(file);
+          var component = Tokens.createImageComponent({
+            source: imageAsset.source,
+            name: file.name,
+            aspectRatio: imageAsset.width / imageAsset.height
+          });
+          store.updateProject(function (project) {
+            var token = findToken(project, selection.token.id);
+            token[selection.faceName].images.push(component);
+          });
+          store.updateUi(function (ui) {
+            ui.selectedComponentType = "image";
+            ui.selectedComponentId = component.id;
+          });
+        } catch (error) {
+          runtimeGlobal.alert("Image import failed.");
+          console.error(error);
+        } finally {
+          addImageInput.value = "";
+        }
       });
     }
 
@@ -2710,6 +2819,43 @@ button {
       });
     }
 
+    var backgroundComponentForm = appElement.querySelector("[data-form='background-component-settings']");
+    if (backgroundComponentForm) {
+      backgroundComponentForm.addEventListener("change", function () {
+        var selection = getDesignerSelection(store.getState());
+        if (!selection.token || selection.selectedComponentType !== "background") {
+          return;
+        }
+        var formData = new FormData(backgroundComponentForm);
+        store.updateProject(function (project) {
+          var token = findToken(project, selection.token.id);
+          var face = token[selection.faceName];
+          face.backgroundColorMode = String(formData.get("backgroundColorMode"));
+          face.backgroundColor = String(formData.get("backgroundColor") || face.backgroundColor);
+          face.backgroundColorSequenceRef = nullableValue(formData.get("backgroundColorSequenceRef"));
+        });
+      });
+    }
+
+    var borderComponentForm = appElement.querySelector("[data-form='border-component-settings']");
+    if (borderComponentForm) {
+      borderComponentForm.addEventListener("change", function () {
+        var selection = getDesignerSelection(store.getState());
+        if (!selection.token || selection.selectedComponentType !== "border") {
+          return;
+        }
+        var formData = new FormData(borderComponentForm);
+        store.updateProject(function (project) {
+          var token = findToken(project, selection.token.id);
+          var border = token[selection.faceName].border;
+          border.widthRatio = toNumberOrDefault(formData.get("borderWidthRatio"), border.widthRatio);
+          border.colorMode = String(formData.get("borderColorMode") || border.colorMode);
+          border.color = String(formData.get("borderColor") || border.color);
+          border.colorSequenceRef = nullableValue(formData.get("borderColorSequenceRef"));
+        });
+      });
+    }
+
     var imageComponentForm = appElement.querySelector("[data-form='image-component-settings']");
     if (imageComponentForm) {
       imageComponentForm.addEventListener("change", function () {
@@ -2724,8 +2870,14 @@ button {
             return;
           }
           component.name = String(formData.get("name") || component.name);
-          component.fit = String(formData.get("fit") || component.fit);
-          applyBoundsFromForm(component, formData);
+          Tokens.updateImageComponent(component, {
+            x: toNumberOrDefault(formData.get("x"), component.x),
+            y: toNumberOrDefault(formData.get("y"), component.y),
+            scale: toNumberOrDefault(formData.get("scale"), component.scale),
+            rotationDeg: toNumberOrDefault(formData.get("rotationDeg"), component.rotationDeg),
+            mirrorX: formData.get("mirrorX") === "on",
+            mirrorY: formData.get("mirrorY") === "on"
+          });
         });
       });
 
@@ -2741,15 +2893,22 @@ button {
           if (!file || !selection.token || selection.selectedComponentType !== "image") {
             return;
           }
-          var source = await Utils.readDataUrlFile(file);
-          store.updateProject(function (project) {
-            var component = findComponent(project, selection, "image");
-            if (component) {
-              component.source = source;
-              component.name = file.name;
-            }
-          });
-          replaceImageInput.value = "";
+          try {
+            var imageAsset = await Utils.readImageAssetFile(file);
+            store.updateProject(function (project) {
+              var component = findComponent(project, selection, "image");
+              if (component) {
+                component.source = imageAsset.source;
+                component.name = file.name;
+                component.aspectRatio = imageAsset.width / imageAsset.height;
+              }
+            });
+          } catch (error) {
+            runtimeGlobal.alert("Image import failed.");
+            console.error(error);
+          } finally {
+            replaceImageInput.value = "";
+          }
         });
       }
     }
@@ -2788,7 +2947,9 @@ button {
             x: component.x,
             y: component.y,
             width: component.width,
-            height: component.height
+            height: component.height,
+            scale: component.scale,
+            aspectRatio: component.aspectRatio
           }
         };
 
@@ -2815,43 +2976,6 @@ button {
 
         store.updateProject(function (project) {
           project.printSelections = Print.normalizeSelections(project, rows);
-        });
-      });
-    }
-
-    var backgroundComponentForm = appElement.querySelector("[data-form='background-component-settings']");
-    if (backgroundComponentForm) {
-      backgroundComponentForm.addEventListener("change", function () {
-        var selection = getDesignerSelection(store.getState());
-        if (!selection.token || selection.selectedComponentType !== "background") {
-          return;
-        }
-        var formData = new FormData(backgroundComponentForm);
-        store.updateProject(function (project) {
-          var token = findToken(project, selection.token.id);
-          var face = token[selection.faceName];
-          face.backgroundColorMode = String(formData.get("backgroundColorMode"));
-          face.backgroundColor = String(formData.get("backgroundColor") || face.backgroundColor);
-          face.backgroundColorSequenceRef = nullableValue(formData.get("backgroundColorSequenceRef"));
-        });
-      });
-    }
-
-    var borderComponentForm = appElement.querySelector("[data-form='border-component-settings']");
-    if (borderComponentForm) {
-      borderComponentForm.addEventListener("change", function () {
-        var selection = getDesignerSelection(store.getState());
-        if (!selection.token || selection.selectedComponentType !== "border") {
-          return;
-        }
-        var formData = new FormData(borderComponentForm);
-        store.updateProject(function (project) {
-          var token = findToken(project, selection.token.id);
-          var border = token.front.border;
-          border.widthRatio = Number(formData.get("borderWidthRatio")) || 0;
-          border.colorMode = String(formData.get("borderColorMode") || border.colorMode);
-          border.color = String(formData.get("borderColor") || border.color);
-          border.colorSequenceRef = nullableValue(formData.get("borderColorSequenceRef"));
         });
       });
     }
@@ -2910,19 +3034,45 @@ button {
       }
 
       if (designerInteraction.mode === "resize") {
-        Tokens.updateComponentRect(component, {
-          x: designerInteraction.startRect.x,
-          y: designerInteraction.startRect.y,
-          width: designerInteraction.startRect.width + deltaX,
-          height: designerInteraction.startRect.height + deltaY
-        });
+        if (designerInteraction.componentType === "image") {
+          var startDimensions = Tokens.getImageDimensions(designerInteraction.startRect);
+          var widthRatio = (startDimensions.width / 2 + deltaX) / Math.max(startDimensions.width / 2, 0.001);
+          var heightRatio = (startDimensions.height / 2 + deltaY) / Math.max(startDimensions.height / 2, 0.001);
+          var nextScale = designerInteraction.startRect.scale * Math.max(0.1, widthRatio, heightRatio);
+          Tokens.updateImageComponent(component, {
+            x: designerInteraction.startRect.x,
+            y: designerInteraction.startRect.y,
+            scale: nextScale,
+            rotationDeg: component.rotationDeg,
+            mirrorX: component.mirrorX,
+            mirrorY: component.mirrorY
+          });
+        } else {
+          Tokens.updateComponentRect(component, {
+            x: designerInteraction.startRect.x,
+            y: designerInteraction.startRect.y,
+            width: designerInteraction.startRect.width + deltaX * 2,
+            height: designerInteraction.startRect.height + deltaY * 2
+          });
+        }
       } else {
-        Tokens.updateComponentRect(component, {
-          x: designerInteraction.startRect.x + deltaX,
-          y: designerInteraction.startRect.y + deltaY,
-          width: designerInteraction.startRect.width,
-          height: designerInteraction.startRect.height
-        });
+        if (designerInteraction.componentType === "image") {
+          Tokens.updateImageComponent(component, {
+            x: designerInteraction.startRect.x + deltaX,
+            y: designerInteraction.startRect.y + deltaY,
+            scale: designerInteraction.startRect.scale,
+            rotationDeg: component.rotationDeg,
+            mirrorX: component.mirrorX,
+            mirrorY: component.mirrorY
+          });
+        } else {
+          Tokens.updateComponentRect(component, {
+            x: designerInteraction.startRect.x + deltaX,
+            y: designerInteraction.startRect.y + deltaY,
+            width: designerInteraction.startRect.width,
+            height: designerInteraction.startRect.height
+          });
+        }
       }
     }, { persist: false });
   }
@@ -2994,11 +3144,16 @@ button {
 
   function applyBoundsFromForm(component, formData) {
     Tokens.updateComponentRect(component, {
-      x: Number(formData.get("x")),
-      y: Number(formData.get("y")),
-      width: Number(formData.get("width")),
-      height: Number(formData.get("height"))
+      x: toNumberOrDefault(formData.get("x"), component.x),
+      y: toNumberOrDefault(formData.get("y"), component.y),
+      width: toNumberOrDefault(formData.get("width"), component.width),
+      height: toNumberOrDefault(formData.get("height"), component.height)
     });
+  }
+
+  function toNumberOrDefault(value, fallback) {
+    var parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
   }
 
   function upsertById(collection, value) {

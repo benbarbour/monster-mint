@@ -22,22 +22,23 @@
     var selectedComponentType = opts.selectedComponentType;
     var selectedComponentId = opts.selectedComponentId;
     var tokenSlug = token.id.replace(/[^a-z0-9_-]/gi, "");
-
     var svgAttributes = opts.svgAttributes ? " " + opts.svgAttributes : "";
+    var borderMarkup = renderBorder(face, colorSequences, sequenceIndex);
 
     return [
       '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" data-preview-svg' + svgAttributes + '>',
-      '  <defs>',
+      "  <defs>",
       '    <clipPath id="token-clip-' + tokenSlug + '"><circle cx="50" cy="50" r="50"></circle></clipPath>',
       renderTextClipPaths(face.texts, tokenSlug),
-      '  </defs>',
+      "  </defs>",
       '  <rect x="0" y="0" width="100" height="100" fill="#f6efe2"></rect>',
       '  <circle cx="50" cy="50" r="50" fill="' + escapeAttr(background) + '"></circle>',
+      token.borderUnderContent ? borderMarkup : "",
       '  <g clip-path="url(#token-clip-' + tokenSlug + ')">',
       renderImageComponents(face.images),
       renderTextComponents(face.texts, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive),
       "  </g>",
-      faceName === "front" ? renderBorder(face, colorSequences, sequenceIndex) : "",
+      token.borderUnderContent ? "" : borderMarkup,
       opts.interactive
         ? renderInteractiveOverlays(face, selectedComponentType, selectedComponentId)
         : "",
@@ -47,16 +48,18 @@
 
   function renderImageComponents(images) {
     return images.map(function (component) {
-      var x = component.x * 100;
-      var y = component.y * 100;
-      var width = component.width * 100;
-      var height = component.height * 100;
-      var preserveAspectRatio = component.fit === "contain"
-        ? "xMidYMid meet"
-        : component.fit === "stretch"
-          ? "none"
-          : "xMidYMid slice";
-      return '<image href="' + escapeAttr(component.source) + '" x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" preserveAspectRatio="' + preserveAspectRatio + '"></image>';
+      var box = toSvgRect(component, "image");
+      var centerX = box.x + box.width / 2;
+      var centerY = box.y + box.height / 2;
+      var scaleX = component.mirrorX ? -1 : 1;
+      var scaleY = component.mirrorY ? -1 : 1;
+      var transform = [
+        "translate(" + centerX + " " + centerY + ")",
+        "rotate(" + Number(component.rotationDeg || 0) + ")",
+        "scale(" + scaleX + " " + scaleY + ")",
+        "translate(" + (-box.width / 2) + " " + (-box.height / 2) + ")"
+      ].join(" ");
+      return '<image href="' + escapeAttr(component.source) + '" width="' + box.width + '" height="' + box.height + '" preserveAspectRatio="none" transform="' + transform + '"></image>';
     }).join("");
   }
 
@@ -64,6 +67,7 @@
     if (!face.border || face.border.widthRatio <= 0) {
       return "";
     }
+
     var color = Tokens.getColorValue(
       face.border.colorMode,
       face.border.color,
@@ -88,7 +92,7 @@
         colorSequences,
         sequenceIndex
       );
-      var box = toSvgRect(component);
+      var box = toSvgRect(component, "text");
       var fontSize = fitFontSize(value, component.fontFamily, component.fontWeight, box.width, box.height);
       var shadow = component.shadow.enabled
         ? ' style="filter: drop-shadow(' + component.shadow.dx + 'px ' + component.shadow.dy + 'px ' + component.shadow.blur + 'px ' + escapeAttr(component.shadow.color) + ')"'
@@ -126,7 +130,7 @@
 
   function renderTextClipPaths(components, tokenSlug) {
     return components.map(function (component) {
-      var box = toSvgRect(component);
+      var box = toSvgRect(component, "text");
       return '<clipPath id="text-clip-' + tokenSlug + "-" + component.id + '"><rect x="' + box.x + '" y="' + box.y + '" width="' + box.width + '" height="' + box.height + '"></rect></clipPath>';
     }).join("");
   }
@@ -146,7 +150,7 @@
   }
 
   function renderOverlay(component, type, selectedComponentType, selectedComponentId) {
-    var box = toSvgRect(component);
+    var box = toSvgRect(component, type);
     var isSelected = selectedComponentType === type && selectedComponentId === component.id;
     var stroke = isSelected ? "#9d3f1d" : "rgba(43, 36, 25, 0.45)";
     var handleX = box.x + box.width - 2;
@@ -188,12 +192,19 @@
     return Math.max(3, Number(best.toFixed(2)));
   }
 
-  function toSvgRect(component) {
+  function toSvgRect(component, type) {
+    var dimensions = type === "image"
+      ? Tokens.getImageDimensions(component)
+      : { width: component.width, height: component.height };
+    var width = dimensions.width * 100;
+    var height = dimensions.height * 100;
+    var centerX = 50 + component.x * 100;
+    var centerY = 50 + component.y * 100;
     return {
-      x: component.x * 100,
-      y: component.y * 100,
-      width: component.width * 100,
-      height: component.height * 100
+      x: centerX - width / 2,
+      y: centerY - height / 2,
+      width: width,
+      height: height
     };
   }
 

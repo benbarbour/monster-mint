@@ -48,11 +48,37 @@
     });
   }
 
+  function loadImageDimensions(source) {
+    return new Promise(function (resolve, reject) {
+      var image = new Image();
+      image.onload = function () {
+        resolve({
+          width: image.naturalWidth || image.width || 1,
+          height: image.naturalHeight || image.height || 1
+        });
+      };
+      image.onerror = reject;
+      image.src = source;
+    });
+  }
+
+  async function readImageAssetFile(file) {
+    var source = await readDataUrlFile(file);
+    var dimensions = await loadImageDimensions(source);
+    return {
+      source: source,
+      width: dimensions.width,
+      height: dimensions.height
+    };
+  }
+
   return {
     uid: uid,
     parseLineList: parseLineList,
     downloadTextFile: downloadTextFile,
     readTextFile: readTextFile,
-    readDataUrlFile: readDataUrlFile
+    readDataUrlFile: readDataUrlFile,
+    loadImageDimensions: loadImageDimensions,
+    readImageAssetFile: readImageAssetFile
   };
 });

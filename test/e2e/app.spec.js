@@ -23,8 +23,12 @@ test("can create and manipulate a token template", async ({ page }) => {
 
   const xInput = page.locator('form[data-form="text-component-settings"] input[name="x"]');
   const yInput = page.locator('form[data-form="text-component-settings"] input[name="y"]');
-  await expect(xInput).toHaveValue("0.18");
-  await expect(yInput).toHaveValue("0.40");
+  await expect(xInput).toHaveValue("0.00");
+  await expect(yInput).toHaveValue("0.00");
+
+  await xInput.fill("0");
+  await xInput.blur();
+  await expect(xInput).toHaveValue("0.00");
 
   const moveHandle = page.locator('[data-component-type="text"] [data-drag-mode="move"]').first();
   const moveBox = await moveHandle.boundingBox();
@@ -36,8 +40,8 @@ test("can create and manipulate a token template", async ({ page }) => {
   await page.mouse.move(moveBox.x + moveBox.width / 2 + 60, moveBox.y + moveBox.height / 2 + 30, { steps: 10 });
   await page.mouse.up();
 
-  await expect(xInput).not.toHaveValue("0.18");
-  await expect(yInput).not.toHaveValue("0.40");
+  await expect(xInput).not.toHaveValue("0.00");
+  await expect(yInput).not.toHaveValue("0.00");
 
   const resizeHandle = page.locator('[data-component-type="text"] [data-drag-mode="resize"]').first();
   const resizeBox = await resizeHandle.boundingBox();
@@ -49,11 +53,43 @@ test("can create and manipulate a token template", async ({ page }) => {
   await page.mouse.move(resizeBox.x + resizeBox.width / 2 + 40, resizeBox.y + resizeBox.height / 2 + 20, { steps: 10 });
   await page.mouse.up();
 
-  await expect(page.locator('form[data-form="text-component-settings"] input[name="width"]')).not.toHaveValue("0.64");
+  await expect(page.locator('form[data-form="text-component-settings"] input[name="width"]')).not.toHaveValue("0.50");
 
   await page.reload();
   await page.locator('select[name="selectedComponentKey"]').selectOption("");
   await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toHaveValue("Untitled Token");
+});
+
+test("back face supports built-in components and image transforms", async ({ page }) => {
+  await page.getByRole("button", { name: "Create Token" }).click();
+  await page.getByRole("button", { name: "Back" }).click();
+
+  const componentOptions = await page.locator('select[name="selectedComponentKey"] option').allTextContents();
+  expect(componentOptions).toContain("Background");
+  expect(componentOptions).toContain("Border");
+
+  await page.locator('select[name="selectedComponentKey"]').selectOption({ label: "Border" });
+  await expect(page.locator('form[data-form="border-component-settings"] input[name="borderWidthRatio"]')).toHaveAttribute("max", "0.25");
+
+  await page.locator('select[name="selectedComponentKey"]').selectOption({ label: "Background" });
+  await expect(page.locator('form[data-form="background-component-settings"]')).toBeVisible();
+
+  await page.getByRole("button", { name: "Add Image" }).click();
+  await page.locator('[data-image-upload-input]').setInputFiles({
+    name: "token.svg",
+    mimeType: "image/svg+xml",
+    buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"><rect width="200" height="100" fill="red"/></svg>')
+  });
+
+  await expect(page.locator('form[data-form="image-component-settings"] input[name="x"]')).toHaveValue("0.00");
+  await expect(page.locator('form[data-form="image-component-settings"] input[name="y"]')).toHaveValue("0.00");
+  await expect(page.locator('form[data-form="image-component-settings"] input[name="scale"]')).toHaveValue("0.50");
+
+  await page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]').fill("45");
+  await page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]').blur();
+  await page.locator('form[data-form="image-component-settings"] input[name="mirrorX"]').check();
+  await expect(page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]')).toHaveValue("45");
+  await expect(page.locator('form[data-form="image-component-settings"] input[name="mirrorX"]')).toBeChecked();
 });
 
 test("custom sequence limits print copy counts", async ({ page }) => {
