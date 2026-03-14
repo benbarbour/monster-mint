@@ -62,7 +62,7 @@
 
 .preview-stage {
   position: relative;
-  width: min(100%, 640px, calc(100vh - 27rem));
+  width: min(100%, 640px, calc(100vh - 28rem));
   aspect-ratio: 1;
   margin: 0 auto;
   padding: 0.85rem;
@@ -132,6 +132,6 @@
 
 @media (max-height: 860px) {
   .preview-stage {
-    width: min(100%, 560px, calc(100vh - 25rem));
+    width: min(100%, 560px, calc(100vh - 26rem));
   }
 }

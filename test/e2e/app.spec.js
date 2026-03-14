@@ -40,7 +40,7 @@ test("can create and manipulate a token template", async ({ page }) => {
   await xInput.blur();
   await expect(xInput).toHaveValue("0.00");
 
-  const moveHandle = page.locator('[data-component-type="text"] [data-drag-mode="move"]').first();
+  const moveHandle = page.locator('[data-component-type="text"][data-drag-mode="move"]').first();
   const moveBox = await moveHandle.boundingBox();
   if (!moveBox) {
     throw new Error("Missing text drag handle");
@@ -98,13 +98,38 @@ test("token settings own appearance controls and color sequences show in preview
 
   await expect(page.locator('form[data-form="image-component-settings"] input[name="x"]')).toHaveValue("0.00");
   await expect(page.locator('form[data-form="image-component-settings"] input[name="y"]')).toHaveValue("0.00");
-  await expect(page.locator('form[data-form="image-component-settings"] input[name="scale"]')).toHaveValue("0.50");
+  await expect(page.locator('form[data-form="image-component-settings"] input[name="scale"]')).toHaveValue("0.5");
+  await expect(page.locator('form[data-form="image-component-settings"] input[name="scale"]')).toHaveAttribute("type", "range");
+  await expect(page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]')).toHaveAttribute("type", "range");
 
-  await page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]').fill("45");
-  await page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]').blur();
+  await page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]').evaluate((element) => {
+    element.value = "45";
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  });
   await page.locator('form[data-form="image-component-settings"] input[name="mirrorX"]').check();
   await expect(page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]')).toHaveValue("45");
   await expect(page.locator('form[data-form="image-component-settings"] input[name="mirrorX"]')).toBeChecked();
+
+  const scaleBeforeWheel = await page.locator('form[data-form="image-component-settings"] input[name="scale"]').inputValue();
+  const previewStage = page.locator('[data-preview-stage]');
+  const previewBox = await previewStage.boundingBox();
+  if (!previewBox) {
+    throw new Error("Missing preview stage");
+  }
+  await page.mouse.move(previewBox.x + previewBox.width / 2, previewBox.y + previewBox.height / 2);
+  await page.mouse.wheel(0, -240);
+  await expect(page.locator('form[data-form="image-component-settings"] input[name="scale"]')).not.toHaveValue(scaleBeforeWheel);
+
+  await page.locator('form[data-form="image-component-settings"] input[name="scale"]').evaluate((element) => {
+    element.value = "2";
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await previewStage.click({ position: { x: 10, y: 10 } });
+  await expect(page.locator('form[data-form="token-settings"]')).toBeVisible();
+
+  await page.getByRole("button", { name: "Clone" }).click();
+  await expect(page.locator('select[name="selectedTokenId"] option')).toHaveCount(2);
+  await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toHaveValue("Untitled Token Copy");
 });
 
 test("built-in text modes and color sequences drive live print preview", async ({ page }) => {

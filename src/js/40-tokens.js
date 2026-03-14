@@ -48,12 +48,22 @@
       y: asCoordinate(payload.y, 0),
       scale: asScale(payload.scale, 0.5),
       aspectRatio: asAspectRatio(payload.aspectRatio, 1),
-      rotationDeg: asSigned(payload.rotationDeg, 0),
+      rotationDeg: asRotation(payload.rotationDeg, 0),
       mirrorX: payload.mirrorX === true,
       mirrorY: payload.mirrorY === true,
       source: payload.source || "",
       name: payload.name || "Uploaded image"
     };
+  }
+
+  function cloneTokenTemplate(token) {
+    return createTokenTemplate({
+      name: (token.name || "Untitled Token") + " Copy",
+      diameterIn: token.diameterIn,
+      borderUnderContent: token.borderUnderContent === true,
+      front: cloneFace(token.front),
+      back: cloneBackFace(token.back)
+    });
   }
 
   function normalizeFace(input) {
@@ -150,7 +160,7 @@
     component.x = asCoordinate(payload.x, component.x);
     component.y = asCoordinate(payload.y, component.y);
     component.scale = asScale(payload.scale, component.scale);
-    component.rotationDeg = asSigned(payload.rotationDeg, component.rotationDeg);
+    component.rotationDeg = asRotation(payload.rotationDeg, component.rotationDeg);
     component.mirrorX = payload.mirrorX === true;
     component.mirrorY = payload.mirrorY === true;
     return component;
@@ -270,6 +280,22 @@
     return Number.isFinite(parsed) ? parsed : fallback;
   }
 
+  function asRotation(value, fallback) {
+    var parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return fallback;
+    }
+
+    var normalized = parsed % 360;
+    if (normalized < 0) {
+      normalized += 360;
+    }
+    if (normalized === 0 && parsed > 0) {
+      return 360;
+    }
+    return Number(normalized.toFixed(2));
+  }
+
   function asInteger(value, fallback) {
     var parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) ? parsed : fallback;
@@ -312,8 +338,67 @@
     return Math.min(max, Math.max(min, value));
   }
 
+  function cloneFace(face) {
+    return {
+      backgroundColorMode: face.backgroundColorMode,
+      backgroundColor: face.backgroundColor,
+      backgroundColorSequenceRef: face.backgroundColorSequenceRef,
+      images: face.images.map(function (component) {
+        return createImageComponent({
+          x: component.x,
+          y: component.y,
+          scale: component.scale,
+          aspectRatio: component.aspectRatio,
+          rotationDeg: component.rotationDeg,
+          mirrorX: component.mirrorX,
+          mirrorY: component.mirrorY,
+          source: component.source,
+          name: component.name
+        });
+      }),
+      texts: face.texts.map(function (component) {
+        return createTextComponent({
+          name: component.name,
+          x: component.x,
+          y: component.y,
+          width: component.width,
+          height: component.height,
+          contentMode: component.contentMode,
+          customText: component.customText,
+          sequenceStart: component.sequenceStart,
+          sequencePad: component.sequencePad,
+          fontFamily: component.fontFamily,
+          fontWeight: component.fontWeight,
+          colorMode: component.colorMode,
+          color: component.color,
+          colorSequenceRef: component.colorSequenceRef,
+          textBorder: {
+            width: component.textBorder.width,
+            colorMode: component.textBorder.colorMode,
+            color: component.textBorder.color,
+            colorSequenceRef: component.textBorder.colorSequenceRef
+          }
+        });
+      }),
+      border: {
+        enabled: !face.border || face.border.enabled !== false,
+        widthRatio: face.border ? face.border.widthRatio : 0,
+        colorMode: face.border ? face.border.colorMode : "manual",
+        color: face.border ? face.border.color : "#000000",
+        colorSequenceRef: face.border ? face.border.colorSequenceRef : null
+      }
+    };
+  }
+
+  function cloneBackFace(face) {
+    var nextFace = cloneFace(face);
+    nextFace.enabled = face.enabled === true;
+    return nextFace;
+  }
+
   return {
     createTokenTemplate: createTokenTemplate,
+    cloneTokenTemplate: cloneTokenTemplate,
     createTextComponent: createTextComponent,
     createImageComponent: createImageComponent,
     normalizeToken: normalizeToken,

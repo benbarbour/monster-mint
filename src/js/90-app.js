@@ -18,6 +18,7 @@
   var designerInteraction = null;
   var mountedStore = null;
   var activePrintFrame = null;
+  var designerWheelPersistTimer = null;
 
   function escapeHtml(value) {
     return String(value)
@@ -148,6 +149,7 @@
       '          <label class="field toolbar-field">Token<select name="selectedTokenId">' + renderTokenOptions(state.project.tokens, token.id) + '</select></label>',
       '          <div class="button-row">',
       '            <button class="button button-primary" type="button" data-action="add-token">New Token</button>',
+      '            <button class="button" type="button" data-action="clone-token" data-token-id="' + token.id + '">Clone</button>',
       '            <button class="button" type="button" data-action="delete-token" data-token-id="' + token.id + '">Delete</button>',
       "          </div>",
       '          <div class="face-toggle">',
@@ -176,7 +178,7 @@
         selectedComponentId: selection.selectedComponentId
       }),
       "      </div>",
-      '      <p class="preview-note">Drag to move. Resize from the lower-right handle. Images keep aspect ratio, and all content clips to the token circle.</p>',
+      '      <p class="preview-note">Drag visible content to move it. Resize from the lower-right handle, rotate images from the top handle, or use the mouse wheel to scale the selected component.</p>',
       "    </section>",
       "  </section>",
       '  <aside class="editor-drawer designer-drawer">',
@@ -341,8 +343,8 @@
       '<form class="form-grid" data-form="image-component-settings">',
       '  <label class="field">Label<input name="name" value="' + escapeHtml(component.name) + '"></label>',
       renderPositionFields(component),
-      '  <label class="field">Scale<input type="number" min="0.05" max="2" step="0.01" name="scale" value="' + component.scale.toFixed(2) + '"><span class="field-help">' + Math.round(component.scale * 100) + '% of max circle diameter</span></label>',
-      '  <label class="field">Rotation<input type="number" step="1" name="rotationDeg" value="' + Number(component.rotationDeg || 0) + '"><span class="field-help">Degrees clockwise.</span></label>',
+      '  <label class="field">Scale<input type="range" min="0.05" max="2" step="0.01" name="scale" value="' + component.scale.toFixed(2) + '"><span class="field-help">' + Math.round(component.scale * 100) + '% of max circle diameter</span></label>',
+      '  <label class="field">Rotation<input type="range" min="0" max="360" step="1" name="rotationDeg" value="' + Math.round(Number(component.rotationDeg || 0)) + '"><span class="field-help">' + Math.round(Number(component.rotationDeg || 0)) + '&deg; clockwise</span></label>',
       '  <div class="field-row two-up">',
       '    <label class="field checkbox-field"><input type="checkbox" name="mirrorX"' + (component.mirrorX ? " checked" : "") + '>Mirror horizontally</label>',
       '    <label class="field checkbox-field"><input type="checkbox" name="mirrorY"' + (component.mirrorY ? " checked" : "") + '>Mirror vertically</label>',
@@ -613,6 +615,26 @@
           ui.selectedComponentType = null;
           ui.selectedComponentId = null;
           ui.selectedFace = "front";
+        });
+      });
+    });
+
+    appElement.querySelectorAll("[data-action='clone-token']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var tokenId = button.getAttribute("data-token-id");
+        var sourceToken = findToken(store.getState().project, tokenId);
+        if (!sourceToken) {
+          return;
+        }
+        var token = Tokens.cloneTokenTemplate(sourceToken);
+        store.updateProject(function (project) {
+          project.tokens.push(token);
+        });
+        store.updateUi(function (ui) {
+          ui.activeTab = "designer";
+          ui.selectedTokenId = token.id;
+          ui.selectedComponentType = null;
+          ui.selectedComponentId = null;
         });
       });
     });
@@ -921,6 +943,7 @@
         }
 
         var svgElement = event.target.ownerSVGElement;
+        var previewRect = svgElement.getBoundingClientRect();
         designerInteraction = {
           tokenId: selection.token.id,
           faceName: selection.faceName,
@@ -929,15 +952,18 @@
           mode: mode,
           startClientX: event.clientX,
           startClientY: event.clientY,
-          previewRect: svgElement.getBoundingClientRect(),
+          previewRect: previewRect,
           startRect: {
             x: component.x,
             y: component.y,
             width: component.width,
             height: component.height,
             scale: component.scale,
-            aspectRatio: component.aspectRatio
-          }
+            aspectRatio: component.aspectRatio,
+            rotationDeg: Number(component.rotationDeg || 0)
+          },
+          centerClientX: previewRect.left + (50 + component.x * 100) / 100 * previewRect.width,
+          centerClientY: previewRect.top + (50 + component.y * 100) / 100 * previewRect.height
         };
 
         store.updateUi(function (ui) {
@@ -949,8 +975,52 @@
 
     var previewStage = appElement.querySelector("[data-preview-stage]");
     if (previewStage) {
+      previewStage.addEventListener("wheel", function (event) {
+        var selection = getDesignerSelection(store.getState());
+        if (!selection.token || !selection.selectedComponentType) {
+          return;
+        }
+        var component = findComponent(store.getState().project, selection, selection.selectedComponentType);
+        if (!component) {
+          return;
+        }
+
+        event.preventDefault();
+        var factor = Math.pow(1.0015, -event.deltaY);
+        store.updateProject(function (project) {
+          var nextComponent = findComponent(project, selection, selection.selectedComponentType);
+          if (!nextComponent) {
+            return;
+          }
+
+          if (selection.selectedComponentType === "image") {
+            Tokens.updateImageComponent(nextComponent, {
+              x: nextComponent.x,
+              y: nextComponent.y,
+              scale: nextComponent.scale * factor,
+              rotationDeg: nextComponent.rotationDeg,
+              mirrorX: nextComponent.mirrorX,
+              mirrorY: nextComponent.mirrorY
+            });
+          } else {
+            Tokens.updateComponentRect(nextComponent, {
+              x: nextComponent.x,
+              y: nextComponent.y,
+              width: nextComponent.width * factor,
+              height: nextComponent.height * factor
+            });
+          }
+        }, { persist: false });
+        scheduleDesignerPersist();
+      }, { passive: false });
+
       previewStage.addEventListener("click", function (event) {
-        if (event.target.closest("[data-component-id]")) {
+        var componentElement = event.target.closest("[data-component-id]");
+        if (componentElement) {
+          store.updateUi(function (ui) {
+            ui.selectedComponentType = componentElement.getAttribute("data-component-type");
+            ui.selectedComponentId = componentElement.getAttribute("data-component-id");
+          });
           return;
         }
         store.updateUi(function (ui) {
@@ -1053,6 +1123,24 @@
             height: designerInteraction.startRect.height + deltaY * 2
           });
         }
+      } else if (designerInteraction.mode === "rotate" && designerInteraction.componentType === "image") {
+        var startAngle = Math.atan2(
+          designerInteraction.startClientY - designerInteraction.centerClientY,
+          designerInteraction.startClientX - designerInteraction.centerClientX
+        );
+        var nextAngle = Math.atan2(
+          event.clientY - designerInteraction.centerClientY,
+          event.clientX - designerInteraction.centerClientX
+        );
+        var deltaDeg = (nextAngle - startAngle) * 180 / Math.PI;
+        Tokens.updateImageComponent(component, {
+          x: designerInteraction.startRect.x,
+          y: designerInteraction.startRect.y,
+          scale: designerInteraction.startRect.scale,
+          rotationDeg: designerInteraction.startRect.rotationDeg + deltaDeg,
+          mirrorX: component.mirrorX,
+          mirrorY: component.mirrorY
+        });
       } else {
         if (designerInteraction.componentType === "image") {
           Tokens.updateImageComponent(component, {
@@ -1081,7 +1169,23 @@
     }
 
     designerInteraction = null;
+    if (designerWheelPersistTimer) {
+      runtimeGlobal.clearTimeout(designerWheelPersistTimer);
+      designerWheelPersistTimer = null;
+    }
     mountedStore.persistProject();
+  }
+
+  function scheduleDesignerPersist() {
+    if (designerWheelPersistTimer) {
+      runtimeGlobal.clearTimeout(designerWheelPersistTimer);
+    }
+    designerWheelPersistTimer = runtimeGlobal.setTimeout(function () {
+      designerWheelPersistTimer = null;
+      if (mountedStore) {
+        mountedStore.persistProject();
+      }
+    }, 180);
   }
 
   function getDesignerSelection(state) {

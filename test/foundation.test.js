@@ -209,6 +209,25 @@ test("image components use centered defaults and aspect-based scaling", () => {
   });
 });
 
+test("token cloning creates new ids while preserving token content", () => {
+  const token = Tokens.createTokenTemplate({
+    name: "Goblin",
+    front: {
+      images: [Tokens.createImageComponent({ name: "Goblin Art", source: "data:image/png;base64,abc" })],
+      texts: [Tokens.createTextComponent({ name: "Label", customText: "Goblin" })]
+    }
+  });
+
+  const clone = Tokens.cloneTokenTemplate(token);
+
+  assert.equal(clone.name, "Goblin Copy");
+  assert.notEqual(clone.id, token.id);
+  assert.notEqual(clone.front.images[0].id, token.front.images[0].id);
+  assert.notEqual(clone.front.texts[0].id, token.front.texts[0].id);
+  assert.equal(clone.front.images[0].source, token.front.images[0].source);
+  assert.equal(clone.front.texts[0].customText, token.front.texts[0].customText);
+});
+
 test("token templates cap border width ratio at twenty-five percent", () => {
   const token = Tokens.createTokenTemplate({
     borderUnderContent: true,

@@ -36,18 +36,18 @@
       '  <circle cx="50" cy="50" r="50" fill="' + escapeAttr(background) + '"></circle>',
       token.borderUnderContent ? borderMarkup : "",
       '  <g clip-path="url(#token-clip-' + tokenSlug + ')">',
-      renderImageComponents(face.images),
-      renderTextComponents(face.texts, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive),
+      renderImageComponents(face.images, opts.interactive, selectedComponentType, selectedComponentId),
+      renderTextComponents(face.texts, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
       "  </g>",
       token.borderUnderContent ? "" : borderMarkup,
       opts.interactive
-        ? renderInteractiveOverlays(face, selectedComponentType, selectedComponentId)
+        ? renderInteractiveOverlays(face, selectedComponentType, selectedComponentId, tokenSlug)
         : "",
       "</svg>"
     ].join("");
   }
 
-  function renderImageComponents(images) {
+  function renderImageComponents(images, interactive, selectedComponentType, selectedComponentId) {
     return images.map(function (component) {
       var box = toSvgRect(component, "image");
       var centerX = box.x + box.width / 2;
@@ -60,7 +60,8 @@
         "scale(" + scaleX + " " + scaleY + ")",
         "translate(" + (-box.width / 2) + " " + (-box.height / 2) + ")"
       ].join(" ");
-      return '<image href="' + escapeAttr(component.source) + '" width="' + box.width + '" height="' + box.height + '" preserveAspectRatio="none" transform="' + transform + '"></image>';
+      var isSelected = interactive && selectedComponentType === "image" && selectedComponentId === component.id;
+      return '<image href="' + escapeAttr(component.source) + '" width="' + box.width + '" height="' + box.height + '" preserveAspectRatio="none" transform="' + transform + '" data-component-id="' + component.id + '" data-component-type="image"' + (isSelected ? ' data-drag-mode="move"' : "") + '></image>';
     }).join("");
   }
 
@@ -81,7 +82,7 @@
     return '<circle cx="50" cy="50" r="' + radius + '" fill="none" stroke="' + escapeAttr(color) + '" stroke-width="' + width + '"></circle>';
   }
 
-  function renderTextComponents(components, textSequences, colorSequences, sequenceIndex, tokenSlug, previewMode) {
+  function renderTextComponents(components, textSequences, colorSequences, sequenceIndex, tokenSlug, previewMode, selectedComponentType, selectedComponentId) {
     return components.map(function (component) {
       var value = previewMode
         ? getPreviewTextValue(component, textSequences)
@@ -105,8 +106,9 @@
           sequenceIndex
         )
         : "#111111";
+      var isSelected = previewMode && selectedComponentType === "text" && selectedComponentId === component.id;
       return [
-        '<g clip-path="url(#text-clip-' + tokenSlug + "-" + component.id + ')">',
+        '<g clip-path="url(#text-clip-' + tokenSlug + "-" + component.id + ')" data-component-id="' + component.id + '" data-component-type="text"' + (isSelected ? ' data-drag-mode="move"' : "") + '>',
         '  <text x="' + (box.x + box.width / 2) + '" y="' + (box.y + box.height / 2) + '" fill="' + escapeAttr(color) + '" stroke="' + (borderWidth > 0 ? escapeAttr(borderColor) : "none") + '" stroke-width="' + borderWidth + '" paint-order="stroke fill" stroke-linejoin="round" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-size="' + fontSize + '" text-anchor="middle" dominant-baseline="middle">' + escapeText(value) + "</text>",
         "</g>"
       ].join("");
@@ -136,31 +138,47 @@
     }).join("");
   }
 
-  function renderInteractiveOverlays(face, selectedComponentType, selectedComponentId) {
+  function renderInteractiveOverlays(face, selectedComponentType, selectedComponentId, tokenSlug) {
     var overlays = [];
 
     face.images.forEach(function (component) {
-      overlays.push(renderOverlay(component, "image", selectedComponentType, selectedComponentId));
+      if (selectedComponentType === "image" && selectedComponentId === component.id) {
+        overlays.push(renderOverlay(component, "image", tokenSlug));
+      }
     });
 
     face.texts.forEach(function (component) {
-      overlays.push(renderOverlay(component, "text", selectedComponentType, selectedComponentId));
+      if (selectedComponentType === "text" && selectedComponentId === component.id) {
+        overlays.push(renderOverlay(component, "text", tokenSlug));
+      }
     });
 
     return overlays.join("");
   }
 
-  function renderOverlay(component, type, selectedComponentType, selectedComponentId) {
+  function renderOverlay(component, type, tokenSlug) {
     var box = toSvgRect(component, type);
-    var isSelected = selectedComponentType === type && selectedComponentId === component.id;
-    var stroke = isSelected ? "#9d3f1d" : "rgba(43, 36, 25, 0.45)";
     var handleX = box.x + box.width - 2;
     var handleY = box.y + box.height - 2;
+    var rotateHandleX = box.x + box.width / 2;
+    var rotateHandleY = box.y - 8;
     return [
-      '<g data-component-id="' + component.id + '" data-component-type="' + type + '">',
-      '  <rect x="' + box.x + '" y="' + box.y + '" width="' + box.width + '" height="' + box.height + '" fill="transparent" stroke="' + stroke + '" stroke-dasharray="2 2" data-drag-mode="move"></rect>',
-      '  <rect x="' + handleX + '" y="' + handleY + '" width="4" height="4" rx="1" fill="' + stroke + '" data-drag-mode="resize"></rect>',
+      '<g clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="' + type + '">',
+      renderSelectionBox(box),
+      '  <rect x="' + handleX + '" y="' + handleY + '" width="4" height="4" rx="1" fill="#ffffff" stroke="#111111" stroke-width="0.8" data-drag-mode="resize"></rect>',
+      type === "image"
+        ? '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#ffffff" stroke-width="1.2"></line>' +
+          '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#111111" stroke-width="0.6" stroke-dasharray="2 2" stroke-dashoffset="2"></line>' +
+          '  <circle cx="' + rotateHandleX + '" cy="' + rotateHandleY + '" r="3.5" fill="#ffffff" stroke="#111111" stroke-width="0.8" data-drag-mode="rotate"></circle>'
+        : "",
       "</g>"
+    ].join("");
+  }
+
+  function renderSelectionBox(box) {
+    return [
+      '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.width + '" height="' + box.height + '" fill="none" stroke="#ffffff" stroke-width="0.8" stroke-dasharray="4 4"></rect>',
+      '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.width + '" height="' + box.height + '" fill="none" stroke="#111111" stroke-width="0.8" stroke-dasharray="4 4" stroke-dashoffset="4"></rect>'
     ].join("");
   }
 

@@ -546,7 +546,7 @@ button {
 
 .preview-stage {
   position: relative;
-  width: min(100%, 640px, calc(100vh - 27rem));
+  width: min(100%, 640px, calc(100vh - 28rem));
   aspect-ratio: 1;
   margin: 0 auto;
   padding: 0.85rem;
@@ -616,7 +616,7 @@ button {
 
 @media (max-height: 860px) {
   .preview-stage {
-    width: min(100%, 560px, calc(100vh - 25rem));
+    width: min(100%, 560px, calc(100vh - 26rem));
   }
 }
 
@@ -1315,12 +1315,22 @@ button {
       y: asCoordinate(payload.y, 0),
       scale: asScale(payload.scale, 0.5),
       aspectRatio: asAspectRatio(payload.aspectRatio, 1),
-      rotationDeg: asSigned(payload.rotationDeg, 0),
+      rotationDeg: asRotation(payload.rotationDeg, 0),
       mirrorX: payload.mirrorX === true,
       mirrorY: payload.mirrorY === true,
       source: payload.source || "",
       name: payload.name || "Uploaded image"
     };
+  }
+
+  function cloneTokenTemplate(token) {
+    return createTokenTemplate({
+      name: (token.name || "Untitled Token") + " Copy",
+      diameterIn: token.diameterIn,
+      borderUnderContent: token.borderUnderContent === true,
+      front: cloneFace(token.front),
+      back: cloneBackFace(token.back)
+    });
   }
 
   function normalizeFace(input) {
@@ -1417,7 +1427,7 @@ button {
     component.x = asCoordinate(payload.x, component.x);
     component.y = asCoordinate(payload.y, component.y);
     component.scale = asScale(payload.scale, component.scale);
-    component.rotationDeg = asSigned(payload.rotationDeg, component.rotationDeg);
+    component.rotationDeg = asRotation(payload.rotationDeg, component.rotationDeg);
     component.mirrorX = payload.mirrorX === true;
     component.mirrorY = payload.mirrorY === true;
     return component;
@@ -1537,6 +1547,22 @@ button {
     return Number.isFinite(parsed) ? parsed : fallback;
   }
 
+  function asRotation(value, fallback) {
+    var parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return fallback;
+    }
+
+    var normalized = parsed % 360;
+    if (normalized < 0) {
+      normalized += 360;
+    }
+    if (normalized === 0 && parsed > 0) {
+      return 360;
+    }
+    return Number(normalized.toFixed(2));
+  }
+
   function asInteger(value, fallback) {
     var parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) ? parsed : fallback;
@@ -1579,8 +1605,67 @@ button {
     return Math.min(max, Math.max(min, value));
   }
 
+  function cloneFace(face) {
+    return {
+      backgroundColorMode: face.backgroundColorMode,
+      backgroundColor: face.backgroundColor,
+      backgroundColorSequenceRef: face.backgroundColorSequenceRef,
+      images: face.images.map(function (component) {
+        return createImageComponent({
+          x: component.x,
+          y: component.y,
+          scale: component.scale,
+          aspectRatio: component.aspectRatio,
+          rotationDeg: component.rotationDeg,
+          mirrorX: component.mirrorX,
+          mirrorY: component.mirrorY,
+          source: component.source,
+          name: component.name
+        });
+      }),
+      texts: face.texts.map(function (component) {
+        return createTextComponent({
+          name: component.name,
+          x: component.x,
+          y: component.y,
+          width: component.width,
+          height: component.height,
+          contentMode: component.contentMode,
+          customText: component.customText,
+          sequenceStart: component.sequenceStart,
+          sequencePad: component.sequencePad,
+          fontFamily: component.fontFamily,
+          fontWeight: component.fontWeight,
+          colorMode: component.colorMode,
+          color: component.color,
+          colorSequenceRef: component.colorSequenceRef,
+          textBorder: {
+            width: component.textBorder.width,
+            colorMode: component.textBorder.colorMode,
+            color: component.textBorder.color,
+            colorSequenceRef: component.textBorder.colorSequenceRef
+          }
+        });
+      }),
+      border: {
+        enabled: !face.border || face.border.enabled !== false,
+        widthRatio: face.border ? face.border.widthRatio : 0,
+        colorMode: face.border ? face.border.colorMode : "manual",
+        color: face.border ? face.border.color : "#000000",
+        colorSequenceRef: face.border ? face.border.colorSequenceRef : null
+      }
+    };
+  }
+
+  function cloneBackFace(face) {
+    var nextFace = cloneFace(face);
+    nextFace.enabled = face.enabled === true;
+    return nextFace;
+  }
+
   return {
     createTokenTemplate: createTokenTemplate,
+    cloneTokenTemplate: cloneTokenTemplate,
     createTextComponent: createTextComponent,
     createImageComponent: createImageComponent,
     normalizeToken: normalizeToken,
@@ -1633,18 +1718,18 @@ button {
       '  <circle cx="50" cy="50" r="50" fill="' + escapeAttr(background) + '"></circle>',
       token.borderUnderContent ? borderMarkup : "",
       '  <g clip-path="url(#token-clip-' + tokenSlug + ')">',
-      renderImageComponents(face.images),
-      renderTextComponents(face.texts, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive),
+      renderImageComponents(face.images, opts.interactive, selectedComponentType, selectedComponentId),
+      renderTextComponents(face.texts, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
       "  </g>",
       token.borderUnderContent ? "" : borderMarkup,
       opts.interactive
-        ? renderInteractiveOverlays(face, selectedComponentType, selectedComponentId)
+        ? renderInteractiveOverlays(face, selectedComponentType, selectedComponentId, tokenSlug)
         : "",
       "</svg>"
     ].join("");
   }
 
-  function renderImageComponents(images) {
+  function renderImageComponents(images, interactive, selectedComponentType, selectedComponentId) {
     return images.map(function (component) {
       var box = toSvgRect(component, "image");
       var centerX = box.x + box.width / 2;
@@ -1657,7 +1742,8 @@ button {
         "scale(" + scaleX + " " + scaleY + ")",
         "translate(" + (-box.width / 2) + " " + (-box.height / 2) + ")"
       ].join(" ");
-      return '<image href="' + escapeAttr(component.source) + '" width="' + box.width + '" height="' + box.height + '" preserveAspectRatio="none" transform="' + transform + '"></image>';
+      var isSelected = interactive && selectedComponentType === "image" && selectedComponentId === component.id;
+      return '<image href="' + escapeAttr(component.source) + '" width="' + box.width + '" height="' + box.height + '" preserveAspectRatio="none" transform="' + transform + '" data-component-id="' + component.id + '" data-component-type="image"' + (isSelected ? ' data-drag-mode="move"' : "") + '></image>';
     }).join("");
   }
 
@@ -1678,7 +1764,7 @@ button {
     return '<circle cx="50" cy="50" r="' + radius + '" fill="none" stroke="' + escapeAttr(color) + '" stroke-width="' + width + '"></circle>';
   }
 
-  function renderTextComponents(components, textSequences, colorSequences, sequenceIndex, tokenSlug, previewMode) {
+  function renderTextComponents(components, textSequences, colorSequences, sequenceIndex, tokenSlug, previewMode, selectedComponentType, selectedComponentId) {
     return components.map(function (component) {
       var value = previewMode
         ? getPreviewTextValue(component, textSequences)
@@ -1702,8 +1788,9 @@ button {
           sequenceIndex
         )
         : "#111111";
+      var isSelected = previewMode && selectedComponentType === "text" && selectedComponentId === component.id;
       return [
-        '<g clip-path="url(#text-clip-' + tokenSlug + "-" + component.id + ')">',
+        '<g clip-path="url(#text-clip-' + tokenSlug + "-" + component.id + ')" data-component-id="' + component.id + '" data-component-type="text"' + (isSelected ? ' data-drag-mode="move"' : "") + '>',
         '  <text x="' + (box.x + box.width / 2) + '" y="' + (box.y + box.height / 2) + '" fill="' + escapeAttr(color) + '" stroke="' + (borderWidth > 0 ? escapeAttr(borderColor) : "none") + '" stroke-width="' + borderWidth + '" paint-order="stroke fill" stroke-linejoin="round" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-size="' + fontSize + '" text-anchor="middle" dominant-baseline="middle">' + escapeText(value) + "</text>",
         "</g>"
       ].join("");
@@ -1733,31 +1820,47 @@ button {
     }).join("");
   }
 
-  function renderInteractiveOverlays(face, selectedComponentType, selectedComponentId) {
+  function renderInteractiveOverlays(face, selectedComponentType, selectedComponentId, tokenSlug) {
     var overlays = [];
 
     face.images.forEach(function (component) {
-      overlays.push(renderOverlay(component, "image", selectedComponentType, selectedComponentId));
+      if (selectedComponentType === "image" && selectedComponentId === component.id) {
+        overlays.push(renderOverlay(component, "image", tokenSlug));
+      }
     });
 
     face.texts.forEach(function (component) {
-      overlays.push(renderOverlay(component, "text", selectedComponentType, selectedComponentId));
+      if (selectedComponentType === "text" && selectedComponentId === component.id) {
+        overlays.push(renderOverlay(component, "text", tokenSlug));
+      }
     });
 
     return overlays.join("");
   }
 
-  function renderOverlay(component, type, selectedComponentType, selectedComponentId) {
+  function renderOverlay(component, type, tokenSlug) {
     var box = toSvgRect(component, type);
-    var isSelected = selectedComponentType === type && selectedComponentId === component.id;
-    var stroke = isSelected ? "#9d3f1d" : "rgba(43, 36, 25, 0.45)";
     var handleX = box.x + box.width - 2;
     var handleY = box.y + box.height - 2;
+    var rotateHandleX = box.x + box.width / 2;
+    var rotateHandleY = box.y - 8;
     return [
-      '<g data-component-id="' + component.id + '" data-component-type="' + type + '">',
-      '  <rect x="' + box.x + '" y="' + box.y + '" width="' + box.width + '" height="' + box.height + '" fill="transparent" stroke="' + stroke + '" stroke-dasharray="2 2" data-drag-mode="move"></rect>',
-      '  <rect x="' + handleX + '" y="' + handleY + '" width="4" height="4" rx="1" fill="' + stroke + '" data-drag-mode="resize"></rect>',
+      '<g clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="' + type + '">',
+      renderSelectionBox(box),
+      '  <rect x="' + handleX + '" y="' + handleY + '" width="4" height="4" rx="1" fill="#ffffff" stroke="#111111" stroke-width="0.8" data-drag-mode="resize"></rect>',
+      type === "image"
+        ? '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#ffffff" stroke-width="1.2"></line>' +
+          '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#111111" stroke-width="0.6" stroke-dasharray="2 2" stroke-dashoffset="2"></line>' +
+          '  <circle cx="' + rotateHandleX + '" cy="' + rotateHandleY + '" r="3.5" fill="#ffffff" stroke="#111111" stroke-width="0.8" data-drag-mode="rotate"></circle>'
+        : "",
       "</g>"
+    ].join("");
+  }
+
+  function renderSelectionBox(box) {
+    return [
+      '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.width + '" height="' + box.height + '" fill="none" stroke="#ffffff" stroke-width="0.8" stroke-dasharray="4 4"></rect>',
+      '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.width + '" height="' + box.height + '" fill="none" stroke="#111111" stroke-width="0.8" stroke-dasharray="4 4" stroke-dashoffset="4"></rect>'
     ].join("");
   }
 
@@ -1999,6 +2102,7 @@ button {
   var designerInteraction = null;
   var mountedStore = null;
   var activePrintFrame = null;
+  var designerWheelPersistTimer = null;
 
   function escapeHtml(value) {
     return String(value)
@@ -2129,6 +2233,7 @@ button {
       '          <label class="field toolbar-field">Token<select name="selectedTokenId">' + renderTokenOptions(state.project.tokens, token.id) + '</select></label>',
       '          <div class="button-row">',
       '            <button class="button button-primary" type="button" data-action="add-token">New Token</button>',
+      '            <button class="button" type="button" data-action="clone-token" data-token-id="' + token.id + '">Clone</button>',
       '            <button class="button" type="button" data-action="delete-token" data-token-id="' + token.id + '">Delete</button>',
       "          </div>",
       '          <div class="face-toggle">',
@@ -2157,7 +2262,7 @@ button {
         selectedComponentId: selection.selectedComponentId
       }),
       "      </div>",
-      '      <p class="preview-note">Drag to move. Resize from the lower-right handle. Images keep aspect ratio, and all content clips to the token circle.</p>',
+      '      <p class="preview-note">Drag visible content to move it. Resize from the lower-right handle, rotate images from the top handle, or use the mouse wheel to scale the selected component.</p>',
       "    </section>",
       "  </section>",
       '  <aside class="editor-drawer designer-drawer">',
@@ -2322,8 +2427,8 @@ button {
       '<form class="form-grid" data-form="image-component-settings">',
       '  <label class="field">Label<input name="name" value="' + escapeHtml(component.name) + '"></label>',
       renderPositionFields(component),
-      '  <label class="field">Scale<input type="number" min="0.05" max="2" step="0.01" name="scale" value="' + component.scale.toFixed(2) + '"><span class="field-help">' + Math.round(component.scale * 100) + '% of max circle diameter</span></label>',
-      '  <label class="field">Rotation<input type="number" step="1" name="rotationDeg" value="' + Number(component.rotationDeg || 0) + '"><span class="field-help">Degrees clockwise.</span></label>',
+      '  <label class="field">Scale<input type="range" min="0.05" max="2" step="0.01" name="scale" value="' + component.scale.toFixed(2) + '"><span class="field-help">' + Math.round(component.scale * 100) + '% of max circle diameter</span></label>',
+      '  <label class="field">Rotation<input type="range" min="0" max="360" step="1" name="rotationDeg" value="' + Math.round(Number(component.rotationDeg || 0)) + '"><span class="field-help">' + Math.round(Number(component.rotationDeg || 0)) + '&deg; clockwise</span></label>',
       '  <div class="field-row two-up">',
       '    <label class="field checkbox-field"><input type="checkbox" name="mirrorX"' + (component.mirrorX ? " checked" : "") + '>Mirror horizontally</label>',
       '    <label class="field checkbox-field"><input type="checkbox" name="mirrorY"' + (component.mirrorY ? " checked" : "") + '>Mirror vertically</label>',
@@ -2594,6 +2699,26 @@ button {
           ui.selectedComponentType = null;
           ui.selectedComponentId = null;
           ui.selectedFace = "front";
+        });
+      });
+    });
+
+    appElement.querySelectorAll("[data-action='clone-token']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var tokenId = button.getAttribute("data-token-id");
+        var sourceToken = findToken(store.getState().project, tokenId);
+        if (!sourceToken) {
+          return;
+        }
+        var token = Tokens.cloneTokenTemplate(sourceToken);
+        store.updateProject(function (project) {
+          project.tokens.push(token);
+        });
+        store.updateUi(function (ui) {
+          ui.activeTab = "designer";
+          ui.selectedTokenId = token.id;
+          ui.selectedComponentType = null;
+          ui.selectedComponentId = null;
         });
       });
     });
@@ -2902,6 +3027,7 @@ button {
         }
 
         var svgElement = event.target.ownerSVGElement;
+        var previewRect = svgElement.getBoundingClientRect();
         designerInteraction = {
           tokenId: selection.token.id,
           faceName: selection.faceName,
@@ -2910,15 +3036,18 @@ button {
           mode: mode,
           startClientX: event.clientX,
           startClientY: event.clientY,
-          previewRect: svgElement.getBoundingClientRect(),
+          previewRect: previewRect,
           startRect: {
             x: component.x,
             y: component.y,
             width: component.width,
             height: component.height,
             scale: component.scale,
-            aspectRatio: component.aspectRatio
-          }
+            aspectRatio: component.aspectRatio,
+            rotationDeg: Number(component.rotationDeg || 0)
+          },
+          centerClientX: previewRect.left + (50 + component.x * 100) / 100 * previewRect.width,
+          centerClientY: previewRect.top + (50 + component.y * 100) / 100 * previewRect.height
         };
 
         store.updateUi(function (ui) {
@@ -2930,8 +3059,52 @@ button {
 
     var previewStage = appElement.querySelector("[data-preview-stage]");
     if (previewStage) {
+      previewStage.addEventListener("wheel", function (event) {
+        var selection = getDesignerSelection(store.getState());
+        if (!selection.token || !selection.selectedComponentType) {
+          return;
+        }
+        var component = findComponent(store.getState().project, selection, selection.selectedComponentType);
+        if (!component) {
+          return;
+        }
+
+        event.preventDefault();
+        var factor = Math.pow(1.0015, -event.deltaY);
+        store.updateProject(function (project) {
+          var nextComponent = findComponent(project, selection, selection.selectedComponentType);
+          if (!nextComponent) {
+            return;
+          }
+
+          if (selection.selectedComponentType === "image") {
+            Tokens.updateImageComponent(nextComponent, {
+              x: nextComponent.x,
+              y: nextComponent.y,
+              scale: nextComponent.scale * factor,
+              rotationDeg: nextComponent.rotationDeg,
+              mirrorX: nextComponent.mirrorX,
+              mirrorY: nextComponent.mirrorY
+            });
+          } else {
+            Tokens.updateComponentRect(nextComponent, {
+              x: nextComponent.x,
+              y: nextComponent.y,
+              width: nextComponent.width * factor,
+              height: nextComponent.height * factor
+            });
+          }
+        }, { persist: false });
+        scheduleDesignerPersist();
+      }, { passive: false });
+
       previewStage.addEventListener("click", function (event) {
-        if (event.target.closest("[data-component-id]")) {
+        var componentElement = event.target.closest("[data-component-id]");
+        if (componentElement) {
+          store.updateUi(function (ui) {
+            ui.selectedComponentType = componentElement.getAttribute("data-component-type");
+            ui.selectedComponentId = componentElement.getAttribute("data-component-id");
+          });
           return;
         }
         store.updateUi(function (ui) {
@@ -3034,6 +3207,24 @@ button {
             height: designerInteraction.startRect.height + deltaY * 2
           });
         }
+      } else if (designerInteraction.mode === "rotate" && designerInteraction.componentType === "image") {
+        var startAngle = Math.atan2(
+          designerInteraction.startClientY - designerInteraction.centerClientY,
+          designerInteraction.startClientX - designerInteraction.centerClientX
+        );
+        var nextAngle = Math.atan2(
+          event.clientY - designerInteraction.centerClientY,
+          event.clientX - designerInteraction.centerClientX
+        );
+        var deltaDeg = (nextAngle - startAngle) * 180 / Math.PI;
+        Tokens.updateImageComponent(component, {
+          x: designerInteraction.startRect.x,
+          y: designerInteraction.startRect.y,
+          scale: designerInteraction.startRect.scale,
+          rotationDeg: designerInteraction.startRect.rotationDeg + deltaDeg,
+          mirrorX: component.mirrorX,
+          mirrorY: component.mirrorY
+        });
       } else {
         if (designerInteraction.componentType === "image") {
           Tokens.updateImageComponent(component, {
@@ -3062,7 +3253,23 @@ button {
     }
 
     designerInteraction = null;
+    if (designerWheelPersistTimer) {
+      runtimeGlobal.clearTimeout(designerWheelPersistTimer);
+      designerWheelPersistTimer = null;
+    }
     mountedStore.persistProject();
+  }
+
+  function scheduleDesignerPersist() {
+    if (designerWheelPersistTimer) {
+      runtimeGlobal.clearTimeout(designerWheelPersistTimer);
+    }
+    designerWheelPersistTimer = runtimeGlobal.setTimeout(function () {
+      designerWheelPersistTimer = null;
+      if (mountedStore) {
+        mountedStore.persistProject();
+      }
+    }, 180);
   }
 
   function getDesignerSelection(state) {
