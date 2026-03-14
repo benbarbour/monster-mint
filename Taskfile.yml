@@ -1,0 +1,25 @@
+version: "3"
+
+tasks:
+  default:
+    desc: Show the available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  build:
+    desc: Build the single-file distributable
+    cmds:
+      - npm run build
+
+  test:
+    desc: Run the automated test suite
+    cmds:
+      - npm test
+
+  serve:
+    desc: Build the app and serve dist/ locally at http://localhost:4173
+    deps:
+      - build
+    cmds:
+      - python3 -m http.server 4173 --directory dist
