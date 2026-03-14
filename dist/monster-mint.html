@@ -468,6 +468,54 @@ button {
 }
 
 
+
+.print-layout {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.print-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-ui);
+}
+
+.print-table th,
+.print-table td {
+  padding: 0.6rem;
+  border-bottom: 1px solid rgba(184, 171, 150, 0.7);
+  text-align: left;
+}
+
+.print-table input {
+  width: 5.5rem;
+}
+
+.preview-page-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.preview-page-card {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.preview-page-label {
+  margin: 0;
+  font-family: var(--font-ui);
+  color: var(--ink-muted);
+}
+
+.preview-page-svg {
+  width: 100%;
+  border: 1px solid rgba(184, 171, 150, 0.85);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+
     </style>
   </head>
   <body>
@@ -1215,8 +1263,10 @@ button {
     var selectedComponentId = opts.selectedComponentId;
     var tokenSlug = token.id.replace(/[^a-z0-9_-]/gi, "");
 
+    var svgAttributes = opts.svgAttributes ? " " + opts.svgAttributes : "";
+
     return [
-      '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" data-preview-svg>',
+      '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" data-preview-svg' + svgAttributes + '>',
       '  <defs>',
       '    <clipPath id="token-clip-' + tokenSlug + '"><circle cx="50" cy="50" r="50"></circle></clipPath>',
       renderTextClipPaths(face.texts, tokenSlug),
@@ -1378,6 +1428,179 @@ button {
 });
 
 
+(function (global, factory) {
+  var api = factory(global.MonsterMintSchema, global.MonsterMintSequences, global.MonsterMintTokens);
+  global.MonsterMintPrint = api;
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = api;
+  }
+})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, Sequences, Tokens) {
+  function getSelectionMap(project) {
+    var map = new Map();
+    project.printSelections.forEach(function (selection) {
+      map.set(selection.tokenId, selection);
+    });
+    return map;
+  }
+
+  function getTokenMaxCopies(token, project) {
+    var refs = Tokens.collectBoundedSequenceLengths(token);
+    var lengths = refs.map(function (ref) {
+      if (ref.kind === "text") {
+        var textSequence = project.sequences.text.find(function (candidate) {
+          return candidate.id === ref.sequenceId;
+        });
+        if (!textSequence) {
+          return 0;
+        }
+        return Sequences.getFiniteLength(textSequence, "text");
+      }
+
+      var colorSequence = project.sequences.color.find(function (candidate) {
+        return candidate.id === ref.sequenceId;
+      });
+      if (!colorSequence) {
+        return 0;
+      }
+      return Sequences.getFiniteLength(colorSequence, "color");
+    }).filter(function (length) {
+      return Number.isFinite(length);
+    });
+
+    if (!lengths.length) {
+      return Infinity;
+    }
+
+    return Math.max(0, Math.min.apply(Math, lengths));
+  }
+
+  function getSelectionRows(project) {
+    var selectionMap = getSelectionMap(project);
+    return project.tokens.map(function (token) {
+      var saved = selectionMap.get(token.id) || {};
+      var maxCopies = getTokenMaxCopies(token, project);
+      return {
+        tokenId: token.id,
+        tokenName: token.name,
+        diameterIn: token.diameterIn,
+        copies: Number(saved.copies) || 0,
+        sequenceStartIndex: Number(saved.sequenceStartIndex) || 0,
+        maxCopies: maxCopies
+      };
+    });
+  }
+
+  function normalizeSelections(project, inputSelections) {
+    return inputSelections.map(function (row) {
+      var token = project.tokens.find(function (candidate) {
+        return candidate.id === row.tokenId;
+      });
+      var maxCopies = token ? getTokenMaxCopies(token, project) : 0;
+      var copies = Math.max(0, Math.floor(Number(row.copies) || 0));
+      if (Number.isFinite(maxCopies)) {
+        copies = Math.min(copies, maxCopies);
+      }
+      return {
+        tokenId: row.tokenId,
+        copies: copies,
+        sequenceStartIndex: Math.max(0, Math.floor(Number(row.sequenceStartIndex) || 0))
+      };
+    }).filter(function (row) {
+      return row.copies > 0;
+    });
+  }
+
+  function layoutProject(project) {
+    var pagePreset = Schema.findPagePreset(project.settings.pagePresetId) || Schema.PAGE_PRESETS[0];
+    var pageWidthIn = project.settings.pageOrientation === "landscape" ? pagePreset.heightIn : pagePreset.widthIn;
+    var pageHeightIn = project.settings.pageOrientation === "landscape" ? pagePreset.widthIn : pagePreset.heightIn;
+    var availableWidth = pageWidthIn - project.settings.pageMarginIn * 2;
+    var availableHeight = pageHeightIn - project.settings.pageMarginIn * 2;
+    var items = [];
+
+    project.printSelections.forEach(function (selection) {
+      var token = project.tokens.find(function (candidate) {
+        return candidate.id === selection.tokenId;
+      });
+      if (!token || selection.copies <= 0) {
+        return;
+      }
+
+      for (var copyIndex = 0; copyIndex < selection.copies; copyIndex += 1) {
+        items.push({
+          tokenId: token.id,
+          token: token,
+          sequenceIndex: selection.sequenceStartIndex + copyIndex
+        });
+      }
+    });
+
+    var pages = [];
+    var currentPage = createPage(pageWidthIn, pageHeightIn);
+    var currentX = project.settings.pageMarginIn;
+    var currentY = project.settings.pageMarginIn;
+    var rowHeight = 0;
+    var gutterIn = 0.1;
+
+    items.forEach(function (item) {
+      var footprint = item.token.diameterIn + project.settings.bleedIn * 2;
+      var cellSize = footprint + gutterIn;
+
+      if (currentX + cellSize > project.settings.pageMarginIn + availableWidth) {
+        currentX = project.settings.pageMarginIn;
+        currentY += rowHeight + gutterIn;
+        rowHeight = 0;
+      }
+
+      if (currentY + cellSize > project.settings.pageMarginIn + availableHeight) {
+        pages.push(currentPage);
+        currentPage = createPage(pageWidthIn, pageHeightIn);
+        currentX = project.settings.pageMarginIn;
+        currentY = project.settings.pageMarginIn;
+        rowHeight = 0;
+      }
+
+      currentPage.items.push({
+        tokenId: item.tokenId,
+        token: item.token,
+        sequenceIndex: item.sequenceIndex,
+        xIn: currentX + project.settings.bleedIn,
+        yIn: currentY + project.settings.bleedIn,
+        diameterIn: item.token.diameterIn,
+        bleedIn: project.settings.bleedIn
+      });
+
+      currentX += cellSize;
+      rowHeight = Math.max(rowHeight, cellSize);
+    });
+
+    if (currentPage.items.length || !pages.length) {
+      pages.push(currentPage);
+    }
+
+    return {
+      pageWidthIn: pageWidthIn,
+      pageHeightIn: pageHeightIn,
+      pages: pages
+    };
+  }
+
+  function createPage(pageWidthIn, pageHeightIn) {
+    return {
+      pageWidthIn: pageWidthIn,
+      pageHeightIn: pageHeightIn,
+      items: []
+    };
+  }
+
+  return {
+    getSelectionRows: getSelectionRows,
+    getTokenMaxCopies: getTokenMaxCopies,
+    normalizeSelections: normalizeSelections,
+    layoutProject: layoutProject
+  };
+});
+
 
 (function (global, factory) {
   var api = factory(
@@ -1386,10 +1609,11 @@ button {
     global.MonsterMintSequences,
     global.MonsterMintUtils,
     global.MonsterMintTokens,
-    global.MonsterMintRenderer
+    global.MonsterMintRenderer,
+    global.MonsterMintPrint
   );
   global.MonsterMintApp = api;
-})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, State, Sequences, Utils, Tokens, Renderer) {
+})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, State, Sequences, Utils, Tokens, Renderer, Print) {
   var TAB_CONFIG = [
     { id: "settings", label: "Settings" },
     { id: "designer", label: "Designer" },
@@ -1576,11 +1800,32 @@ button {
     ].join("");
   }
 
-  function renderPrintPanel() {
+  function renderPrintPanel(state) {
+    var rows = Print.getSelectionRows(state.project);
+    var layout = Print.layoutProject(state.project);
+    var hasBacks = state.project.tokens.some(function (token) {
+      return token.back.enabled && (token.back.images.length || token.back.texts.length || token.back.backgroundColor);
+    });
     return [
-      '<div class="empty-state">',
-      "  <h2>Print pipeline pending</h2>",
-      "  <p>Page layout, previews, and print rendering will be added after the designer is in place.</p>",
+      '<div class="print-layout">',
+      '  <section class="panel-card">',
+      "    <h2>Print Selections</h2>",
+      renderPrintSelectionForm(rows),
+      "  </section>",
+      '  <section class="panel-card">',
+      "    <h2>Preview</h2>",
+      '    <div class="button-row">',
+      '      <button class="button button-primary" type="button" data-action="print-fronts">Print Fronts</button>',
+      '      <button class="button" type="button" data-action="print-backs"' + (hasBacks ? "" : " disabled") + '>Print Backs</button>',
+      '      <button class="button" type="button" data-action="print-both"' + (hasBacks ? "" : " disabled") + '>Print Both</button>',
+      "    </div>",
+      layout.pages.length && layout.pages[0].items.length
+        ? renderPreviewSection(layout, state.project, "front", "Front Pages")
+        : '<div class="empty-state">Choose at least one token copy to generate pages.</div>',
+      hasBacks && layout.pages.length && layout.pages[0].items.length
+        ? renderPreviewSection(layout, state.project, "back", "Back Pages")
+        : "",
+      "  </section>",
       "</div>"
     ].join("");
   }
@@ -1784,6 +2029,7 @@ button {
     bindSettingsForms(appElement, store);
     bindTransferActions(appElement, store);
     bindDesignerEvents(appElement, store);
+    bindPrintEvents(appElement, store);
   }
 
   function bindSettingsForms(appElement, store) {
@@ -2300,6 +2546,56 @@ button {
     });
   }
 
+  function bindPrintEvents(appElement, store) {
+    var printForm = appElement.querySelector("[data-form='print-selections']");
+    if (printForm) {
+      printForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var rows = Print.getSelectionRows(store.getState().project).map(function (row) {
+          return {
+            tokenId: row.tokenId,
+            copies: printForm.querySelector('[name="copies-' + row.tokenId + '"]').value,
+            sequenceStartIndex: printForm.querySelector('[name="start-' + row.tokenId + '"]').value
+          };
+        });
+
+        store.updateProject(function (project) {
+          project.printSelections = Print.normalizeSelections(project, rows);
+        });
+      });
+    }
+
+    var layout = Print.layoutProject(store.getState().project);
+    var hasPages = layout.pages.length && layout.pages[0].items.length;
+
+    var printFrontsButton = appElement.querySelector("[data-action='print-fronts']");
+    if (printFrontsButton) {
+      printFrontsButton.addEventListener("click", function () {
+        if (hasPages) {
+          openPrintWindow(layout, store.getState().project, "front");
+        }
+      });
+    }
+
+    var printBacksButton = appElement.querySelector("[data-action='print-backs']");
+    if (printBacksButton) {
+      printBacksButton.addEventListener("click", function () {
+        if (hasPages) {
+          openPrintWindow(layout, store.getState().project, "back");
+        }
+      });
+    }
+
+    var printBothButton = appElement.querySelector("[data-action='print-both']");
+    if (printBothButton) {
+      printBothButton.addEventListener("click", function () {
+        if (hasPages) {
+          openPrintWindow(layout, store.getState().project, "both");
+        }
+      });
+    }
+  }
+
   function handleGlobalPointerMove(event) {
     if (!designerInteraction || !mountedStore) {
       return;
@@ -2563,6 +2859,141 @@ button {
     }
 
     return "#000000";
+  }
+
+  function renderPrintSelectionForm(rows) {
+    if (!rows.length) {
+      return '<div class="empty-state">Create token templates in the designer before preparing print pages.</div>';
+    }
+
+    return [
+      '<form class="form-grid" data-form="print-selections">',
+      '  <table class="print-table">',
+      "    <thead><tr><th>Token</th><th>Copies</th><th>Start Index</th><th>Max</th></tr></thead>",
+      "    <tbody>",
+      rows.map(function (row) {
+        return [
+          "      <tr>",
+          "        <td>" + escapeHtml(row.tokenName) + " (" + row.diameterIn + '&quot;)</td>',
+          '        <td><input type="number" min="0" step="1" name="copies-' + row.tokenId + '" value="' + row.copies + '"' + (Number.isFinite(row.maxCopies) ? ' max="' + row.maxCopies + '"' : "") + "></td>",
+          '        <td><input type="number" min="0" step="1" name="start-' + row.tokenId + '" value="' + row.sequenceStartIndex + '"></td>',
+          "        <td>" + (Number.isFinite(row.maxCopies) ? row.maxCopies : "&infin;") + "</td>",
+          "      </tr>"
+        ].join("");
+      }).join(""),
+      "    </tbody>",
+      "  </table>",
+      '  <div class="button-row"><button class="button button-primary" type="submit">Save Print Selections</button></div>',
+      "</form>"
+    ].join("");
+  }
+
+  function renderPreviewSection(layout, project, faceName, title) {
+    return [
+      "    <h3>" + title + "</h3>",
+      '    <div class="preview-page-grid">',
+      layout.pages.map(function (page, index) {
+        return [
+          '<article class="preview-page-card">',
+          '  <p class="preview-page-label">Page ' + (index + 1) + "</p>",
+          '  <div class="preview-page-svg">',
+          renderPageSvg(page, project, faceName, true),
+          "  </div>",
+          "</article>"
+        ].join("");
+      }).join(""),
+      "    </div>"
+    ].join("");
+  }
+
+  function renderPageSvg(page, project, faceName, isPreview) {
+    var pageWidth = page.pageWidthIn * 100;
+    var pageHeight = page.pageHeightIn * 100;
+    return [
+      '<svg viewBox="0 0 ' + pageWidth + " " + pageHeight + '" xmlns="http://www.w3.org/2000/svg"' + (isPreview ? "" : ' width="100%" height="100%"') + '>',
+      '  <rect x="0" y="0" width="' + pageWidth + '" height="' + pageHeight + '" fill="#ffffff"></rect>',
+      page.items.map(function (item) {
+        return renderPageItem(item, project, faceName);
+      }).join(""),
+      "</svg>"
+    ].join("");
+  }
+
+  function renderPageItem(item, project, faceName) {
+    var x = item.xIn * 100;
+    var y = item.yIn * 100;
+    var size = item.diameterIn * 100;
+    var centerX = x + size / 2;
+    var centerY = y + size / 2;
+    var guideStyle = project.settings.guideStyle;
+    var tokenSvg = faceName === "back" && !item.token.back.enabled
+      ? ""
+      : Renderer.renderTokenSvg(item.token, project, {
+        face: faceName,
+        sequenceIndex: item.sequenceIndex,
+        interactive: false,
+        svgAttributes: 'x="' + x + '" y="' + y + '" width="' + size + '" height="' + size + '"'
+      });
+
+    return [
+      renderGuideMarks(centerX, centerY, size / 2, guideStyle),
+      tokenSvg
+    ].join("");
+  }
+
+  function renderGuideMarks(centerX, centerY, radius, guideStyle) {
+    var parts = [];
+
+    if (guideStyle === "cut" || guideStyle === "cut-and-punch") {
+      parts.push('<circle cx="' + centerX + '" cy="' + centerY + '" r="' + radius + '" fill="none" stroke="#777777" stroke-width="0.75"></circle>');
+    }
+
+    if (guideStyle === "punch" || guideStyle === "cut-and-punch") {
+      parts.push('<line x1="' + (centerX - 4) + '" y1="' + centerY + '" x2="' + (centerX + 4) + '" y2="' + centerY + '" stroke="#999999" stroke-width="0.6"></line>');
+      parts.push('<line x1="' + centerX + '" y1="' + (centerY - 4) + '" x2="' + centerX + '" y2="' + (centerY + 4) + '" stroke="#999999" stroke-width="0.6"></line>');
+    }
+
+    return parts.join("");
+  }
+
+  function openPrintWindow(layout, project, mode) {
+    var printWindow = global.open("", "_blank", "noopener,noreferrer");
+    if (!printWindow) {
+      global.alert("The print window was blocked by the browser.");
+      return;
+    }
+
+    var pages = [];
+    if (mode === "front" || mode === "both") {
+      pages = pages.concat(layout.pages.map(function (page) {
+        return renderPrintablePage(page, project, "front");
+      }));
+    }
+    if (mode === "back" || mode === "both") {
+      pages = pages.concat(layout.pages.map(function (page) {
+        return renderPrintablePage(page, project, "back");
+      }));
+    }
+
+    printWindow.document.write([
+      "<!doctype html><html><head><title>Monster Mint Print</title><style>",
+      "html,body{margin:0;padding:0;background:#fff;font-family:Georgia,serif;}",
+      ".print-page{page-break-after:always;break-after:page;display:block;}",
+      ".print-page:last-child{page-break-after:auto;break-after:auto;}",
+      "</style></head><body>",
+      pages.join(""),
+      "<script>window.addEventListener('load',function(){window.print();});<\/script>",
+      "</body></html>"
+    ].join(""));
+    printWindow.document.close();
+  }
+
+  function renderPrintablePage(page, project, faceName) {
+    return [
+      '<div class="print-page" style="width:' + page.pageWidthIn + "in;height:" + page.pageHeightIn + 'in;">',
+      renderPageSvg(page, project, faceName, false),
+      "</div>"
+    ].join("");
   }
 
   function mount() {

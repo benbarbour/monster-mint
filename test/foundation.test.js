@@ -7,6 +7,7 @@ const Storage = require("../src/js/10-storage.js");
 const State = require("../src/js/20-state.js");
 const Sequences = require("../src/js/30-sequences.js");
 const Tokens = require("../src/js/40-tokens.js");
+const Print = require("../src/js/60-print.js");
 
 function createMemoryStorage() {
   const map = new Map();
@@ -167,4 +168,45 @@ test("clampRect keeps components inside the token square", () => {
     width: 0.3,
     height: 0.4
   });
+});
+
+test("print max copies are capped by the shortest bounded sequence", () => {
+  const project = Schema.createDefaultProject();
+  const textSequence = Sequences.createTextSequence({
+    id: "t1",
+    type: "custom",
+    customValuesText: "one\ntwo\nthree"
+  });
+  const colorSequence = Sequences.createColorSequence({
+    id: "c1",
+    valuesText: "#000000\n#ffffff"
+  });
+  const token = Tokens.createTokenTemplate({
+    front: {
+      texts: [
+        Tokens.createTextComponent({
+          contentMode: "sequence",
+          textSequenceRef: "t1",
+          colorMode: "sequence",
+          colorSequenceRef: "c1"
+        })
+      ]
+    }
+  });
+  project.sequences.text.push(textSequence);
+  project.sequences.color.push(colorSequence);
+
+  assert.equal(Print.getTokenMaxCopies(token, project), 2);
+});
+
+test("print layout creates at least one page with placed items", () => {
+  const project = Schema.createDefaultProject();
+  const token = Tokens.createTokenTemplate({ id: "token-1", diameterIn: 1 });
+  project.tokens.push(token);
+  project.printSelections = [{ tokenId: "token-1", copies: 3, sequenceStartIndex: 0 }];
+
+  const layout = Print.layoutProject(project);
+
+  assert.equal(layout.pages.length >= 1, true);
+  assert.equal(layout.pages[0].items.length, 3);
 });

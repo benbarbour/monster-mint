@@ -23,8 +23,10 @@
     var selectedComponentId = opts.selectedComponentId;
     var tokenSlug = token.id.replace(/[^a-z0-9_-]/gi, "");
 
+    var svgAttributes = opts.svgAttributes ? " " + opts.svgAttributes : "";
+
     return [
-      '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" data-preview-svg>',
+      '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" data-preview-svg' + svgAttributes + '>',
       '  <defs>',
       '    <clipPath id="token-clip-' + tokenSlug + '"><circle cx="50" cy="50" r="50"></circle></clipPath>',
       renderTextClipPaths(face.texts, tokenSlug),
@@ -184,4 +186,3 @@
     fitFontSize: fitFontSize
   };
 });
-

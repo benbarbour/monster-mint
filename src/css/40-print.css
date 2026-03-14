@@ -1,0 +1,46 @@
+.print-layout {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.print-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-ui);
+}
+
+.print-table th,
+.print-table td {
+  padding: 0.6rem;
+  border-bottom: 1px solid rgba(184, 171, 150, 0.7);
+  text-align: left;
+}
+
+.print-table input {
+  width: 5.5rem;
+}
+
+.preview-page-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.preview-page-card {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.preview-page-label {
+  margin: 0;
+  font-family: var(--font-ui);
+  color: var(--ink-muted);
+}
+
+.preview-page-svg {
+  width: 100%;
+  border: 1px solid rgba(184, 171, 150, 0.85);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+

@@ -5,10 +5,11 @@
     global.MonsterMintSequences,
     global.MonsterMintUtils,
     global.MonsterMintTokens,
-    global.MonsterMintRenderer
+    global.MonsterMintRenderer,
+    global.MonsterMintPrint
   );
   global.MonsterMintApp = api;
-})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, State, Sequences, Utils, Tokens, Renderer) {
+})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, State, Sequences, Utils, Tokens, Renderer, Print) {
   var TAB_CONFIG = [
     { id: "settings", label: "Settings" },
     { id: "designer", label: "Designer" },
@@ -195,11 +196,32 @@
     ].join("");
   }
 
-  function renderPrintPanel() {
+  function renderPrintPanel(state) {
+    var rows = Print.getSelectionRows(state.project);
+    var layout = Print.layoutProject(state.project);
+    var hasBacks = state.project.tokens.some(function (token) {
+      return token.back.enabled && (token.back.images.length || token.back.texts.length || token.back.backgroundColor);
+    });
     return [
-      '<div class="empty-state">',
-      "  <h2>Print pipeline pending</h2>",
-      "  <p>Page layout, previews, and print rendering will be added after the designer is in place.</p>",
+      '<div class="print-layout">',
+      '  <section class="panel-card">',
+      "    <h2>Print Selections</h2>",
+      renderPrintSelectionForm(rows),
+      "  </section>",
+      '  <section class="panel-card">',
+      "    <h2>Preview</h2>",
+      '    <div class="button-row">',
+      '      <button class="button button-primary" type="button" data-action="print-fronts">Print Fronts</button>',
+      '      <button class="button" type="button" data-action="print-backs"' + (hasBacks ? "" : " disabled") + '>Print Backs</button>',
+      '      <button class="button" type="button" data-action="print-both"' + (hasBacks ? "" : " disabled") + '>Print Both</button>',
+      "    </div>",
+      layout.pages.length && layout.pages[0].items.length
+        ? renderPreviewSection(layout, state.project, "front", "Front Pages")
+        : '<div class="empty-state">Choose at least one token copy to generate pages.</div>',
+      hasBacks && layout.pages.length && layout.pages[0].items.length
+        ? renderPreviewSection(layout, state.project, "back", "Back Pages")
+        : "",
+      "  </section>",
       "</div>"
     ].join("");
   }
@@ -403,6 +425,7 @@
     bindSettingsForms(appElement, store);
     bindTransferActions(appElement, store);
     bindDesignerEvents(appElement, store);
+    bindPrintEvents(appElement, store);
   }
 
   function bindSettingsForms(appElement, store) {
@@ -919,6 +942,56 @@
     });
   }
 
+  function bindPrintEvents(appElement, store) {
+    var printForm = appElement.querySelector("[data-form='print-selections']");
+    if (printForm) {
+      printForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var rows = Print.getSelectionRows(store.getState().project).map(function (row) {
+          return {
+            tokenId: row.tokenId,
+            copies: printForm.querySelector('[name="copies-' + row.tokenId + '"]').value,
+            sequenceStartIndex: printForm.querySelector('[name="start-' + row.tokenId + '"]').value
+          };
+        });
+
+        store.updateProject(function (project) {
+          project.printSelections = Print.normalizeSelections(project, rows);
+        });
+      });
+    }
+
+    var layout = Print.layoutProject(store.getState().project);
+    var hasPages = layout.pages.length && layout.pages[0].items.length;
+
+    var printFrontsButton = appElement.querySelector("[data-action='print-fronts']");
+    if (printFrontsButton) {
+      printFrontsButton.addEventListener("click", function () {
+        if (hasPages) {
+          openPrintWindow(layout, store.getState().project, "front");
+        }
+      });
+    }
+
+    var printBacksButton = appElement.querySelector("[data-action='print-backs']");
+    if (printBacksButton) {
+      printBacksButton.addEventListener("click", function () {
+        if (hasPages) {
+          openPrintWindow(layout, store.getState().project, "back");
+        }
+      });
+    }
+
+    var printBothButton = appElement.querySelector("[data-action='print-both']");
+    if (printBothButton) {
+      printBothButton.addEventListener("click", function () {
+        if (hasPages) {
+          openPrintWindow(layout, store.getState().project, "both");
+        }
+      });
+    }
+  }
+
   function handleGlobalPointerMove(event) {
     if (!designerInteraction || !mountedStore) {
       return;
@@ -1182,6 +1255,141 @@
     }
 
     return "#000000";
+  }
+
+  function renderPrintSelectionForm(rows) {
+    if (!rows.length) {
+      return '<div class="empty-state">Create token templates in the designer before preparing print pages.</div>';
+    }
+
+    return [
+      '<form class="form-grid" data-form="print-selections">',
+      '  <table class="print-table">',
+      "    <thead><tr><th>Token</th><th>Copies</th><th>Start Index</th><th>Max</th></tr></thead>",
+      "    <tbody>",
+      rows.map(function (row) {
+        return [
+          "      <tr>",
+          "        <td>" + escapeHtml(row.tokenName) + " (" + row.diameterIn + '&quot;)</td>',
+          '        <td><input type="number" min="0" step="1" name="copies-' + row.tokenId + '" value="' + row.copies + '"' + (Number.isFinite(row.maxCopies) ? ' max="' + row.maxCopies + '"' : "") + "></td>",
+          '        <td><input type="number" min="0" step="1" name="start-' + row.tokenId + '" value="' + row.sequenceStartIndex + '"></td>',
+          "        <td>" + (Number.isFinite(row.maxCopies) ? row.maxCopies : "&infin;") + "</td>",
+          "      </tr>"
+        ].join("");
+      }).join(""),
+      "    </tbody>",
+      "  </table>",
+      '  <div class="button-row"><button class="button button-primary" type="submit">Save Print Selections</button></div>',
+      "</form>"
+    ].join("");
+  }
+
+  function renderPreviewSection(layout, project, faceName, title) {
+    return [
+      "    <h3>" + title + "</h3>",
+      '    <div class="preview-page-grid">',
+      layout.pages.map(function (page, index) {
+        return [
+          '<article class="preview-page-card">',
+          '  <p class="preview-page-label">Page ' + (index + 1) + "</p>",
+          '  <div class="preview-page-svg">',
+          renderPageSvg(page, project, faceName, true),
+          "  </div>",
+          "</article>"
+        ].join("");
+      }).join(""),
+      "    </div>"
+    ].join("");
+  }
+
+  function renderPageSvg(page, project, faceName, isPreview) {
+    var pageWidth = page.pageWidthIn * 100;
+    var pageHeight = page.pageHeightIn * 100;
+    return [
+      '<svg viewBox="0 0 ' + pageWidth + " " + pageHeight + '" xmlns="http://www.w3.org/2000/svg"' + (isPreview ? "" : ' width="100%" height="100%"') + '>',
+      '  <rect x="0" y="0" width="' + pageWidth + '" height="' + pageHeight + '" fill="#ffffff"></rect>',
+      page.items.map(function (item) {
+        return renderPageItem(item, project, faceName);
+      }).join(""),
+      "</svg>"
+    ].join("");
+  }
+
+  function renderPageItem(item, project, faceName) {
+    var x = item.xIn * 100;
+    var y = item.yIn * 100;
+    var size = item.diameterIn * 100;
+    var centerX = x + size / 2;
+    var centerY = y + size / 2;
+    var guideStyle = project.settings.guideStyle;
+    var tokenSvg = faceName === "back" && !item.token.back.enabled
+      ? ""
+      : Renderer.renderTokenSvg(item.token, project, {
+        face: faceName,
+        sequenceIndex: item.sequenceIndex,
+        interactive: false,
+        svgAttributes: 'x="' + x + '" y="' + y + '" width="' + size + '" height="' + size + '"'
+      });
+
+    return [
+      renderGuideMarks(centerX, centerY, size / 2, guideStyle),
+      tokenSvg
+    ].join("");
+  }
+
+  function renderGuideMarks(centerX, centerY, radius, guideStyle) {
+    var parts = [];
+
+    if (guideStyle === "cut" || guideStyle === "cut-and-punch") {
+      parts.push('<circle cx="' + centerX + '" cy="' + centerY + '" r="' + radius + '" fill="none" stroke="#777777" stroke-width="0.75"></circle>');
+    }
+
+    if (guideStyle === "punch" || guideStyle === "cut-and-punch") {
+      parts.push('<line x1="' + (centerX - 4) + '" y1="' + centerY + '" x2="' + (centerX + 4) + '" y2="' + centerY + '" stroke="#999999" stroke-width="0.6"></line>');
+      parts.push('<line x1="' + centerX + '" y1="' + (centerY - 4) + '" x2="' + centerX + '" y2="' + (centerY + 4) + '" stroke="#999999" stroke-width="0.6"></line>');
+    }
+
+    return parts.join("");
+  }
+
+  function openPrintWindow(layout, project, mode) {
+    var printWindow = global.open("", "_blank", "noopener,noreferrer");
+    if (!printWindow) {
+      global.alert("The print window was blocked by the browser.");
+      return;
+    }
+
+    var pages = [];
+    if (mode === "front" || mode === "both") {
+      pages = pages.concat(layout.pages.map(function (page) {
+        return renderPrintablePage(page, project, "front");
+      }));
+    }
+    if (mode === "back" || mode === "both") {
+      pages = pages.concat(layout.pages.map(function (page) {
+        return renderPrintablePage(page, project, "back");
+      }));
+    }
+
+    printWindow.document.write([
+      "<!doctype html><html><head><title>Monster Mint Print</title><style>",
+      "html,body{margin:0;padding:0;background:#fff;font-family:Georgia,serif;}",
+      ".print-page{page-break-after:always;break-after:page;display:block;}",
+      ".print-page:last-child{page-break-after:auto;break-after:auto;}",
+      "</style></head><body>",
+      pages.join(""),
+      "<script>window.addEventListener('load',function(){window.print();});<\/script>",
+      "</body></html>"
+    ].join(""));
+    printWindow.document.close();
+  }
+
+  function renderPrintablePage(page, project, faceName) {
+    return [
+      '<div class="print-page" style="width:' + page.pageWidthIn + "in;height:" + page.pageHeightIn + 'in;">',
+      renderPageSvg(page, project, faceName, false),
+      "</div>"
+    ].join("");
   }
 
   function mount() {
