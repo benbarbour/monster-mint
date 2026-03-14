@@ -43,12 +43,11 @@
 }
 
 .designer-drawer {
-  max-height: calc(100vh - 2rem);
-  overflow: hidden;
+  align-self: start;
 }
 
 .designer-drawer .drawer-body {
-  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .designer-drawer .drawer-section h3 {

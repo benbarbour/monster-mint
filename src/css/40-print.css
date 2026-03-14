@@ -28,14 +28,18 @@
 
 .preview-tab-list {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.2rem;
   margin-bottom: var(--space-2);
   padding: 0 0.5rem;
   border-bottom: 1px solid rgba(184, 171, 150, 0.8);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
 }
 
 .preview-tab {
+  flex: 0 0 auto;
   border: 1px solid transparent;
   border-bottom: 0;
   border-radius: 0.9rem 0.9rem 0 0;

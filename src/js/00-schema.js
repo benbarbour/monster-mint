@@ -42,6 +42,22 @@
     }
   ];
 
+  function createDefaultTextDefaults() {
+    return {
+      fontFamily: "Georgia",
+      fontWeight: "700",
+      colorMode: "manual",
+      color: "#111111",
+      colorSequenceRef: null,
+      textBorder: {
+        width: 0,
+        colorMode: "manual",
+        color: "#111111",
+        colorSequenceRef: null
+      }
+    };
+  }
+
   function timestamp() {
     return new Date().toISOString();
   }
@@ -57,7 +73,8 @@
         pagePresetId: "letter",
         pageOrientation: "portrait",
         pageMarginIn: 0.25,
-        bleedIn: 0.0625
+        bleedIn: 0.0625,
+        textDefaults: createDefaultTextDefaults()
       },
       sequences: {
         text: clone(BUILT_IN_TEXT_SEQUENCES),
@@ -84,7 +101,8 @@
         pagePresetId: project.settings && findPagePreset(project.settings.pagePresetId) ? project.settings.pagePresetId : defaults.settings.pagePresetId,
         pageOrientation: project.settings && project.settings.pageOrientation === "landscape" ? "landscape" : "portrait",
         pageMarginIn: asPositiveNumber(project.settings && project.settings.pageMarginIn, defaults.settings.pageMarginIn),
-        bleedIn: asNonNegativeNumber(project.settings && project.settings.bleedIn, defaults.settings.bleedIn)
+        bleedIn: asNonNegativeNumber(project.settings && project.settings.bleedIn, defaults.settings.bleedIn),
+        textDefaults: normalizeTextDefaults(project.settings && project.settings.textDefaults, defaults.settings.textDefaults)
       },
       sequences: {
         text: clone(BUILT_IN_TEXT_SEQUENCES),
@@ -122,6 +140,25 @@
     return clone(builtIns).concat(customSequences);
   }
 
+  function normalizeTextDefaults(input, fallback) {
+    var payload = input && typeof input === "object" ? input : {};
+    var defaults = fallback || createDefaultTextDefaults();
+    var textBorder = payload.textBorder && typeof payload.textBorder === "object" ? payload.textBorder : {};
+    return {
+      fontFamily: typeof payload.fontFamily === "string" && payload.fontFamily.trim() ? payload.fontFamily : defaults.fontFamily,
+      fontWeight: typeof payload.fontWeight === "string" && payload.fontWeight.trim() ? payload.fontWeight : defaults.fontWeight,
+      colorMode: payload.colorMode === "sequence" ? "sequence" : "manual",
+      color: typeof payload.color === "string" && payload.color.trim() ? payload.color : defaults.color,
+      colorSequenceRef: typeof payload.colorSequenceRef === "string" && payload.colorSequenceRef ? payload.colorSequenceRef : null,
+      textBorder: {
+        width: typeof textBorder.width === "number" && Number.isFinite(textBorder.width) ? Math.max(0, textBorder.width) : defaults.textBorder.width,
+        colorMode: textBorder.colorMode === "sequence" ? "sequence" : "manual",
+        color: typeof textBorder.color === "string" && textBorder.color.trim() ? textBorder.color : defaults.textBorder.color,
+        colorSequenceRef: typeof textBorder.colorSequenceRef === "string" && textBorder.colorSequenceRef ? textBorder.colorSequenceRef : null
+      }
+    };
+  }
+
   return {
     STORAGE_KEY: STORAGE_KEY,
     UI_STORAGE_KEY: UI_STORAGE_KEY,
@@ -130,6 +167,7 @@
     TOKEN_SIZES: TOKEN_SIZES,
     BUILT_IN_TEXT_SEQUENCES: BUILT_IN_TEXT_SEQUENCES,
     BUILT_IN_COLOR_SEQUENCES: BUILT_IN_COLOR_SEQUENCES,
+    createDefaultTextDefaults: createDefaultTextDefaults,
     clone: clone,
     createDefaultProject: createDefaultProject,
     normalizeProject: normalizeProject,

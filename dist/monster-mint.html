@@ -204,6 +204,11 @@ button {
 .editor-drawer {
   position: sticky;
   top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 2rem);
+  min-height: 0;
+  overflow: hidden;
   background: rgba(255, 252, 246, 0.96);
   border: 1px solid rgba(184, 171, 150, 0.9);
   border-radius: var(--radius);
@@ -236,6 +241,8 @@ button {
   display: grid;
   gap: var(--space-2);
   padding: var(--space-2);
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .panel-card h2,
@@ -527,12 +534,11 @@ button {
 }
 
 .designer-drawer {
-  max-height: calc(100vh - 2rem);
-  overflow: hidden;
+  align-self: start;
 }
 
 .designer-drawer .drawer-body {
-  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .designer-drawer .drawer-section h3 {
@@ -651,14 +657,18 @@ button {
 
 .preview-tab-list {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.2rem;
   margin-bottom: var(--space-2);
   padding: 0 0.5rem;
   border-bottom: 1px solid rgba(184, 171, 150, 0.8);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
 }
 
 .preview-tab {
+  flex: 0 0 auto;
   border: 1px solid transparent;
   border-bottom: 0;
   border-radius: 0.9rem 0.9rem 0 0;
@@ -743,6 +753,22 @@ button {
     }
   ];
 
+  function createDefaultTextDefaults() {
+    return {
+      fontFamily: "Georgia",
+      fontWeight: "700",
+      colorMode: "manual",
+      color: "#111111",
+      colorSequenceRef: null,
+      textBorder: {
+        width: 0,
+        colorMode: "manual",
+        color: "#111111",
+        colorSequenceRef: null
+      }
+    };
+  }
+
   function timestamp() {
     return new Date().toISOString();
   }
@@ -758,7 +784,8 @@ button {
         pagePresetId: "letter",
         pageOrientation: "portrait",
         pageMarginIn: 0.25,
-        bleedIn: 0.0625
+        bleedIn: 0.0625,
+        textDefaults: createDefaultTextDefaults()
       },
       sequences: {
         text: clone(BUILT_IN_TEXT_SEQUENCES),
@@ -785,7 +812,8 @@ button {
         pagePresetId: project.settings && findPagePreset(project.settings.pagePresetId) ? project.settings.pagePresetId : defaults.settings.pagePresetId,
         pageOrientation: project.settings && project.settings.pageOrientation === "landscape" ? "landscape" : "portrait",
         pageMarginIn: asPositiveNumber(project.settings && project.settings.pageMarginIn, defaults.settings.pageMarginIn),
-        bleedIn: asNonNegativeNumber(project.settings && project.settings.bleedIn, defaults.settings.bleedIn)
+        bleedIn: asNonNegativeNumber(project.settings && project.settings.bleedIn, defaults.settings.bleedIn),
+        textDefaults: normalizeTextDefaults(project.settings && project.settings.textDefaults, defaults.settings.textDefaults)
       },
       sequences: {
         text: clone(BUILT_IN_TEXT_SEQUENCES),
@@ -823,6 +851,25 @@ button {
     return clone(builtIns).concat(customSequences);
   }
 
+  function normalizeTextDefaults(input, fallback) {
+    var payload = input && typeof input === "object" ? input : {};
+    var defaults = fallback || createDefaultTextDefaults();
+    var textBorder = payload.textBorder && typeof payload.textBorder === "object" ? payload.textBorder : {};
+    return {
+      fontFamily: typeof payload.fontFamily === "string" && payload.fontFamily.trim() ? payload.fontFamily : defaults.fontFamily,
+      fontWeight: typeof payload.fontWeight === "string" && payload.fontWeight.trim() ? payload.fontWeight : defaults.fontWeight,
+      colorMode: payload.colorMode === "sequence" ? "sequence" : "manual",
+      color: typeof payload.color === "string" && payload.color.trim() ? payload.color : defaults.color,
+      colorSequenceRef: typeof payload.colorSequenceRef === "string" && payload.colorSequenceRef ? payload.colorSequenceRef : null,
+      textBorder: {
+        width: typeof textBorder.width === "number" && Number.isFinite(textBorder.width) ? Math.max(0, textBorder.width) : defaults.textBorder.width,
+        colorMode: textBorder.colorMode === "sequence" ? "sequence" : "manual",
+        color: typeof textBorder.color === "string" && textBorder.color.trim() ? textBorder.color : defaults.textBorder.color,
+        colorSequenceRef: typeof textBorder.colorSequenceRef === "string" && textBorder.colorSequenceRef ? textBorder.colorSequenceRef : null
+      }
+    };
+  }
+
   return {
     STORAGE_KEY: STORAGE_KEY,
     UI_STORAGE_KEY: UI_STORAGE_KEY,
@@ -831,6 +878,7 @@ button {
     TOKEN_SIZES: TOKEN_SIZES,
     BUILT_IN_TEXT_SEQUENCES: BUILT_IN_TEXT_SEQUENCES,
     BUILT_IN_COLOR_SEQUENCES: BUILT_IN_COLOR_SEQUENCES,
+    createDefaultTextDefaults: createDefaultTextDefaults,
     clone: clone,
     createDefaultProject: createDefaultProject,
     normalizeProject: normalizeProject,
@@ -1844,14 +1892,19 @@ button {
     var handleY = box.y + box.height - 2;
     var rotateHandleX = box.x + box.width / 2;
     var rotateHandleY = box.y - 8;
+    var centerX = box.x + box.width / 2;
+    var centerY = box.y + box.height / 2;
+    var transform = type === "image"
+      ? ' transform="rotate(' + Number(component.rotationDeg || 0) + " " + centerX + " " + centerY + ')"'
+      : "";
     return [
-      '<g clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="' + type + '">',
+      '<g clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="' + type + '"' + transform + '>',
       renderSelectionBox(box),
-      '  <rect x="' + handleX + '" y="' + handleY + '" width="4" height="4" rx="1" fill="#ffffff" stroke="#111111" stroke-width="0.8" data-drag-mode="resize"></rect>',
+      '  <rect x="' + handleX + '" y="' + handleY + '" width="4" height="4" rx="1" fill="#ffffff" stroke="#111111" stroke-width="0.6" data-drag-mode="resize"></rect>',
       type === "image"
-        ? '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#ffffff" stroke-width="1.2"></line>' +
-          '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#111111" stroke-width="0.6" stroke-dasharray="2 2" stroke-dashoffset="2"></line>' +
-          '  <circle cx="' + rotateHandleX + '" cy="' + rotateHandleY + '" r="3.5" fill="#ffffff" stroke="#111111" stroke-width="0.8" data-drag-mode="rotate"></circle>'
+        ? '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#ffffff" stroke-width="0.9"></line>' +
+          '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#111111" stroke-width="0.45" stroke-dasharray="2 2" stroke-dashoffset="2"></line>' +
+          '  <circle cx="' + rotateHandleX + '" cy="' + rotateHandleY + '" r="3.5" fill="#ffffff" stroke="#111111" stroke-width="0.6" data-drag-mode="rotate"></circle>'
         : "",
       "</g>"
     ].join("");
@@ -1859,8 +1912,8 @@ button {
 
   function renderSelectionBox(box) {
     return [
-      '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.width + '" height="' + box.height + '" fill="none" stroke="#ffffff" stroke-width="0.8" stroke-dasharray="4 4"></rect>',
-      '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.width + '" height="' + box.height + '" fill="none" stroke="#111111" stroke-width="0.8" stroke-dasharray="4 4" stroke-dashoffset="4"></rect>'
+      '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.width + '" height="' + box.height + '" fill="none" stroke="#ffffff" stroke-width="0.45" stroke-dasharray="4 4"></rect>',
+      '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.width + '" height="' + box.height + '" fill="none" stroke="#111111" stroke-width="0.45" stroke-dasharray="4 4" stroke-dashoffset="4"></rect>'
     ].join("");
   }
 
@@ -2099,6 +2152,16 @@ button {
     { id: "designer", label: "Designer" },
     { id: "print", label: "Print" }
   ];
+  var FONT_CHOICES = [
+    { value: "Georgia", label: "Georgia" },
+    { value: "Times New Roman", label: "Times New Roman" },
+    { value: "Palatino Linotype", label: "Palatino Linotype" },
+    { value: "Trebuchet MS", label: "Trebuchet MS" },
+    { value: "Verdana", label: "Verdana" },
+    { value: "Arial", label: "Arial" },
+    { value: "Courier New", label: "Courier New" },
+    { value: "Impact", label: "Impact" }
+  ];
   var designerInteraction = null;
   var mountedStore = null;
   var activePrintFrame = null;
@@ -2162,6 +2225,10 @@ button {
       '<div class="settings-shell' + (settingsDrawer ? " has-drawer" : "") + '">',
       '  <div class="settings-main">',
       '    <div class="panel-grid settings-grid">',
+      '      <section class="panel-card">',
+      "    <h2>Default Text</h2>",
+      renderDefaultTextSettingsForm(state.project.settings.textDefaults, state.project.sequences.color),
+      "      </section>",
       '      <section class="panel-card">',
       "    <h2>Color Sequences</h2>",
       renderColorSequenceManager(customColorSequences, selectedColorSequence, editingColorSequence),
@@ -2403,7 +2470,7 @@ button {
         "</div>"
       ].join("")),
       '  <div class="field-row two-up">',
-      '    <label class="field">Font family<input name="fontFamily" value="' + escapeHtml(component.fontFamily) + '"></label>',
+      '    <label class="field">Font family<select name="fontFamily">' + renderFontFamilyOptions(component.fontFamily) + "</select></label>",
       '    <label class="field">Font weight<select name="fontWeight">' + renderFontWeightOptions(component.fontWeight) + "</select></label>",
       "  </div>",
       renderColorPicker({
@@ -2438,6 +2505,37 @@ button {
       '    <input class="visually-hidden" type="file" accept="image/*" data-replace-image-input>',
       '    <span class="field-help">Changes save automatically.</span>',
       "  </div>",
+      "</form>"
+    ].join("");
+  }
+
+  function renderDefaultTextSettingsForm(textDefaults, colorSequences) {
+    return [
+      '<form class="form-grid" data-form="text-defaults">',
+      '  <div class="field-row two-up">',
+      '    <label class="field">Font family<select name="fontFamily">' + renderFontFamilyOptions(textDefaults.fontFamily) + "</select></label>",
+      '    <label class="field">Font weight<select name="fontWeight">' + renderFontWeightOptions(textDefaults.fontWeight) + "</select></label>",
+      "  </div>",
+      renderColorPicker({
+        label: "Default text color",
+        sourceName: "defaultTextColorSource",
+        colorName: "defaultTextColor",
+        currentMode: textDefaults.colorMode,
+        currentColor: textDefaults.color,
+        currentSequenceRef: textDefaults.colorSequenceRef,
+        sequences: colorSequences
+      }),
+      '<label class="field">Default text border<input type="number" min="0" max="8" step="0.1" name="defaultTextBorderWidth" value="' + textDefaults.textBorder.width + '"><span class="field-help">0 turns it off for new text components.</span></label>',
+      renderColorPicker({
+        label: "Default text border color",
+        sourceName: "defaultTextBorderColorSource",
+        colorName: "defaultTextBorderColor",
+        currentMode: textDefaults.textBorder.colorMode,
+        currentColor: textDefaults.textBorder.color,
+        currentSequenceRef: textDefaults.textBorder.colorSequenceRef,
+        sequences: colorSequences
+      }),
+      '  <p class="field-help">These defaults apply to newly created text components.</p>',
       "</form>"
     ].join("");
   }
@@ -2554,6 +2652,37 @@ button {
   }
 
   function bindSettingsForms(appElement, store) {
+    var textDefaultsForm = appElement.querySelector("[data-form='text-defaults']");
+    if (textDefaultsForm) {
+      var syncTextDefaultVisibility = function () {
+        syncConditionalFields(textDefaultsForm, {
+          defaultTextColorSource: textDefaultsForm.querySelector('[name="defaultTextColorSource"]').value,
+          defaultTextBorderColorSource: textDefaultsForm.querySelector('[name="defaultTextBorderColorSource"]').value
+        });
+      };
+      textDefaultsForm.querySelectorAll('select[name="defaultTextColorSource"], select[name="defaultTextBorderColorSource"]').forEach(function (element) {
+        element.addEventListener("change", syncTextDefaultVisibility);
+      });
+      syncTextDefaultVisibility();
+
+      textDefaultsForm.addEventListener("change", function () {
+        var formData = new FormData(textDefaultsForm);
+        var textColorSelection = parseColorSourceValue(formData.get("defaultTextColorSource"));
+        var textBorderColorSelection = parseColorSourceValue(formData.get("defaultTextBorderColorSource"));
+        store.updateProject(function (project) {
+          project.settings.textDefaults.fontFamily = String(formData.get("fontFamily") || project.settings.textDefaults.fontFamily);
+          project.settings.textDefaults.fontWeight = String(formData.get("fontWeight") || project.settings.textDefaults.fontWeight);
+          project.settings.textDefaults.colorMode = textColorSelection.mode;
+          project.settings.textDefaults.color = String(formData.get("defaultTextColor") || project.settings.textDefaults.color);
+          project.settings.textDefaults.colorSequenceRef = textColorSelection.sequenceRef;
+          project.settings.textDefaults.textBorder.width = toNonNegativeNumberOrDefault(formData.get("defaultTextBorderWidth"), project.settings.textDefaults.textBorder.width);
+          project.settings.textDefaults.textBorder.colorMode = textBorderColorSelection.mode;
+          project.settings.textDefaults.textBorder.color = String(formData.get("defaultTextBorderColor") || project.settings.textDefaults.textBorder.color);
+          project.settings.textDefaults.textBorder.colorSequenceRef = textBorderColorSelection.sequenceRef;
+        });
+      });
+    }
+
     var colorSequenceForm = appElement.querySelector("[data-form='color-sequence']");
     if (colorSequenceForm) {
       colorSequenceForm.addEventListener("change", function () {
@@ -2811,8 +2940,20 @@ button {
           return;
         }
         var face = selection.token[selection.faceName];
+        var textDefaults = store.getState().project.settings.textDefaults;
         var component = Tokens.createTextComponent({
-          name: "Text #" + (face.texts.length + 1)
+          name: "Text #" + (face.texts.length + 1),
+          fontFamily: textDefaults.fontFamily,
+          fontWeight: textDefaults.fontWeight,
+          colorMode: textDefaults.colorMode,
+          color: textDefaults.color,
+          colorSequenceRef: textDefaults.colorSequenceRef,
+          textBorder: {
+            width: textDefaults.textBorder.width,
+            colorMode: textDefaults.textBorder.colorMode,
+            color: textDefaults.textBorder.color,
+            colorSequenceRef: textDefaults.textBorder.colorSequenceRef
+          }
         });
         store.updateProject(function (project) {
           var token = findToken(project, selection.token.id);
@@ -3523,6 +3664,17 @@ button {
   function renderFontWeightOptions(currentValue) {
     return ["400", "500", "600", "700", "800"].map(function (value) {
       return '<option value="' + value + '"' + (currentValue === value ? " selected" : "") + ">" + value + "</option>";
+    }).join("");
+  }
+
+  function renderFontFamilyOptions(currentValue) {
+    var options = FONT_CHOICES.slice();
+    if (currentValue && !options.some(function (option) { return option.value === currentValue; })) {
+      options.push({ value: currentValue, label: currentValue });
+    }
+
+    return options.map(function (option) {
+      return '<option value="' + escapeHtml(option.value) + '"' + (currentValue === option.value ? " selected" : "") + ">" + escapeHtml(option.label) + "</option>";
     }).join("");
   }
 

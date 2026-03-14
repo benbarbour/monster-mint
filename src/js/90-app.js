@@ -15,6 +15,16 @@
     { id: "designer", label: "Designer" },
     { id: "print", label: "Print" }
   ];
+  var FONT_CHOICES = [
+    { value: "Georgia", label: "Georgia" },
+    { value: "Times New Roman", label: "Times New Roman" },
+    { value: "Palatino Linotype", label: "Palatino Linotype" },
+    { value: "Trebuchet MS", label: "Trebuchet MS" },
+    { value: "Verdana", label: "Verdana" },
+    { value: "Arial", label: "Arial" },
+    { value: "Courier New", label: "Courier New" },
+    { value: "Impact", label: "Impact" }
+  ];
   var designerInteraction = null;
   var mountedStore = null;
   var activePrintFrame = null;
@@ -78,6 +88,10 @@
       '<div class="settings-shell' + (settingsDrawer ? " has-drawer" : "") + '">',
       '  <div class="settings-main">',
       '    <div class="panel-grid settings-grid">',
+      '      <section class="panel-card">',
+      "    <h2>Default Text</h2>",
+      renderDefaultTextSettingsForm(state.project.settings.textDefaults, state.project.sequences.color),
+      "      </section>",
       '      <section class="panel-card">',
       "    <h2>Color Sequences</h2>",
       renderColorSequenceManager(customColorSequences, selectedColorSequence, editingColorSequence),
@@ -319,7 +333,7 @@
         "</div>"
       ].join("")),
       '  <div class="field-row two-up">',
-      '    <label class="field">Font family<input name="fontFamily" value="' + escapeHtml(component.fontFamily) + '"></label>',
+      '    <label class="field">Font family<select name="fontFamily">' + renderFontFamilyOptions(component.fontFamily) + "</select></label>",
       '    <label class="field">Font weight<select name="fontWeight">' + renderFontWeightOptions(component.fontWeight) + "</select></label>",
       "  </div>",
       renderColorPicker({
@@ -354,6 +368,37 @@
       '    <input class="visually-hidden" type="file" accept="image/*" data-replace-image-input>',
       '    <span class="field-help">Changes save automatically.</span>',
       "  </div>",
+      "</form>"
+    ].join("");
+  }
+
+  function renderDefaultTextSettingsForm(textDefaults, colorSequences) {
+    return [
+      '<form class="form-grid" data-form="text-defaults">',
+      '  <div class="field-row two-up">',
+      '    <label class="field">Font family<select name="fontFamily">' + renderFontFamilyOptions(textDefaults.fontFamily) + "</select></label>",
+      '    <label class="field">Font weight<select name="fontWeight">' + renderFontWeightOptions(textDefaults.fontWeight) + "</select></label>",
+      "  </div>",
+      renderColorPicker({
+        label: "Default text color",
+        sourceName: "defaultTextColorSource",
+        colorName: "defaultTextColor",
+        currentMode: textDefaults.colorMode,
+        currentColor: textDefaults.color,
+        currentSequenceRef: textDefaults.colorSequenceRef,
+        sequences: colorSequences
+      }),
+      '<label class="field">Default text border<input type="number" min="0" max="8" step="0.1" name="defaultTextBorderWidth" value="' + textDefaults.textBorder.width + '"><span class="field-help">0 turns it off for new text components.</span></label>',
+      renderColorPicker({
+        label: "Default text border color",
+        sourceName: "defaultTextBorderColorSource",
+        colorName: "defaultTextBorderColor",
+        currentMode: textDefaults.textBorder.colorMode,
+        currentColor: textDefaults.textBorder.color,
+        currentSequenceRef: textDefaults.textBorder.colorSequenceRef,
+        sequences: colorSequences
+      }),
+      '  <p class="field-help">These defaults apply to newly created text components.</p>',
       "</form>"
     ].join("");
   }
@@ -470,6 +515,37 @@
   }
 
   function bindSettingsForms(appElement, store) {
+    var textDefaultsForm = appElement.querySelector("[data-form='text-defaults']");
+    if (textDefaultsForm) {
+      var syncTextDefaultVisibility = function () {
+        syncConditionalFields(textDefaultsForm, {
+          defaultTextColorSource: textDefaultsForm.querySelector('[name="defaultTextColorSource"]').value,
+          defaultTextBorderColorSource: textDefaultsForm.querySelector('[name="defaultTextBorderColorSource"]').value
+        });
+      };
+      textDefaultsForm.querySelectorAll('select[name="defaultTextColorSource"], select[name="defaultTextBorderColorSource"]').forEach(function (element) {
+        element.addEventListener("change", syncTextDefaultVisibility);
+      });
+      syncTextDefaultVisibility();
+
+      textDefaultsForm.addEventListener("change", function () {
+        var formData = new FormData(textDefaultsForm);
+        var textColorSelection = parseColorSourceValue(formData.get("defaultTextColorSource"));
+        var textBorderColorSelection = parseColorSourceValue(formData.get("defaultTextBorderColorSource"));
+        store.updateProject(function (project) {
+          project.settings.textDefaults.fontFamily = String(formData.get("fontFamily") || project.settings.textDefaults.fontFamily);
+          project.settings.textDefaults.fontWeight = String(formData.get("fontWeight") || project.settings.textDefaults.fontWeight);
+          project.settings.textDefaults.colorMode = textColorSelection.mode;
+          project.settings.textDefaults.color = String(formData.get("defaultTextColor") || project.settings.textDefaults.color);
+          project.settings.textDefaults.colorSequenceRef = textColorSelection.sequenceRef;
+          project.settings.textDefaults.textBorder.width = toNonNegativeNumberOrDefault(formData.get("defaultTextBorderWidth"), project.settings.textDefaults.textBorder.width);
+          project.settings.textDefaults.textBorder.colorMode = textBorderColorSelection.mode;
+          project.settings.textDefaults.textBorder.color = String(formData.get("defaultTextBorderColor") || project.settings.textDefaults.textBorder.color);
+          project.settings.textDefaults.textBorder.colorSequenceRef = textBorderColorSelection.sequenceRef;
+        });
+      });
+    }
+
     var colorSequenceForm = appElement.querySelector("[data-form='color-sequence']");
     if (colorSequenceForm) {
       colorSequenceForm.addEventListener("change", function () {
@@ -727,8 +803,20 @@
           return;
         }
         var face = selection.token[selection.faceName];
+        var textDefaults = store.getState().project.settings.textDefaults;
         var component = Tokens.createTextComponent({
-          name: "Text #" + (face.texts.length + 1)
+          name: "Text #" + (face.texts.length + 1),
+          fontFamily: textDefaults.fontFamily,
+          fontWeight: textDefaults.fontWeight,
+          colorMode: textDefaults.colorMode,
+          color: textDefaults.color,
+          colorSequenceRef: textDefaults.colorSequenceRef,
+          textBorder: {
+            width: textDefaults.textBorder.width,
+            colorMode: textDefaults.textBorder.colorMode,
+            color: textDefaults.textBorder.color,
+            colorSequenceRef: textDefaults.textBorder.colorSequenceRef
+          }
         });
         store.updateProject(function (project) {
           var token = findToken(project, selection.token.id);
@@ -1439,6 +1527,17 @@
   function renderFontWeightOptions(currentValue) {
     return ["400", "500", "600", "700", "800"].map(function (value) {
       return '<option value="' + value + '"' + (currentValue === value ? " selected" : "") + ">" + value + "</option>";
+    }).join("");
+  }
+
+  function renderFontFamilyOptions(currentValue) {
+    var options = FONT_CHOICES.slice();
+    if (currentValue && !options.some(function (option) { return option.value === currentValue; })) {
+      options.push({ value: currentValue, label: currentValue });
+    }
+
+    return options.map(function (option) {
+      return '<option value="' + escapeHtml(option.value) + '"' + (currentValue === option.value ? " selected" : "") + ">" + escapeHtml(option.label) + "</option>";
     }).join("");
   }
 

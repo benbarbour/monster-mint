@@ -162,14 +162,19 @@
     var handleY = box.y + box.height - 2;
     var rotateHandleX = box.x + box.width / 2;
     var rotateHandleY = box.y - 8;
+    var centerX = box.x + box.width / 2;
+    var centerY = box.y + box.height / 2;
+    var transform = type === "image"
+      ? ' transform="rotate(' + Number(component.rotationDeg || 0) + " " + centerX + " " + centerY + ')"'
+      : "";
     return [
-      '<g clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="' + type + '">',
+      '<g clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="' + type + '"' + transform + '>',
       renderSelectionBox(box),
-      '  <rect x="' + handleX + '" y="' + handleY + '" width="4" height="4" rx="1" fill="#ffffff" stroke="#111111" stroke-width="0.8" data-drag-mode="resize"></rect>',
+      '  <rect x="' + handleX + '" y="' + handleY + '" width="4" height="4" rx="1" fill="#ffffff" stroke="#111111" stroke-width="0.6" data-drag-mode="resize"></rect>',
       type === "image"
-        ? '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#ffffff" stroke-width="1.2"></line>' +
-          '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#111111" stroke-width="0.6" stroke-dasharray="2 2" stroke-dashoffset="2"></line>' +
-          '  <circle cx="' + rotateHandleX + '" cy="' + rotateHandleY + '" r="3.5" fill="#ffffff" stroke="#111111" stroke-width="0.8" data-drag-mode="rotate"></circle>'
+        ? '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#ffffff" stroke-width="0.9"></line>' +
+          '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#111111" stroke-width="0.45" stroke-dasharray="2 2" stroke-dashoffset="2"></line>' +
+          '  <circle cx="' + rotateHandleX + '" cy="' + rotateHandleY + '" r="3.5" fill="#ffffff" stroke="#111111" stroke-width="0.6" data-drag-mode="rotate"></circle>'
         : "",
       "</g>"
     ].join("");
@@ -177,8 +182,8 @@
 
   function renderSelectionBox(box) {
     return [
-      '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.width + '" height="' + box.height + '" fill="none" stroke="#ffffff" stroke-width="0.8" stroke-dasharray="4 4"></rect>',
-      '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.width + '" height="' + box.height + '" fill="none" stroke="#111111" stroke-width="0.8" stroke-dasharray="4 4" stroke-dashoffset="4"></rect>'
+      '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.width + '" height="' + box.height + '" fill="none" stroke="#ffffff" stroke-width="0.45" stroke-dasharray="4 4"></rect>',
+      '<rect x="' + box.x + '" y="' + box.y + '" width="' + box.width + '" height="' + box.height + '" fill="none" stroke="#111111" stroke-width="0.45" stroke-dasharray="4 4" stroke-dashoffset="4"></rect>'
     ].join("");
   }
 

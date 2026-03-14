@@ -26,6 +26,7 @@ test("can create and manipulate a token template", async ({ page }) => {
 
   await page.getByRole("button", { name: "Add Text" }).click();
   await expect(page.getByRole("heading", { name: "Selected Component" })).toBeVisible();
+  await expect(page.locator(".designer-drawer .drawer-body")).toHaveCSS("overflow-y", "auto");
   await expect(page.locator('form[data-form="text-component-settings"] input[name="name"]')).toHaveValue("Text #1");
   await expect(page.locator('form[data-form="text-component-settings"] select[name="contentMode"]')).toHaveValue("custom");
   await expect(page.locator('form[data-form="text-component-settings"] input[name="customText"]')).toBeVisible();
@@ -74,6 +75,13 @@ test("can create and manipulate a token template", async ({ page }) => {
 });
 
 test("token settings own appearance controls and color sequences show in preview", async ({ page }) => {
+  await page.getByRole("button", { name: "Settings" }).click();
+  await expect(page.locator('form[data-form="text-defaults"] select[name="fontFamily"]')).toBeVisible();
+  await page.locator('form[data-form="text-defaults"] select[name="fontFamily"]').selectOption("Arial");
+  await page.locator('form[data-form="text-defaults"] select[name="fontWeight"]').selectOption("500");
+  await page.locator('form[data-form="text-defaults"] input[name="defaultTextBorderWidth"]').fill("1.5");
+  await page.locator('form[data-form="text-defaults"] input[name="defaultTextBorderWidth"]').blur();
+  await page.getByRole("tab", { name: "Designer" }).click();
   await page.getByRole("button", { name: "Create Token" }).click();
   const componentOptions = await page.locator('select[name="selectedComponentKey"] option').allTextContents();
   expect(componentOptions).not.toContain("Background");
@@ -109,6 +117,7 @@ test("token settings own appearance controls and color sequences show in preview
   await page.locator('form[data-form="image-component-settings"] input[name="mirrorX"]').check();
   await expect(page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]')).toHaveValue("45");
   await expect(page.locator('form[data-form="image-component-settings"] input[name="mirrorX"]')).toBeChecked();
+  await expect(page.locator('[data-preview-stage] svg g[data-component-type="image"][transform*="rotate(45"]')).toHaveCount(1);
 
   const scaleBeforeWheel = await page.locator('form[data-form="image-component-settings"] input[name="scale"]').inputValue();
   const previewStage = page.locator('[data-preview-stage]');
@@ -130,6 +139,11 @@ test("token settings own appearance controls and color sequences show in preview
   await page.getByRole("button", { name: "Clone" }).click();
   await expect(page.locator('select[name="selectedTokenId"] option')).toHaveCount(2);
   await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toHaveValue("Untitled Token Copy");
+
+  await page.getByRole("button", { name: "Add Text" }).click();
+  await expect(page.locator('form[data-form="text-component-settings"] select[name="fontFamily"]')).toHaveValue("Arial");
+  await expect(page.locator('form[data-form="text-component-settings"] select[name="fontWeight"]')).toHaveValue("500");
+  await expect(page.locator('form[data-form="text-component-settings"] input[name="textBorderWidth"]')).toHaveValue("1.5");
 });
 
 test("built-in text modes and color sequences drive live print preview", async ({ page }) => {
@@ -183,6 +197,7 @@ test("built-in text modes and color sequences drive live print preview", async (
   await expect(page.getByRole("button", { name: "Print", exact: true })).toBeVisible();
   await expect(page.locator('[data-action="select-preview-page"]')).toHaveCount(1);
   await expect(page.getByRole("tab", { name: "Page 1" })).toBeVisible();
+  await expect(page.locator(".preview-tab-list")).toHaveCSS("overflow-x", "auto");
   await expect(page.locator(".preview-page-card svg text").first()).toHaveText("0");
 
   await page.getByRole("button", { name: "Print", exact: true }).click();
