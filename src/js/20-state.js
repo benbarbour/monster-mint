@@ -49,6 +49,14 @@
       emit();
     }
 
+    function updateUi(mutator) {
+      var nextUi = Schema.clone(state.ui);
+      mutator(nextUi);
+      state.ui = Object.assign(Storage.defaultUiState(), nextUi);
+      Storage.saveUiState(storage, state.ui);
+      emit();
+    }
+
     return {
       getState: function () {
         return state;
@@ -63,7 +71,8 @@
       },
       updateProject: updateProject,
       replaceProject: replaceProject,
-      setActiveTab: setActiveTab
+      setActiveTab: setActiveTab,
+      updateUi: updateUi
     };
   }
 
@@ -71,4 +80,3 @@
     createStore: createStore
   };
 });
-

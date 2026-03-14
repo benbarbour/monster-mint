@@ -39,22 +39,24 @@
 
   function loadUiState(storage) {
     if (!storage) {
-      return { activeTab: "settings" };
+      return defaultUiState();
     }
 
     try {
       var raw = storage.getItem(Schema.UI_STORAGE_KEY);
       if (!raw) {
-        return { activeTab: "settings" };
+        return defaultUiState();
       }
 
       var parsed = JSON.parse(raw);
       return {
-        activeTab: typeof parsed.activeTab === "string" ? parsed.activeTab : "settings"
+        activeTab: typeof parsed.activeTab === "string" ? parsed.activeTab : "settings",
+        editingTextSequenceId: typeof parsed.editingTextSequenceId === "string" ? parsed.editingTextSequenceId : null,
+        editingColorSequenceId: typeof parsed.editingColorSequenceId === "string" ? parsed.editingColorSequenceId : null
       };
     } catch (error) {
       console.warn("Failed to load UI state", error);
-      return { activeTab: "settings" };
+      return defaultUiState();
     }
   }
 
@@ -72,11 +74,19 @@
     }
   }
 
+  function defaultUiState() {
+    return {
+      activeTab: "settings",
+      editingTextSequenceId: null,
+      editingColorSequenceId: null
+    };
+  }
+
   return {
+    defaultUiState: defaultUiState,
     loadProject: loadProject,
     saveProject: saveProject,
     loadUiState: loadUiState,
     saveUiState: saveUiState
   };
 });
-
