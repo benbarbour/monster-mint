@@ -57,6 +57,7 @@ test("can create and manipulate a token template", async ({ page }) => {
 
 test("custom sequence limits print copy counts", async ({ page }) => {
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "New Custom" }).first().click();
   await page.locator('form[data-form="text-sequence"] input[name="name"]').fill("Two Names");
   await page.locator('form[data-form="text-sequence"] select[name="type"]').selectOption("custom");
   await page.locator('form[data-form="text-sequence"] textarea[name="customValuesText"]').fill("Goblin\nOrc");

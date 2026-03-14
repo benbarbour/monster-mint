@@ -18,6 +18,7 @@
   ];
   var designerInteraction = null;
   var mountedStore = null;
+  var NEW_SEQUENCE_ID = "__new__";
 
   function escapeHtml(value) {
     return String(value)
@@ -41,7 +42,12 @@
       '    <div class="project-meta">',
       '      <label>Project name<input class="project-name-input" name="project-name" value="' + escapeHtml(state.project.meta.name) + '"></label>',
       '      <span class="status-pill">' + escapeHtml(state.autosaveStatus) + "</span>",
-      '      <button class="button" type="button" data-action="reset-project">Reset Project</button>',
+      '      <div class="project-actions">',
+      '        <button class="button button-primary" type="button" data-action="export-project">Export JSON</button>',
+      '        <button class="button" type="button" data-action="import-project">Import JSON</button>',
+      '        <button class="button" type="button" data-action="reset-project">Reset Project</button>',
+      '        <input class="visually-hidden" type="file" accept="application/json,.json" data-import-input>',
+      "      </div>",
       "    </div>",
       "  </header>",
       '  <nav class="tabs" aria-label="Main tabs">',
@@ -63,12 +69,18 @@
   }
 
   function renderSettingsPanel(state) {
-    var editingTextSequence = state.project.sequences.text.find(function (sequence) {
-      return sequence.id === state.ui.editingTextSequenceId;
-    }) || null;
-    var editingColorSequence = state.project.sequences.color.find(function (sequence) {
-      return sequence.id === state.ui.editingColorSequenceId;
-    }) || null;
+    var selectedTextSequence = getSelectedSequence(state.project.sequences.text, state.ui.selectedTextSequenceId);
+    var selectedColorSequence = getSelectedSequence(state.project.sequences.color, state.ui.selectedColorSequenceId);
+    var editingTextSequence = state.ui.editingTextSequenceId === NEW_SEQUENCE_ID
+      ? NEW_SEQUENCE_ID
+      : state.project.sequences.text.find(function (sequence) {
+          return sequence.id === state.ui.editingTextSequenceId;
+        }) || null;
+    var editingColorSequence = state.ui.editingColorSequenceId === NEW_SEQUENCE_ID
+      ? NEW_SEQUENCE_ID
+      : state.project.sequences.color.find(function (sequence) {
+          return sequence.id === state.ui.editingColorSequenceId;
+        }) || null;
     var preset = Schema.findPagePreset(state.project.settings.pagePresetId);
     return [
       '<div class="panel-grid">',
@@ -97,22 +109,11 @@
       "  </section>",
       '  <section class="panel-card">',
       "    <h2>Text Sequences</h2>",
-      renderTextSequenceList(state.project.sequences.text),
-      renderTextSequenceForm(editingTextSequence),
+      renderTextSequenceManager(state.project.sequences.text, selectedTextSequence, editingTextSequence),
       "  </section>",
       '  <section class="panel-card">',
       "    <h2>Color Sequences</h2>",
-      renderColorSequenceList(state.project.sequences.color),
-      renderColorSequenceForm(editingColorSequence),
-      "  </section>",
-      '  <section class="panel-card">',
-      "    <h2>Project Transfer</h2>",
-      "    <p>Export a self-contained JSON project file or import one to replace the current project.</p>",
-      '    <div class="transfer-actions">',
-      '      <button class="button button-primary" type="button" data-action="export-project">Export JSON</button>',
-      '      <button class="button" type="button" data-action="import-project">Import JSON</button>',
-      '      <input class="visually-hidden" type="file" accept="application/json,.json" data-import-input>',
-      "    </div>",
+      renderColorSequenceManager(state.project.sequences.color, selectedColorSequence, editingColorSequence),
       "  </section>",
       "</div>"
     ].join("");
@@ -413,6 +414,8 @@
         store.updateUi(function (ui) {
           ui.editingTextSequenceId = null;
           ui.editingColorSequenceId = null;
+          ui.selectedTextSequenceId = null;
+          ui.selectedColorSequenceId = null;
           ui.selectedTokenId = null;
           ui.selectedComponentType = null;
           ui.selectedComponentId = null;
@@ -475,6 +478,7 @@
         });
         store.updateUi(function (ui) {
           ui.editingTextSequenceId = null;
+          ui.selectedTextSequenceId = sequence.id;
         });
       });
 
@@ -486,6 +490,59 @@
           });
         });
       }
+    }
+
+    var selectedTextSequenceField = appElement.querySelector('[name="selectedTextSequenceId"]');
+    if (selectedTextSequenceField) {
+      selectedTextSequenceField.addEventListener("change", function () {
+        store.updateUi(function (ui) {
+          ui.selectedTextSequenceId = selectedTextSequenceField.value || null;
+          ui.editingTextSequenceId = null;
+        });
+      });
+    }
+
+    var newTextSequenceButton = appElement.querySelector('[data-action="new-text-sequence"]');
+    if (newTextSequenceButton) {
+      newTextSequenceButton.addEventListener("click", function () {
+        store.updateUi(function (ui) {
+          ui.editingTextSequenceId = NEW_SEQUENCE_ID;
+        });
+      });
+    }
+
+    var editSelectedTextButton = appElement.querySelector('[data-action="edit-selected-text-sequence"]');
+    if (editSelectedTextButton) {
+      editSelectedTextButton.addEventListener("click", function () {
+        var sequenceId = editSelectedTextButton.getAttribute("data-sequence-id");
+        if (!sequenceId) {
+          return;
+        }
+        store.updateUi(function (ui) {
+          ui.editingTextSequenceId = sequenceId;
+        });
+      });
+    }
+
+    var deleteSelectedTextButton = appElement.querySelector('[data-action="delete-selected-text-sequence"]');
+    if (deleteSelectedTextButton) {
+      deleteSelectedTextButton.addEventListener("click", function () {
+        var sequenceId = deleteSelectedTextButton.getAttribute("data-sequence-id");
+        if (!sequenceId) {
+          return;
+        }
+        store.updateProject(function (project) {
+          project.sequences.text = project.sequences.text.filter(function (sequence) {
+            return sequence.id !== sequenceId;
+          });
+        });
+        store.updateUi(function (ui) {
+          ui.editingTextSequenceId = null;
+          if (ui.selectedTextSequenceId === sequenceId) {
+            ui.selectedTextSequenceId = null;
+          }
+        });
+      });
     }
 
     appElement.querySelectorAll("[data-action='edit-text-sequence']").forEach(function (button) {
@@ -508,6 +565,9 @@
           if (ui.editingTextSequenceId === sequenceId) {
             ui.editingTextSequenceId = null;
           }
+          if (ui.selectedTextSequenceId === sequenceId) {
+            ui.selectedTextSequenceId = null;
+          }
         });
       });
     });
@@ -528,6 +588,7 @@
         });
         store.updateUi(function (ui) {
           ui.editingColorSequenceId = null;
+          ui.selectedColorSequenceId = sequence.id;
         });
       });
 
@@ -539,6 +600,59 @@
           });
         });
       }
+    }
+
+    var selectedColorSequenceField = appElement.querySelector('[name="selectedColorSequenceId"]');
+    if (selectedColorSequenceField) {
+      selectedColorSequenceField.addEventListener("change", function () {
+        store.updateUi(function (ui) {
+          ui.selectedColorSequenceId = selectedColorSequenceField.value || null;
+          ui.editingColorSequenceId = null;
+        });
+      });
+    }
+
+    var newColorSequenceButton = appElement.querySelector('[data-action="new-color-sequence"]');
+    if (newColorSequenceButton) {
+      newColorSequenceButton.addEventListener("click", function () {
+        store.updateUi(function (ui) {
+          ui.editingColorSequenceId = NEW_SEQUENCE_ID;
+        });
+      });
+    }
+
+    var editSelectedColorButton = appElement.querySelector('[data-action="edit-selected-color-sequence"]');
+    if (editSelectedColorButton) {
+      editSelectedColorButton.addEventListener("click", function () {
+        var sequenceId = editSelectedColorButton.getAttribute("data-sequence-id");
+        if (!sequenceId) {
+          return;
+        }
+        store.updateUi(function (ui) {
+          ui.editingColorSequenceId = sequenceId;
+        });
+      });
+    }
+
+    var deleteSelectedColorButton = appElement.querySelector('[data-action="delete-selected-color-sequence"]');
+    if (deleteSelectedColorButton) {
+      deleteSelectedColorButton.addEventListener("click", function () {
+        var sequenceId = deleteSelectedColorButton.getAttribute("data-sequence-id");
+        if (!sequenceId) {
+          return;
+        }
+        store.updateProject(function (project) {
+          project.sequences.color = project.sequences.color.filter(function (sequence) {
+            return sequence.id !== sequenceId;
+          });
+        });
+        store.updateUi(function (ui) {
+          ui.editingColorSequenceId = null;
+          if (ui.selectedColorSequenceId === sequenceId) {
+            ui.selectedColorSequenceId = null;
+          }
+        });
+      });
     }
 
     appElement.querySelectorAll("[data-action='edit-color-sequence']").forEach(function (button) {
@@ -560,6 +674,9 @@
         store.updateUi(function (ui) {
           if (ui.editingColorSequenceId === sequenceId) {
             ui.editingColorSequenceId = null;
+          }
+          if (ui.selectedColorSequenceId === sequenceId) {
+            ui.selectedColorSequenceId = null;
           }
         });
       });
@@ -596,6 +713,8 @@
           store.updateUi(function (ui) {
             ui.editingTextSequenceId = null;
             ui.editingColorSequenceId = null;
+            ui.selectedTextSequenceId = null;
+            ui.selectedColorSequenceId = null;
             ui.selectedTokenId = null;
             ui.selectedComponentType = null;
             ui.selectedComponentId = null;
@@ -1132,54 +1251,54 @@
     return '<label class="field" data-visible-when="' + visibleWhen + '"' + (isVisible ? "" : " hidden") + ">" + innerHtml + "</label>";
   }
 
-  function renderTextSequenceList(sequences) {
-    if (!sequences.length) {
-      return '<div class="empty-state">No text sequences yet.</div>';
-    }
-
-    return '<div class="sequence-list">' + sequences.map(function (sequence) {
-      return [
-        '<article class="sequence-item">',
-        '  <div class="sequence-item-header">',
-        '    <div>',
-        '      <h3 class="sequence-item-name">' + escapeHtml(sequence.name) + "</h3>",
-        '      <p class="sequence-item-meta">' + escapeHtml(Sequences.summarizeTextSequence(sequence)) + (sequence.builtIn ? " · Built in" : "") + "</p>",
-        "    </div>",
-        sequence.builtIn
-          ? ""
-          : '    <div class="button-row">' +
-            '      <button class="button" type="button" data-action="edit-text-sequence" data-sequence-id="' + sequence.id + '">Edit</button>' +
-            '      <button class="button" type="button" data-action="delete-text-sequence" data-sequence-id="' + sequence.id + '">Delete</button>' +
-            "    </div>",
-        "  </div>",
-        "</article>"
-      ].join("");
-    }).join("") + "</div>";
+  function renderTextSequenceManager(sequences, selectedSequence, editingSequence) {
+    return renderSequenceManager({
+      selectedName: "selectedTextSequenceId",
+      selectedSequence: selectedSequence,
+      sequences: sequences,
+      summary: selectedSequence
+        ? Sequences.summarizeTextSequence(selectedSequence) + (selectedSequence.builtIn ? " · Built in" : "")
+        : "No sequence selected.",
+      newAction: "new-text-sequence",
+      editAction: "edit-selected-text-sequence",
+      deleteAction: "delete-selected-text-sequence",
+      editor: editingSequence
+        ? renderTextSequenceForm(editingSequence === NEW_SEQUENCE_ID ? null : editingSequence)
+        : ""
+    });
   }
 
-  function renderColorSequenceList(sequences) {
-    if (!sequences.length) {
-      return '<div class="empty-state">No color sequences yet.</div>';
-    }
+  function renderColorSequenceManager(sequences, selectedSequence, editingSequence) {
+    return renderSequenceManager({
+      selectedName: "selectedColorSequenceId",
+      selectedSequence: selectedSequence,
+      sequences: sequences,
+      summary: selectedSequence
+        ? Sequences.summarizeColorSequence(selectedSequence) + (selectedSequence.builtIn ? " · Built in" : "")
+        : "No sequence selected.",
+      newAction: "new-color-sequence",
+      editAction: "edit-selected-color-sequence",
+      deleteAction: "delete-selected-color-sequence",
+      editor: editingSequence
+        ? renderColorSequenceForm(editingSequence === NEW_SEQUENCE_ID ? null : editingSequence)
+        : ""
+    });
+  }
 
-    return '<div class="sequence-list">' + sequences.map(function (sequence) {
-      return [
-        '<article class="sequence-item">',
-        '  <div class="sequence-item-header">',
-        '    <div>',
-        '      <h3 class="sequence-item-name">' + escapeHtml(sequence.name) + "</h3>",
-        '      <p class="sequence-item-meta">' + escapeHtml(Sequences.summarizeColorSequence(sequence)) + (sequence.builtIn ? " · Built in" : "") + "</p>",
-        "    </div>",
-        sequence.builtIn
-          ? ""
-          : '    <div class="button-row">' +
-            '      <button class="button" type="button" data-action="edit-color-sequence" data-sequence-id="' + sequence.id + '">Edit</button>' +
-            '      <button class="button" type="button" data-action="delete-color-sequence" data-sequence-id="' + sequence.id + '">Delete</button>' +
-            "    </div>",
-        "  </div>",
-        "</article>"
-      ].join("");
-    }).join("") + "</div>";
+  function renderSequenceManager(config) {
+    var selectedSequence = config.selectedSequence;
+    return [
+      '<div class="sequence-manager">',
+      '  <label class="field">Selected sequence<select name="' + config.selectedName + '">' + renderSequenceOptions(config.sequences, selectedSequence ? selectedSequence.id : null, "Select a sequence") + "</select></label>",
+      '  <p class="sequence-summary">' + escapeHtml(config.summary) + "</p>",
+      '  <div class="button-row">',
+      '    <button class="button button-primary" type="button" data-action="' + config.newAction + '">New Custom</button>',
+      '    <button class="button" type="button" data-action="' + config.editAction + '"' + (selectedSequence && !selectedSequence.builtIn ? ' data-sequence-id="' + selectedSequence.id + '"' : " disabled") + '>Edit</button>',
+      '    <button class="button" type="button" data-action="' + config.deleteAction + '"' + (selectedSequence && !selectedSequence.builtIn ? ' data-sequence-id="' + selectedSequence.id + '"' : " disabled") + '>Delete</button>',
+      "  </div>",
+      config.editor ? '  <div class="sequence-editor">' + config.editor + "</div>" : "",
+      "</div>"
+    ].join("");
   }
 
   function renderTextSequenceForm(sequence) {
@@ -1276,6 +1395,12 @@
     return ['<option value="">' + emptyLabel + "</option>"].concat(sequences.map(function (sequence) {
       return '<option value="' + sequence.id + '"' + (selectedId === sequence.id ? " selected" : "") + ">" + escapeHtml(sequence.name) + "</option>";
     })).join("");
+  }
+
+  function getSelectedSequence(sequences, selectedId) {
+    return sequences.find(function (sequence) {
+      return sequence.id === selectedId;
+    }) || sequences[0] || null;
   }
 
   function normalizeColorInput(value) {

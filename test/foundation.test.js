@@ -106,6 +106,8 @@ test("loadUiState provides editing slots for sequence forms", () => {
     activeTab: "settings",
     editingTextSequenceId: null,
     editingColorSequenceId: null,
+    selectedTextSequenceId: null,
+    selectedColorSequenceId: null,
     selectedTokenId: null,
     selectedComponentType: null,
     selectedComponentId: null,
