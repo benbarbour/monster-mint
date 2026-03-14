@@ -223,7 +223,19 @@ test("token templates cap border width ratio at twenty-five percent", () => {
   assert.equal(token.front.border.widthRatio, 0.25);
 });
 
-test("print max copies are capped by the shortest bounded color sequence", () => {
+test("color sequences wrap when copies exceed sequence length", () => {
+  const colorSequence = Sequences.createColorSequence({
+    id: "c1",
+    valuesText: "#000000\n#ffffff"
+  });
+
+  assert.equal(Sequences.resolveColorValue(colorSequence, 0), "#000000");
+  assert.equal(Sequences.resolveColorValue(colorSequence, 1), "#ffffff");
+  assert.equal(Sequences.resolveColorValue(colorSequence, 2), "#000000");
+  assert.equal(Sequences.resolveColorValue(colorSequence, -1), "#ffffff");
+});
+
+test("print selections allow copy counts beyond color sequence length", () => {
   const project = Schema.createDefaultProject();
   const colorSequence = Sequences.createColorSequence({
     id: "c1",
@@ -244,18 +256,52 @@ test("print max copies are capped by the shortest bounded color sequence", () =>
   });
   project.sequences.color.push(colorSequence);
 
-  assert.equal(Print.getTokenMaxCopies(token, project), 2);
+  const selections = Print.normalizeSelections(project, [{
+    tokenId: token.id,
+    copies: 5,
+    sequenceStart: 1
+  }]);
+
+  assert.deepEqual(selections, [{
+    tokenId: token.id,
+    copies: 5,
+    sequenceStart: 1
+  }]);
 });
 
 test("print layout creates at least one page with placed items", () => {
   const project = Schema.createDefaultProject();
   const token = Tokens.createTokenTemplate({ id: "token-1", diameterIn: 1 });
   project.tokens.push(token);
-  project.printSelections = [{ tokenId: "token-1", copies: 3, sequenceStartIndex: 0 }];
+  project.printSelections = [{ tokenId: "token-1", copies: 3, sequenceStart: 1 }];
 
   const layout = Print.layoutProject(project);
 
   assert.equal(layout.pages.length >= 1, true);
   assert.equal(layout.pages[0].items.length, 3);
   assert.equal(layout.pages[0].items[1].xIn - layout.pages[0].items[0].xIn, 1.125);
+});
+
+test("print start 0 yields a first numeric value of 0", () => {
+  const project = Schema.createDefaultProject();
+  const token = Tokens.createTokenTemplate({
+    id: "token-1",
+    front: {
+      texts: [
+        Tokens.createTextComponent({
+          contentMode: "numeric",
+          sequenceStart: 1
+        })
+      ]
+    }
+  });
+  project.tokens.push(token);
+  project.printSelections = [{ tokenId: "token-1", copies: 2, sequenceStart: 0 }];
+
+  const layout = Print.layoutProject(project);
+  const firstIndex = layout.pages[0].items[0].sequenceIndex;
+  const secondIndex = layout.pages[0].items[1].sequenceIndex;
+
+  assert.equal(Tokens.getTextValue(token.front.texts[0], project.sequences.text, firstIndex), "0");
+  assert.equal(Tokens.getTextValue(token.front.texts[0], project.sequences.text, secondIndex), "1");
 });

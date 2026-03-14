@@ -17,6 +17,7 @@
   ];
   var designerInteraction = null;
   var mountedStore = null;
+  var activePrintFrame = null;
 
   function escapeHtml(value) {
     return String(value)
@@ -968,28 +969,23 @@
         store.updateProject(function (project) {
           project.settings.pagePresetId = String(formData.get("pagePresetId"));
           project.settings.pageOrientation = String(formData.get("pageOrientation"));
-          project.settings.pageMarginIn = Number(formData.get("pageMarginIn")) || project.settings.pageMarginIn;
-          project.settings.bleedIn = Number(formData.get("bleedIn")) || project.settings.bleedIn;
+          project.settings.pageMarginIn = toNonNegativeNumberOrDefault(formData.get("pageMarginIn"), project.settings.pageMarginIn);
+          project.settings.bleedIn = toNonNegativeNumberOrDefault(formData.get("bleedIn"), project.settings.bleedIn);
         });
       });
     }
 
     var printForm = appElement.querySelector("[data-form='print-selections']");
     if (printForm) {
-      printForm.addEventListener("submit", function (event) {
-        event.preventDefault();
-        var rows = Print.getSelectionRows(store.getState().project).map(function (row) {
-          return {
-            tokenId: row.tokenId,
-            copies: printForm.querySelector('[name="copies-' + row.tokenId + '"]').value,
-            sequenceStartIndex: printForm.querySelector('[name="start-' + row.tokenId + '"]').value
-          };
-        });
-
+      var syncPrintSelections = function () {
+        var rows = collectPrintSelectionRows(printForm, store.getState().project);
         store.updateProject(function (project) {
           project.printSelections = Print.normalizeSelections(project, rows);
         });
-      });
+      };
+
+      printForm.addEventListener("input", syncPrintSelections);
+      printForm.addEventListener("change", syncPrintSelections);
     }
 
     var layout = Print.layoutProject(store.getState().project);
@@ -1163,9 +1159,24 @@
     return Number.isFinite(parsed) ? parsed : fallback;
   }
 
+  function toNonNegativeNumberOrDefault(value, fallback) {
+    var parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+  }
+
   function toNonNegativeInteger(value, fallback) {
     var parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) ? Math.max(0, parsed) : fallback;
+  }
+
+  function collectPrintSelectionRows(printForm, project) {
+    return Print.getSelectionRows(project).map(function (row) {
+      return {
+        tokenId: row.tokenId,
+        copies: printForm.querySelector('[name="copies-' + row.tokenId + '"]').value,
+        sequenceStart: printForm.querySelector('[name="start-' + row.tokenId + '"]').value
+      };
+    });
   }
 
   function upsertById(collection, value) {
@@ -1395,7 +1406,7 @@
       "  </div>",
       '  <div class="field-row two-up">',
       '    <label class="field">Margin (in)<input type="number" min="0.05" step="0.05" name="pageMarginIn" value="' + settings.pageMarginIn + '"></label>',
-      '    <label class="field">Bleed (in)<input type="number" min="0.01" step="0.01" name="bleedIn" value="' + settings.bleedIn + '"></label>',
+      '    <label class="field">Bleed (in)<input type="number" min="0" step="0.01" name="bleedIn" value="' + settings.bleedIn + '"></label>',
       "  </div>",
       '  <p class="field-help">Changes save automatically.</p>',
       "</form>"
@@ -1410,21 +1421,20 @@
     return [
       '<form class="form-grid" data-form="print-selections" novalidate>',
       '  <table class="print-table">',
-      "    <thead><tr><th>Token</th><th>Copies</th><th>Start Index</th><th>Max</th></tr></thead>",
+      "    <thead><tr><th>Token</th><th>Copies</th><th>Start</th></tr></thead>",
       "    <tbody>",
       rows.map(function (row) {
         return [
           "      <tr>",
           "        <td>" + escapeHtml(row.tokenName) + " (" + row.diameterIn + '&quot;)</td>',
-          '        <td><input type="number" min="0" step="1" name="copies-' + row.tokenId + '" value="' + row.copies + '"' + (Number.isFinite(row.maxCopies) ? ' max="' + row.maxCopies + '"' : "") + "></td>",
-          '        <td><input type="number" min="0" step="1" name="start-' + row.tokenId + '" value="' + row.sequenceStartIndex + '"></td>',
-          "        <td>" + (Number.isFinite(row.maxCopies) ? row.maxCopies : "&infin;") + "</td>",
+          '        <td><input type="number" min="0" step="1" name="copies-' + row.tokenId + '" value="' + row.copies + '"></td>',
+          '        <td><input type="number" min="0" step="1" name="start-' + row.tokenId + '" value="' + row.sequenceStart + '"></td>',
           "      </tr>"
         ].join("");
       }).join(""),
       "    </tbody>",
       "  </table>",
-      '  <div class="button-row"><button class="button button-primary" type="submit">Save Print Selections</button></div>',
+      '  <p class="field-help">Changes update the preview automatically. Color sequences repeat when copies exceed their length.</p>',
       "</form>"
     ].join("");
   }
@@ -1553,16 +1563,33 @@
   }
 
   function openPrintWindow(layout, project) {
-    var printWindow = runtimeGlobal.open("", "_blank", "noopener,noreferrer");
-    if (!printWindow) {
-      runtimeGlobal.alert("The print window was blocked by the browser.");
+    if (!runtimeGlobal.document || !runtimeGlobal.document.body) {
       return;
     }
 
+    cleanupPrintFrame();
     var pages = layout.pages.map(function (page) {
       return renderPrintablePage(page, project);
     });
+    var iframe = runtimeGlobal.document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.className = "print-frame";
+    iframe.style.position = "fixed";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.style.opacity = "0";
+    iframe.style.pointerEvents = "none";
+    runtimeGlobal.document.body.appendChild(iframe);
+    activePrintFrame = iframe;
 
+    var printWindow = iframe.contentWindow;
+    if (!printWindow) {
+      cleanupPrintFrame();
+      return;
+    }
+
+    printWindow.document.open();
     printWindow.document.write([
       "<!doctype html><html><head><title>Monster Mint Print</title><style>",
       "html,body{margin:0;padding:0;background:#fff;font-family:Georgia,serif;}",
@@ -1570,10 +1597,28 @@
       ".print-page:last-child{page-break-after:auto;break-after:auto;}",
       "</style></head><body>",
       pages.join(""),
-      "<script>window.addEventListener('load',function(){window.print();});<\/script>",
       "</body></html>"
     ].join(""));
     printWindow.document.close();
+    runtimeGlobal.setTimeout(function () {
+      try {
+        printWindow.focus();
+        printWindow.print();
+      } finally {
+        runtimeGlobal.setTimeout(cleanupPrintFrame, 1000);
+      }
+    }, 50);
+  }
+
+  function cleanupPrintFrame() {
+    if (!activePrintFrame) {
+      return;
+    }
+
+    if (activePrintFrame.parentNode) {
+      activePrintFrame.parentNode.removeChild(activePrintFrame);
+    }
+    activePrintFrame = null;
   }
 
   function renderPrintablePage(page, project) {

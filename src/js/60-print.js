@@ -13,67 +13,27 @@
     return map;
   }
 
-  function getTokenMaxCopies(token, project) {
-    var refs = Tokens.collectBoundedSequenceLengths(token);
-    var lengths = refs.map(function (ref) {
-      if (ref.kind === "text") {
-        var textSequence = project.sequences.text.find(function (candidate) {
-          return candidate.id === ref.sequenceId;
-        });
-        if (!textSequence) {
-          return 0;
-        }
-        return Sequences.getFiniteLength(textSequence, "text");
-      }
-
-      var colorSequence = project.sequences.color.find(function (candidate) {
-        return candidate.id === ref.sequenceId;
-      });
-      if (!colorSequence) {
-        return 0;
-      }
-      return Sequences.getFiniteLength(colorSequence, "color");
-    }).filter(function (length) {
-      return Number.isFinite(length);
-    });
-
-    if (!lengths.length) {
-      return Infinity;
-    }
-
-    return Math.max(0, Math.min.apply(Math, lengths));
-  }
-
   function getSelectionRows(project) {
     var selectionMap = getSelectionMap(project);
     return project.tokens.map(function (token) {
       var saved = selectionMap.get(token.id) || {};
-      var maxCopies = getTokenMaxCopies(token, project);
       return {
         tokenId: token.id,
         tokenName: token.name,
         diameterIn: token.diameterIn,
         copies: Number(saved.copies) || 0,
-        sequenceStartIndex: Number(saved.sequenceStartIndex) || 0,
-        maxCopies: maxCopies
+        sequenceStart: getSequenceStart(saved)
       };
     });
   }
 
   function normalizeSelections(project, inputSelections) {
     return inputSelections.map(function (row) {
-      var token = project.tokens.find(function (candidate) {
-        return candidate.id === row.tokenId;
-      });
-      var maxCopies = token ? getTokenMaxCopies(token, project) : 0;
       var copies = Math.max(0, Math.floor(Number(row.copies) || 0));
-      if (Number.isFinite(maxCopies)) {
-        copies = Math.min(copies, maxCopies);
-      }
       return {
         tokenId: row.tokenId,
         copies: copies,
-        sequenceStartIndex: Math.max(0, Math.floor(Number(row.sequenceStartIndex) || 0))
+        sequenceStart: Math.max(0, Math.floor(Number(row.sequenceStart) || 0))
       };
     }).filter(function (row) {
       return row.copies > 0;
@@ -100,7 +60,7 @@
         items.push({
           tokenId: token.id,
           token: token,
-          sequenceIndex: selection.sequenceStartIndex + copyIndex,
+          sequenceIndex: getSequenceStart(selection) - 1 + copyIndex,
           faceCount: token.back.enabled ? 2 : 1
         });
       }
@@ -176,9 +136,16 @@
     };
   }
 
+  function getSequenceStart(selection) {
+    if (Number.isFinite(Number(selection.sequenceStart))) {
+      return Math.max(0, Math.floor(Number(selection.sequenceStart)));
+    }
+
+    return Math.max(0, Math.floor((Number(selection.sequenceStartIndex) || 0) + 1));
+  }
+
   return {
     getSelectionRows: getSelectionRows,
-    getTokenMaxCopies: getTokenMaxCopies,
     normalizeSelections: normalizeSelections,
     layoutProject: layoutProject
   };

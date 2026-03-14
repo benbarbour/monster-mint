@@ -90,7 +90,12 @@
       return "";
     }
 
-    return sequence.values[index] || "";
+    if (!sequence.values.length) {
+      return "";
+    }
+
+    var resolvedIndex = ((index % sequence.values.length) + sequence.values.length) % sequence.values.length;
+    return sequence.values[resolvedIndex] || "";
   }
 
   function alphabeticValue(index) {

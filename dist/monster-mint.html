@@ -758,8 +758,7 @@ button {
         pagePresetId: "letter",
         pageOrientation: "portrait",
         pageMarginIn: 0.25,
-        bleedIn: 0.0625,
-        guideStyle: "cut-and-punch"
+        bleedIn: 0.0625
       },
       sequences: {
         text: clone(BUILT_IN_TEXT_SEQUENCES),
@@ -786,8 +785,7 @@ button {
         pagePresetId: project.settings && findPagePreset(project.settings.pagePresetId) ? project.settings.pagePresetId : defaults.settings.pagePresetId,
         pageOrientation: project.settings && project.settings.pageOrientation === "landscape" ? "landscape" : "portrait",
         pageMarginIn: asPositiveNumber(project.settings && project.settings.pageMarginIn, defaults.settings.pageMarginIn),
-        bleedIn: asPositiveNumber(project.settings && project.settings.bleedIn, defaults.settings.bleedIn),
-        guideStyle: project.settings && typeof project.settings.guideStyle === "string" ? project.settings.guideStyle : defaults.settings.guideStyle
+        bleedIn: asNonNegativeNumber(project.settings && project.settings.bleedIn, defaults.settings.bleedIn)
       },
       sequences: {
         text: clone(BUILT_IN_TEXT_SEQUENCES),
@@ -810,6 +808,10 @@ button {
 
   function asPositiveNumber(value, fallback) {
     return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
+  }
+
+  function asNonNegativeNumber(value, fallback) {
+    return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : fallback;
   }
 
   function mergeBuiltInSequences(sequences, builtIns) {
@@ -1221,7 +1223,12 @@ button {
       return "";
     }
 
-    return sequence.values[index] || "";
+    if (!sequence.values.length) {
+      return "";
+    }
+
+    var resolvedIndex = ((index % sequence.values.length) + sequence.values.length) % sequence.values.length;
+    return sequence.values[resolvedIndex] || "";
   }
 
   function alphabeticValue(index) {
@@ -1833,67 +1840,27 @@ button {
     return map;
   }
 
-  function getTokenMaxCopies(token, project) {
-    var refs = Tokens.collectBoundedSequenceLengths(token);
-    var lengths = refs.map(function (ref) {
-      if (ref.kind === "text") {
-        var textSequence = project.sequences.text.find(function (candidate) {
-          return candidate.id === ref.sequenceId;
-        });
-        if (!textSequence) {
-          return 0;
-        }
-        return Sequences.getFiniteLength(textSequence, "text");
-      }
-
-      var colorSequence = project.sequences.color.find(function (candidate) {
-        return candidate.id === ref.sequenceId;
-      });
-      if (!colorSequence) {
-        return 0;
-      }
-      return Sequences.getFiniteLength(colorSequence, "color");
-    }).filter(function (length) {
-      return Number.isFinite(length);
-    });
-
-    if (!lengths.length) {
-      return Infinity;
-    }
-
-    return Math.max(0, Math.min.apply(Math, lengths));
-  }
-
   function getSelectionRows(project) {
     var selectionMap = getSelectionMap(project);
     return project.tokens.map(function (token) {
       var saved = selectionMap.get(token.id) || {};
-      var maxCopies = getTokenMaxCopies(token, project);
       return {
         tokenId: token.id,
         tokenName: token.name,
         diameterIn: token.diameterIn,
         copies: Number(saved.copies) || 0,
-        sequenceStartIndex: Number(saved.sequenceStartIndex) || 0,
-        maxCopies: maxCopies
+        sequenceStart: getSequenceStart(saved)
       };
     });
   }
 
   function normalizeSelections(project, inputSelections) {
     return inputSelections.map(function (row) {
-      var token = project.tokens.find(function (candidate) {
-        return candidate.id === row.tokenId;
-      });
-      var maxCopies = token ? getTokenMaxCopies(token, project) : 0;
       var copies = Math.max(0, Math.floor(Number(row.copies) || 0));
-      if (Number.isFinite(maxCopies)) {
-        copies = Math.min(copies, maxCopies);
-      }
       return {
         tokenId: row.tokenId,
         copies: copies,
-        sequenceStartIndex: Math.max(0, Math.floor(Number(row.sequenceStartIndex) || 0))
+        sequenceStart: Math.max(0, Math.floor(Number(row.sequenceStart) || 0))
       };
     }).filter(function (row) {
       return row.copies > 0;
@@ -1920,7 +1887,7 @@ button {
         items.push({
           tokenId: token.id,
           token: token,
-          sequenceIndex: selection.sequenceStartIndex + copyIndex,
+          sequenceIndex: getSequenceStart(selection) - 1 + copyIndex,
           faceCount: token.back.enabled ? 2 : 1
         });
       }
@@ -1996,9 +1963,16 @@ button {
     };
   }
 
+  function getSequenceStart(selection) {
+    if (Number.isFinite(Number(selection.sequenceStart))) {
+      return Math.max(0, Math.floor(Number(selection.sequenceStart)));
+    }
+
+    return Math.max(0, Math.floor((Number(selection.sequenceStartIndex) || 0) + 1));
+  }
+
   return {
     getSelectionRows: getSelectionRows,
-    getTokenMaxCopies: getTokenMaxCopies,
     normalizeSelections: normalizeSelections,
     layoutProject: layoutProject
   };
@@ -2024,6 +1998,7 @@ button {
   ];
   var designerInteraction = null;
   var mountedStore = null;
+  var activePrintFrame = null;
 
   function escapeHtml(value) {
     return String(value)
@@ -2975,28 +2950,23 @@ button {
         store.updateProject(function (project) {
           project.settings.pagePresetId = String(formData.get("pagePresetId"));
           project.settings.pageOrientation = String(formData.get("pageOrientation"));
-          project.settings.pageMarginIn = Number(formData.get("pageMarginIn")) || project.settings.pageMarginIn;
-          project.settings.bleedIn = Number(formData.get("bleedIn")) || project.settings.bleedIn;
+          project.settings.pageMarginIn = toNonNegativeNumberOrDefault(formData.get("pageMarginIn"), project.settings.pageMarginIn);
+          project.settings.bleedIn = toNonNegativeNumberOrDefault(formData.get("bleedIn"), project.settings.bleedIn);
         });
       });
     }
 
     var printForm = appElement.querySelector("[data-form='print-selections']");
     if (printForm) {
-      printForm.addEventListener("submit", function (event) {
-        event.preventDefault();
-        var rows = Print.getSelectionRows(store.getState().project).map(function (row) {
-          return {
-            tokenId: row.tokenId,
-            copies: printForm.querySelector('[name="copies-' + row.tokenId + '"]').value,
-            sequenceStartIndex: printForm.querySelector('[name="start-' + row.tokenId + '"]').value
-          };
-        });
-
+      var syncPrintSelections = function () {
+        var rows = collectPrintSelectionRows(printForm, store.getState().project);
         store.updateProject(function (project) {
           project.printSelections = Print.normalizeSelections(project, rows);
         });
-      });
+      };
+
+      printForm.addEventListener("input", syncPrintSelections);
+      printForm.addEventListener("change", syncPrintSelections);
     }
 
     var layout = Print.layoutProject(store.getState().project);
@@ -3170,9 +3140,24 @@ button {
     return Number.isFinite(parsed) ? parsed : fallback;
   }
 
+  function toNonNegativeNumberOrDefault(value, fallback) {
+    var parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+  }
+
   function toNonNegativeInteger(value, fallback) {
     var parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) ? Math.max(0, parsed) : fallback;
+  }
+
+  function collectPrintSelectionRows(printForm, project) {
+    return Print.getSelectionRows(project).map(function (row) {
+      return {
+        tokenId: row.tokenId,
+        copies: printForm.querySelector('[name="copies-' + row.tokenId + '"]').value,
+        sequenceStart: printForm.querySelector('[name="start-' + row.tokenId + '"]').value
+      };
+    });
   }
 
   function upsertById(collection, value) {
@@ -3402,7 +3387,7 @@ button {
       "  </div>",
       '  <div class="field-row two-up">',
       '    <label class="field">Margin (in)<input type="number" min="0.05" step="0.05" name="pageMarginIn" value="' + settings.pageMarginIn + '"></label>',
-      '    <label class="field">Bleed (in)<input type="number" min="0.01" step="0.01" name="bleedIn" value="' + settings.bleedIn + '"></label>',
+      '    <label class="field">Bleed (in)<input type="number" min="0" step="0.01" name="bleedIn" value="' + settings.bleedIn + '"></label>',
       "  </div>",
       '  <p class="field-help">Changes save automatically.</p>',
       "</form>"
@@ -3417,21 +3402,20 @@ button {
     return [
       '<form class="form-grid" data-form="print-selections" novalidate>',
       '  <table class="print-table">',
-      "    <thead><tr><th>Token</th><th>Copies</th><th>Start Index</th><th>Max</th></tr></thead>",
+      "    <thead><tr><th>Token</th><th>Copies</th><th>Start</th></tr></thead>",
       "    <tbody>",
       rows.map(function (row) {
         return [
           "      <tr>",
           "        <td>" + escapeHtml(row.tokenName) + " (" + row.diameterIn + '&quot;)</td>',
-          '        <td><input type="number" min="0" step="1" name="copies-' + row.tokenId + '" value="' + row.copies + '"' + (Number.isFinite(row.maxCopies) ? ' max="' + row.maxCopies + '"' : "") + "></td>",
-          '        <td><input type="number" min="0" step="1" name="start-' + row.tokenId + '" value="' + row.sequenceStartIndex + '"></td>',
-          "        <td>" + (Number.isFinite(row.maxCopies) ? row.maxCopies : "&infin;") + "</td>",
+          '        <td><input type="number" min="0" step="1" name="copies-' + row.tokenId + '" value="' + row.copies + '"></td>',
+          '        <td><input type="number" min="0" step="1" name="start-' + row.tokenId + '" value="' + row.sequenceStart + '"></td>',
           "      </tr>"
         ].join("");
       }).join(""),
       "    </tbody>",
       "  </table>",
-      '  <div class="button-row"><button class="button button-primary" type="submit">Save Print Selections</button></div>',
+      '  <p class="field-help">Changes update the preview automatically. Color sequences repeat when copies exceed their length.</p>',
       "</form>"
     ].join("");
   }
@@ -3560,16 +3544,33 @@ button {
   }
 
   function openPrintWindow(layout, project) {
-    var printWindow = runtimeGlobal.open("", "_blank", "noopener,noreferrer");
-    if (!printWindow) {
-      runtimeGlobal.alert("The print window was blocked by the browser.");
+    if (!runtimeGlobal.document || !runtimeGlobal.document.body) {
       return;
     }
 
+    cleanupPrintFrame();
     var pages = layout.pages.map(function (page) {
       return renderPrintablePage(page, project);
     });
+    var iframe = runtimeGlobal.document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.className = "print-frame";
+    iframe.style.position = "fixed";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.style.opacity = "0";
+    iframe.style.pointerEvents = "none";
+    runtimeGlobal.document.body.appendChild(iframe);
+    activePrintFrame = iframe;
 
+    var printWindow = iframe.contentWindow;
+    if (!printWindow) {
+      cleanupPrintFrame();
+      return;
+    }
+
+    printWindow.document.open();
     printWindow.document.write([
       "<!doctype html><html><head><title>Monster Mint Print</title><style>",
       "html,body{margin:0;padding:0;background:#fff;font-family:Georgia,serif;}",
@@ -3577,10 +3578,28 @@ button {
       ".print-page:last-child{page-break-after:auto;break-after:auto;}",
       "</style></head><body>",
       pages.join(""),
-      "<script>window.addEventListener('load',function(){window.print();});<\/script>",
       "</body></html>"
     ].join(""));
     printWindow.document.close();
+    runtimeGlobal.setTimeout(function () {
+      try {
+        printWindow.focus();
+        printWindow.print();
+      } finally {
+        runtimeGlobal.setTimeout(cleanupPrintFrame, 1000);
+      }
+    }, 50);
+  }
+
+  function cleanupPrintFrame() {
+    if (!activePrintFrame) {
+      return;
+    }
+
+    if (activePrintFrame.parentNode) {
+      activePrintFrame.parentNode.removeChild(activePrintFrame);
+    }
+    activePrintFrame = null;
   }
 
   function renderPrintablePage(page, project) {

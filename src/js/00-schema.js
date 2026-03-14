@@ -57,8 +57,7 @@
         pagePresetId: "letter",
         pageOrientation: "portrait",
         pageMarginIn: 0.25,
-        bleedIn: 0.0625,
-        guideStyle: "cut-and-punch"
+        bleedIn: 0.0625
       },
       sequences: {
         text: clone(BUILT_IN_TEXT_SEQUENCES),
@@ -85,8 +84,7 @@
         pagePresetId: project.settings && findPagePreset(project.settings.pagePresetId) ? project.settings.pagePresetId : defaults.settings.pagePresetId,
         pageOrientation: project.settings && project.settings.pageOrientation === "landscape" ? "landscape" : "portrait",
         pageMarginIn: asPositiveNumber(project.settings && project.settings.pageMarginIn, defaults.settings.pageMarginIn),
-        bleedIn: asPositiveNumber(project.settings && project.settings.bleedIn, defaults.settings.bleedIn),
-        guideStyle: project.settings && typeof project.settings.guideStyle === "string" ? project.settings.guideStyle : defaults.settings.guideStyle
+        bleedIn: asNonNegativeNumber(project.settings && project.settings.bleedIn, defaults.settings.bleedIn)
       },
       sequences: {
         text: clone(BUILT_IN_TEXT_SEQUENCES),
@@ -109,6 +107,10 @@
 
   function asPositiveNumber(value, fallback) {
     return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
+  }
+
+  function asNonNegativeNumber(value, fallback) {
+    return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : fallback;
   }
 
   function mergeBuiltInSequences(sequences, builtIns) {
