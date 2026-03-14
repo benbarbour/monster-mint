@@ -13,6 +13,46 @@
     { id: "a4", label: "A4", widthIn: 8.27, heightIn: 11.69 }
   ];
   var TOKEN_SIZES = [0.5, 1, 2, 3, 4, 5];
+  var BUILT_IN_TEXT_SEQUENCES = [
+    {
+      id: "builtin_text_numeric",
+      name: "Numeric",
+      builtIn: true,
+      type: "numeric",
+      start: 1,
+      step: 1,
+      prefix: "",
+      suffix: "",
+      padTo: 0,
+      customValues: []
+    },
+    {
+      id: "builtin_text_alphabet",
+      name: "Alphabet",
+      builtIn: true,
+      type: "alphabetic",
+      start: 1,
+      step: 1,
+      prefix: "",
+      suffix: "",
+      padTo: 0,
+      customValues: []
+    }
+  ];
+  var BUILT_IN_COLOR_SEQUENCES = [
+    {
+      id: "builtin_color_rainbow",
+      name: "Rainbow",
+      builtIn: true,
+      values: ["#ff0000", "#ff7f00", "#ffff00", "#00aa00", "#0000ff", "#4b0082", "#8b00ff"]
+    },
+    {
+      id: "builtin_color_primary",
+      name: "Primary Colors",
+      builtIn: true,
+      values: ["#ff0000", "#ffff00", "#0000ff"]
+    }
+  ];
 
   function timestamp() {
     return new Date().toISOString();
@@ -33,8 +73,8 @@
         guideStyle: "cut-and-punch"
       },
       sequences: {
-        text: [],
-        color: []
+        text: clone(BUILT_IN_TEXT_SEQUENCES),
+        color: clone(BUILT_IN_COLOR_SEQUENCES)
       },
       tokens: [],
       printSelections: []
@@ -61,8 +101,8 @@
         guideStyle: project.settings && typeof project.settings.guideStyle === "string" ? project.settings.guideStyle : defaults.settings.guideStyle
       },
       sequences: {
-        text: project.sequences && Array.isArray(project.sequences.text) ? project.sequences.text : [],
-        color: project.sequences && Array.isArray(project.sequences.color) ? project.sequences.color : []
+        text: mergeBuiltInSequences(project.sequences && Array.isArray(project.sequences.text) ? project.sequences.text : [], BUILT_IN_TEXT_SEQUENCES),
+        color: mergeBuiltInSequences(project.sequences && Array.isArray(project.sequences.color) ? project.sequences.color : [], BUILT_IN_COLOR_SEQUENCES)
       },
       tokens: Array.isArray(project.tokens) ? project.tokens.map(tokenApi.normalizeToken) : [],
       printSelections: Array.isArray(project.printSelections) ? project.printSelections : []
@@ -83,12 +123,23 @@
     return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
   }
 
+  function mergeBuiltInSequences(sequences, builtIns) {
+    var customSequences = sequences.filter(function (sequence) {
+      return !builtIns.some(function (builtIn) {
+        return builtIn.id === sequence.id;
+      });
+    });
+    return clone(builtIns).concat(customSequences);
+  }
+
   return {
     STORAGE_KEY: STORAGE_KEY,
     UI_STORAGE_KEY: UI_STORAGE_KEY,
     PROJECT_VERSION: PROJECT_VERSION,
     PAGE_PRESETS: PAGE_PRESETS,
     TOKEN_SIZES: TOKEN_SIZES,
+    BUILT_IN_TEXT_SEQUENCES: BUILT_IN_TEXT_SEQUENCES,
+    BUILT_IN_COLOR_SEQUENCES: BUILT_IN_COLOR_SEQUENCES,
     clone: clone,
     createDefaultProject: createDefaultProject,
     normalizeProject: normalizeProject,

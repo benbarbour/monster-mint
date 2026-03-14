@@ -27,7 +27,14 @@ test("createDefaultProject returns the expected baseline structure", () => {
   assert.equal(project.version, 1);
   assert.equal(project.meta.name, "Untitled Project");
   assert.equal(project.settings.pagePresetId, "letter");
-  assert.deepEqual(project.sequences, { text: [], color: [] });
+  assert.deepEqual(project.sequences.text.map((sequence) => sequence.id), [
+    "builtin_text_numeric",
+    "builtin_text_alphabet"
+  ]);
+  assert.deepEqual(project.sequences.color.map((sequence) => sequence.id), [
+    "builtin_color_rainbow",
+    "builtin_color_primary"
+  ]);
   assert.deepEqual(project.tokens, []);
   assert.deepEqual(project.printSelections, []);
 });
@@ -46,6 +53,8 @@ test("normalizeProject fills missing values and rejects unknown page presets", (
   assert.equal(normalized.settings.pagePresetId, "letter");
   assert.equal(normalized.settings.pageOrientation, "landscape");
   assert.equal(normalized.settings.pageMarginIn, 0.5);
+  assert.equal(normalized.sequences.text[0].id, "builtin_text_numeric");
+  assert.equal(normalized.sequences.color[0].id, "builtin_color_rainbow");
 });
 
 test("storage round-trips a saved project", () => {

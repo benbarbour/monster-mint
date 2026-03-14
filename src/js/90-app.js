@@ -1143,12 +1143,14 @@
         '  <div class="sequence-item-header">',
         '    <div>',
         '      <h3 class="sequence-item-name">' + escapeHtml(sequence.name) + "</h3>",
-        '      <p class="sequence-item-meta">' + escapeHtml(Sequences.summarizeTextSequence(sequence)) + "</p>",
+        '      <p class="sequence-item-meta">' + escapeHtml(Sequences.summarizeTextSequence(sequence)) + (sequence.builtIn ? " · Built in" : "") + "</p>",
         "    </div>",
-        '    <div class="button-row">',
-        '      <button class="button" type="button" data-action="edit-text-sequence" data-sequence-id="' + sequence.id + '">Edit</button>',
-        '      <button class="button" type="button" data-action="delete-text-sequence" data-sequence-id="' + sequence.id + '">Delete</button>',
-        "    </div>",
+        sequence.builtIn
+          ? ""
+          : '    <div class="button-row">' +
+            '      <button class="button" type="button" data-action="edit-text-sequence" data-sequence-id="' + sequence.id + '">Edit</button>' +
+            '      <button class="button" type="button" data-action="delete-text-sequence" data-sequence-id="' + sequence.id + '">Delete</button>' +
+            "    </div>",
         "  </div>",
         "</article>"
       ].join("");
@@ -1166,12 +1168,14 @@
         '  <div class="sequence-item-header">',
         '    <div>',
         '      <h3 class="sequence-item-name">' + escapeHtml(sequence.name) + "</h3>",
-        '      <p class="sequence-item-meta">' + escapeHtml(Sequences.summarizeColorSequence(sequence)) + "</p>",
+        '      <p class="sequence-item-meta">' + escapeHtml(Sequences.summarizeColorSequence(sequence)) + (sequence.builtIn ? " · Built in" : "") + "</p>",
         "    </div>",
-        '    <div class="button-row">',
-        '      <button class="button" type="button" data-action="edit-color-sequence" data-sequence-id="' + sequence.id + '">Edit</button>',
-        '      <button class="button" type="button" data-action="delete-color-sequence" data-sequence-id="' + sequence.id + '">Delete</button>',
-        "    </div>",
+        sequence.builtIn
+          ? ""
+          : '    <div class="button-row">' +
+            '      <button class="button" type="button" data-action="edit-color-sequence" data-sequence-id="' + sequence.id + '">Edit</button>' +
+            '      <button class="button" type="button" data-action="delete-color-sequence" data-sequence-id="' + sequence.id + '">Delete</button>' +
+            "    </div>",
         "  </div>",
         "</article>"
       ].join("");

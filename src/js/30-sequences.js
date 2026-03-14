@@ -14,6 +14,7 @@
     return {
       id: payload.id || Utils.uid("seq_text"),
       name: (payload.name || "").trim() || "Untitled text sequence",
+      builtIn: payload.builtIn === true,
       type: type,
       start: type === "numeric" ? asInteger(payload.start, 1) : 1,
       step: type === "numeric" ? asInteger(payload.step, 1) : 1,
@@ -31,6 +32,7 @@
     return {
       id: payload.id || Utils.uid("seq_color"),
       name: (payload.name || "").trim() || "Untitled color sequence",
+      builtIn: payload.builtIn === true,
       values: values
     };
   }
