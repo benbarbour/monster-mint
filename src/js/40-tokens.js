@@ -19,21 +19,23 @@
 
   function createTextComponent(input) {
     var payload = input || {};
+    var legacyMode = payload.contentMode === "sequence" ? resolveLegacyTextMode(payload.textSequenceRef) : null;
     return {
       id: payload.id || Utils.uid("text"),
       x: asCoordinate(payload.x, 0),
       y: asCoordinate(payload.y, 0),
       width: asSize(payload.width, 0.5),
       height: asSize(payload.height, 0.2),
-      contentMode: payload.contentMode === "sequence" ? "sequence" : "custom",
+      contentMode: normalizeTextContentMode(payload.contentMode, legacyMode),
       customText: payload.customText || "Token",
-      textSequenceRef: payload.textSequenceRef || null,
+      sequenceStart: asInteger(payload.sequenceStart, legacyMode === "alphabetic" ? 1 : (payload.start || 1)),
+      sequencePad: asNonNegativeInteger(payload.sequencePad, payload.padTo || 0),
       fontFamily: payload.fontFamily || "Georgia",
       fontWeight: payload.fontWeight || "700",
       colorMode: payload.colorMode === "sequence" ? "sequence" : "manual",
       color: payload.color || "#111111",
       colorSequenceRef: payload.colorSequenceRef || null,
-      shadow: normalizeShadow(payload.shadow)
+      textBorder: normalizeTextBorder(payload.textBorder || payload.shadow)
     };
   }
 
@@ -107,14 +109,14 @@
     return [0.5, 1, 2, 3, 4, 5].includes(parsed) ? parsed : 1;
   }
 
-  function normalizeShadow(input) {
+  function normalizeTextBorder(input) {
     var payload = input || {};
     return {
-      enabled: payload.enabled === true,
-      dx: asSigned(payload.dx, 1),
-      dy: asSigned(payload.dy, 1),
-      blur: asPositive(payload.blur, 1),
-      color: payload.color || "rgba(0,0,0,0.5)"
+      width: asBorderWidth(
+        payload.width,
+        payload.enabled === true ? 1 : 0
+      ),
+      color: isHexColor(payload.color) ? payload.color : "#111111"
     };
   }
 
@@ -167,15 +169,19 @@
   }
 
   function getTextValue(component, textSequences, index) {
-    if (component.contentMode !== "sequence") {
+    if (component.contentMode === "custom") {
       return component.customText || "";
     }
 
+    var sequenceId = component.contentMode === "alphabetic" ? "builtin_text_alphabet" : "builtin_text_numeric";
     var sequence = textSequences.find(function (candidate) {
-      return candidate.id === component.textSequenceRef;
-    });
+      return candidate.id === sequenceId;
+    }) || { type: component.contentMode === "alphabetic" ? "alphabetic" : "numeric" };
 
-    return Sequences.resolveTextValue(sequence, index);
+    return Sequences.resolveTextValue(sequence, index, {
+      start: component.sequenceStart,
+      padTo: component.contentMode === "numeric" ? component.sequencePad : 0
+    });
   }
 
   function getColorValue(mode, manualColor, sequenceRef, colorSequences, index) {
@@ -200,10 +206,6 @@
       }
 
       face.texts.forEach(function (component) {
-        if (component.contentMode === "sequence" && component.textSequenceRef) {
-          lengths.push({ kind: "text", sequenceId: component.textSequenceRef });
-        }
-
         if (component.colorMode === "sequence" && component.colorSequenceRef) {
           lengths.push({ kind: "color", sequenceId: component.colorSequenceRef });
         }
@@ -246,6 +248,11 @@
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   }
 
+  function asBorderWidth(value, fallback) {
+    var parsed = Number(value);
+    return Number.isFinite(parsed) ? clamp(parsed, 0, 8) : fallback;
+  }
+
   function asRatio(value, fallback) {
     var parsed = Number(value);
     return Number.isFinite(parsed) ? clamp(parsed, 0, 0.25) : fallback;
@@ -254,6 +261,40 @@
   function asSigned(value, fallback) {
     var parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  function asInteger(value, fallback) {
+    var parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  function asNonNegativeInteger(value, fallback) {
+    var parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? Math.max(0, parsed) : fallback;
+  }
+
+  function normalizeTextContentMode(value, legacyMode) {
+    if (value === "numeric" || value === "alphabetic" || value === "custom") {
+      return value;
+    }
+
+    return legacyMode || "custom";
+  }
+
+  function resolveLegacyTextMode(sequenceRef) {
+    if (sequenceRef === "builtin_text_alphabet") {
+      return "alphabetic";
+    }
+
+    if (sequenceRef === "builtin_text_numeric") {
+      return "numeric";
+    }
+
+    return null;
+  }
+
+  function isHexColor(value) {
+    return /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(value || "").trim());
   }
 
   function clamp(value, min, max) {

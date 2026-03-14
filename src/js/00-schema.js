@@ -18,25 +18,13 @@
       id: "builtin_text_numeric",
       name: "Numeric",
       builtIn: true,
-      type: "numeric",
-      start: 1,
-      step: 1,
-      prefix: "",
-      suffix: "",
-      padTo: 0,
-      customValues: []
+      type: "numeric"
     },
     {
       id: "builtin_text_alphabet",
       name: "Alphabet",
       builtIn: true,
-      type: "alphabetic",
-      start: 1,
-      step: 1,
-      prefix: "",
-      suffix: "",
-      padTo: 0,
-      customValues: []
+      type: "alphabetic"
     }
   ];
   var BUILT_IN_COLOR_SEQUENCES = [
@@ -101,7 +89,7 @@
         guideStyle: project.settings && typeof project.settings.guideStyle === "string" ? project.settings.guideStyle : defaults.settings.guideStyle
       },
       sequences: {
-        text: mergeBuiltInSequences(project.sequences && Array.isArray(project.sequences.text) ? project.sequences.text : [], BUILT_IN_TEXT_SEQUENCES),
+        text: clone(BUILT_IN_TEXT_SEQUENCES),
         color: mergeBuiltInSequences(project.sequences && Array.isArray(project.sequences.color) ? project.sequences.color : [], BUILT_IN_COLOR_SEQUENCES)
       },
       tokens: Array.isArray(project.tokens) ? project.tokens.map(tokenApi.normalizeToken) : [],

@@ -39,6 +39,17 @@
   resize: vertical;
 }
 
+.checkbox-field {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.checkbox-field input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
 .sequence-manager {
   display: grid;
   gap: var(--space-2);

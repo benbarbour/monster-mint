@@ -64,21 +64,14 @@
   }
 
   function renderSettingsPanel(state) {
-    var customTextSequences = state.project.sequences.text.filter(function (sequence) {
-      return !sequence.builtIn;
-    });
     var customColorSequences = state.project.sequences.color.filter(function (sequence) {
       return !sequence.builtIn;
     });
-    var selectedTextSequence = getSelectedSequence(customTextSequences, state.ui.selectedTextSequenceId);
     var selectedColorSequence = getSelectedSequence(customColorSequences, state.ui.selectedColorSequenceId);
-    var editingTextSequence = customTextSequences.find(function (sequence) {
-      return sequence.id === state.ui.editingTextSequenceId;
-    }) || null;
     var editingColorSequence = customColorSequences.find(function (sequence) {
       return sequence.id === state.ui.editingColorSequenceId;
     }) || null;
-    var settingsDrawer = getSettingsDrawer(editingTextSequence, editingColorSequence);
+    var settingsDrawer = getSettingsDrawer(editingColorSequence);
     var preset = Schema.findPagePreset(state.project.settings.pagePresetId);
     return [
       '<div class="settings-shell' + (settingsDrawer ? " has-drawer" : "") + '">',
@@ -108,10 +101,6 @@
       '    <p class="field-help">Current page preset: ' + escapeHtml(preset ? preset.label : "Unknown") + "</p>",
       "      </section>",
       '      <section class="panel-card">',
-      "    <h2>Text Sequences</h2>",
-      renderTextSequenceManager(customTextSequences, selectedTextSequence, editingTextSequence),
-      "      </section>",
-      '      <section class="panel-card">',
       "    <h2>Color Sequences</h2>",
       renderColorSequenceManager(customColorSequences, selectedColorSequence, editingColorSequence),
       "      </section>",
@@ -122,15 +111,7 @@
     ].join("");
   }
 
-  function getSettingsDrawer(editingTextSequence, editingColorSequence) {
-    if (editingTextSequence) {
-      return {
-        kind: "text",
-        title: "Text Sequence",
-        sequence: editingTextSequence
-      };
-    }
-
+  function getSettingsDrawer(editingColorSequence) {
     if (editingColorSequence) {
       return {
         kind: "color",
@@ -153,7 +134,7 @@
       '    <button class="button" type="button" data-action="close-settings-drawer">Close</button>',
       "  </div>",
       '  <div class="drawer-body">',
-      drawer.kind === "text" ? renderTextSequenceForm(drawer.sequence) : renderColorSequenceForm(drawer.sequence),
+      renderColorSequenceForm(drawer.sequence),
       '    <div class="button-row drawer-actions">',
       '      <button class="button" type="button" data-action="delete-selected-' + drawer.kind + '-sequence" data-sequence-id="' + drawer.sequence.id + '">Delete Sequence</button>',
       "    </div>",
@@ -285,10 +266,15 @@
     return items.concat(face.images.map(function (component) {
       return { type: "image", id: component.id, label: component.name || "Image" };
     })).concat(face.texts.map(function (component) {
+      var label = component.contentMode === "numeric"
+        ? "Number sequence"
+        : component.contentMode === "alphabetic"
+          ? "Alphabet sequence"
+          : (component.customText || "Custom text");
       return {
         type: "text",
         id: component.id,
-        label: component.contentMode === "sequence" ? "Sequence text" : (component.customText || "Custom text")
+        label: label
       };
     }));
   }
@@ -402,7 +388,14 @@
       '<form class="form-grid" data-form="text-component-settings">',
       '  <label class="field">Content mode<select name="contentMode">' + renderTextContentModeOptions(component.contentMode) + "</select></label>",
       renderConditionalField("contentMode:custom", component.contentMode === "custom", 'Text<input name="customText" value="' + escapeHtml(component.customText) + '">'),
-      renderConditionalField("contentMode:sequence", component.contentMode === "sequence", 'Text sequence<select name="textSequenceRef">' + renderSequenceOptions(project.sequences.text, component.textSequenceRef, "No sequence") + "</select>"),
+      renderConditionalBlock("contentMode:numeric|alphabetic", component.contentMode === "numeric" || component.contentMode === "alphabetic", [
+        '<div class="field-row two-up">',
+        '  <label class="field">Start<input type="number" step="1" name="sequenceStart" value="' + component.sequenceStart + '"></label>',
+        component.contentMode === "numeric"
+          ? '  <label class="field">Pad<input type="number" min="0" step="1" name="sequencePad" value="' + component.sequencePad + '"></label>'
+          : "  <div></div>",
+        "</div>"
+      ].join("")),
       '  <div class="field-row two-up">',
       '    <label class="field">Font family<input name="fontFamily" value="' + escapeHtml(component.fontFamily) + '"></label>',
       '    <label class="field">Font weight<select name="fontWeight">' + renderFontWeightOptions(component.fontWeight) + "</select></label>",
@@ -411,7 +404,7 @@
       renderConditionalField("colorMode:manual", component.colorMode === "manual", 'Text color<input type="color" name="color" value="' + escapeHtml(component.color) + '">'),
       renderConditionalField("colorMode:sequence", component.colorMode === "sequence", 'Color sequence<select name="colorSequenceRef">' + renderSequenceOptions(project.sequences.color, component.colorSequenceRef, "No sequence") + "</select>"),
       renderBoundsFields(component),
-      renderShadowFields(component.shadow),
+      renderTextBorderFields(component.textBorder),
       '  <p class="field-help">Changes save automatically.</p>',
       "</form>"
     ].join("");
@@ -457,19 +450,11 @@
     ].join("");
   }
 
-  function renderShadowFields(shadow) {
+  function renderTextBorderFields(textBorder) {
     return [
-      '<label class="field">Drop shadow<select name="shadowEnabled">',
-      '<option value="false"' + (!shadow.enabled ? " selected" : "") + '>Disabled</option>',
-      '<option value="true"' + (shadow.enabled ? " selected" : "") + '>Enabled</option>',
-      "</select></label>",
       '<div class="field-row two-up">',
-      '  <label class="field">Shadow X<input type="number" step="0.5" name="shadowDx" value="' + shadow.dx + '"></label>',
-      '  <label class="field">Shadow Y<input type="number" step="0.5" name="shadowDy" value="' + shadow.dy + '"></label>',
-      "</div>",
-      '<div class="field-row two-up">',
-      '  <label class="field">Blur<input type="number" min="0" step="0.5" name="shadowBlur" value="' + shadow.blur + '"></label>',
-      '  <label class="field">Shadow color<input type="color" name="shadowColor" value="' + normalizeColorInput(shadow.color) + '"></label>',
+      '  <label class="field">Text border<input type="number" min="0" max="8" step="0.1" name="textBorderWidth" value="' + textBorder.width + '"><span class="field-help">0 turns it off.</span></label>',
+      '  <label class="field">Border color<input type="color" name="textBorderColor" value="' + normalizeColorInput(textBorder.color) + '"></label>',
       "</div>"
     ].join("");
   }
@@ -529,92 +514,6 @@
         });
       };
       pageSettingsForm.addEventListener("change", savePageSettings);
-    }
-
-    var textSequenceForm = appElement.querySelector("[data-form='text-sequence']");
-    if (textSequenceForm) {
-      var textTypeField = textSequenceForm.querySelector("[name='type']");
-      var syncTextSequenceFields = function () {
-        var currentType = textTypeField.value;
-        textSequenceForm.querySelectorAll("[data-type-only]").forEach(function (element) {
-          element.hidden = element.getAttribute("data-type-only") !== currentType;
-        });
-      };
-      textTypeField.addEventListener("change", syncTextSequenceFields);
-      syncTextSequenceFields();
-
-      textSequenceForm.addEventListener("change", function () {
-        var formData = new FormData(textSequenceForm);
-        var sequence = Sequences.createTextSequence({
-          id: formData.get("id") || null,
-          name: formData.get("name"),
-          type: formData.get("type"),
-          start: formData.get("start"),
-          step: formData.get("step"),
-          prefix: formData.get("prefix"),
-          suffix: formData.get("suffix"),
-          padTo: formData.get("padTo"),
-          customValuesText: formData.get("customValuesText")
-        });
-
-        store.updateProject(function (project) {
-          upsertById(project.sequences.text, sequence);
-        });
-        store.updateUi(function (ui) {
-          ui.selectedTextSequenceId = sequence.id;
-          ui.editingTextSequenceId = sequence.id;
-        });
-      });
-    }
-
-    var selectedTextSequenceField = appElement.querySelector('[name="selectedTextSequenceId"]');
-    if (selectedTextSequenceField) {
-      selectedTextSequenceField.addEventListener("change", function () {
-        store.updateUi(function (ui) {
-          ui.selectedTextSequenceId = selectedTextSequenceField.value || null;
-          ui.editingTextSequenceId = selectedTextSequenceField.value || null;
-          ui.editingColorSequenceId = null;
-        });
-      });
-    }
-
-    var newTextSequenceButton = appElement.querySelector('[data-action="new-text-sequence"]');
-    if (newTextSequenceButton) {
-      newTextSequenceButton.addEventListener("click", function () {
-        var sequence = Sequences.createTextSequence({
-          name: "New text sequence"
-        });
-        store.updateProject(function (project) {
-          project.sequences.text.push(sequence);
-        });
-        store.updateUi(function (ui) {
-          ui.selectedTextSequenceId = sequence.id;
-          ui.editingTextSequenceId = sequence.id;
-          ui.editingColorSequenceId = null;
-        });
-      });
-    }
-
-    var deleteSelectedTextButton = appElement.querySelector('[data-action="delete-selected-text-sequence"]');
-    if (deleteSelectedTextButton) {
-      deleteSelectedTextButton.addEventListener("click", function () {
-        var sequenceId = deleteSelectedTextButton.getAttribute("data-sequence-id");
-        if (!sequenceId) {
-          return;
-        }
-        store.updateProject(function (project) {
-          project.sequences.text = project.sequences.text.filter(function (sequence) {
-            return sequence.id !== sequenceId;
-          });
-        });
-        store.updateUi(function (ui) {
-          ui.editingTextSequenceId = null;
-          ui.editingColorSequenceId = null;
-          if (ui.selectedTextSequenceId === sequenceId) {
-            ui.selectedTextSequenceId = null;
-          }
-        });
-      });
     }
 
     var colorSequenceForm = appElement.querySelector("[data-form='color-sequence']");
@@ -945,18 +844,16 @@
           }
           component.contentMode = String(formData.get("contentMode"));
           component.customText = String(formData.get("customText") || "");
-          component.textSequenceRef = nullableValue(formData.get("textSequenceRef"));
+          component.sequenceStart = toIntegerOrDefault(formData.get("sequenceStart"), component.sequenceStart);
+          component.sequencePad = toNonNegativeInteger(formData.get("sequencePad"), component.sequencePad);
           component.fontFamily = String(formData.get("fontFamily") || component.fontFamily);
           component.fontWeight = String(formData.get("fontWeight") || component.fontWeight);
           component.colorMode = String(formData.get("colorMode"));
           component.color = String(formData.get("color") || component.color);
           component.colorSequenceRef = nullableValue(formData.get("colorSequenceRef"));
           applyBoundsFromForm(component, formData);
-          component.shadow.enabled = String(formData.get("shadowEnabled")) === "true";
-          component.shadow.dx = Number(formData.get("shadowDx")) || 0;
-          component.shadow.dy = Number(formData.get("shadowDy")) || 0;
-          component.shadow.blur = Number(formData.get("shadowBlur")) || 0;
-          component.shadow.color = String(formData.get("shadowColor") || component.shadow.color);
+          component.textBorder.width = toNumberOrDefault(formData.get("textBorderWidth"), component.textBorder.width);
+          component.textBorder.color = String(formData.get("textBorderColor") || component.textBorder.color);
         });
       });
     }
@@ -1298,6 +1195,16 @@
     return Number.isFinite(parsed) ? parsed : fallback;
   }
 
+  function toIntegerOrDefault(value, fallback) {
+    var parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  function toNonNegativeInteger(value, fallback) {
+    var parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? Math.max(0, parsed) : fallback;
+  }
+
   function upsertById(collection, value) {
     var index = collection.findIndex(function (candidate) {
       return candidate.id === value.id;
@@ -1318,13 +1225,25 @@
     form.querySelectorAll("[data-visible-when]").forEach(function (element) {
       var parts = element.getAttribute("data-visible-when").split(":");
       var fieldName = parts[0];
-      var expectedValue = parts[1];
-      element.hidden = values[fieldName] !== expectedValue;
+      var expectedValues = parts[1].split("|");
+      var isVisible = expectedValues.indexOf(values[fieldName]) !== -1;
+      element.hidden = !isVisible;
+      element.style.display = isVisible ? "" : "none";
+      element.querySelectorAll("input, select, textarea, button").forEach(function (control) {
+        if (control.name === "contentMode" || control.name === "colorMode") {
+          return;
+        }
+        control.disabled = !isVisible;
+      });
     });
   }
 
   function renderConditionalField(visibleWhen, isVisible, innerHtml) {
-    return '<label class="field" data-visible-when="' + visibleWhen + '"' + (isVisible ? "" : " hidden") + ">" + innerHtml + "</label>";
+    return '<label class="field" data-visible-when="' + visibleWhen + '"' + (isVisible ? "" : ' hidden style="display:none"') + ">" + innerHtml + "</label>";
+  }
+
+  function renderConditionalBlock(visibleWhen, isVisible, innerHtml) {
+    return '<div data-visible-when="' + visibleWhen + '"' + (isVisible ? "" : ' hidden style="display:none"') + ">" + innerHtml + "</div>";
   }
 
   function renderTextSequenceManager(sequences, selectedSequence, editingSequence) {
@@ -1422,8 +1341,9 @@
 
   function renderTextContentModeOptions(currentValue) {
     return [
-      { id: "custom", label: "Custom text" },
-      { id: "sequence", label: "Sequence" }
+      { id: "numeric", label: "Number Sequence" },
+      { id: "alphabetic", label: "Alphabet Sequence" },
+      { id: "custom", label: "Custom Text" }
     ].map(function (option) {
       return '<option value="' + option.id + '"' + (currentValue === option.id ? " selected" : "") + ">" + option.label + "</option>";
     }).join("");
@@ -1441,16 +1361,6 @@
   function renderFontWeightOptions(currentValue) {
     return ["400", "500", "600", "700", "800"].map(function (value) {
       return '<option value="' + value + '"' + (currentValue === value ? " selected" : "") + ">" + value + "</option>";
-    }).join("");
-  }
-
-  function renderImageFitOptions(currentValue) {
-    return [
-      { id: "cover", label: "Cover" },
-      { id: "contain", label: "Contain" },
-      { id: "stretch", label: "Stretch" }
-    ].map(function (option) {
-      return '<option value="' + option.id + '"' + (currentValue === option.id ? " selected" : "") + ">" + option.label + "</option>";
     }).join("");
   }
 

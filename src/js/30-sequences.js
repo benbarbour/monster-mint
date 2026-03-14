@@ -9,19 +9,15 @@
 
   function createTextSequence(input) {
     var payload = input || {};
-    var type = payload.type === "alphabetic" || payload.type === "custom" ? payload.type : "numeric";
+    var type = payload.type === "alphabetic" ? "alphabetic" : "numeric";
 
     return {
       id: payload.id || Utils.uid("seq_text"),
       name: (payload.name || "").trim() || "Untitled text sequence",
       builtIn: payload.builtIn === true,
       type: type,
-      start: type === "numeric" ? asInteger(payload.start, 1) : 1,
-      step: type === "numeric" ? asInteger(payload.step, 1) : 1,
-      prefix: payload.prefix || "",
-      suffix: payload.suffix || "",
-      padTo: type === "numeric" ? Math.max(0, asInteger(payload.padTo, 0)) : 0,
-      customValues: type === "custom" ? Utils.parseLineList(payload.customValues || payload.customValuesText) : []
+      start: asInteger(payload.start, 1),
+      padTo: type === "numeric" ? Math.max(0, asInteger(payload.padTo, 0)) : 0
     };
   }
 
@@ -43,14 +39,10 @@
     }
 
     if (sequence.type === "numeric") {
-      return "Numeric, starts at " + sequence.start + ", step " + sequence.step;
+      return "Numeric sequence";
     }
 
-    if (sequence.type === "alphabetic") {
-      return "Alphabetic sequence";
-    }
-
-    return "Custom, " + sequence.customValues.length + " values";
+    return "Alphabetic sequence";
   }
 
   function summarizeColorSequence(sequence) {
@@ -67,7 +59,7 @@
     }
 
     if (kind === "text") {
-      return sequence.type === "custom" ? sequence.customValues.length : Infinity;
+      return Infinity;
     }
 
     if (kind === "color") {
@@ -77,22 +69,20 @@
     return Infinity;
   }
 
-  function resolveTextValue(sequence, index) {
+  function resolveTextValue(sequence, index, options) {
     if (!sequence) {
       return "";
     }
 
+    var opts = options || {};
+    var start = asInteger(opts.start, 1);
+    var zeroBased = Math.max(0, start - 1 + index);
+
     if (sequence.type === "numeric") {
-      var numericValue = sequence.start + sequence.step * index;
-      var asText = String(numericValue).padStart(sequence.padTo || 0, "0");
-      return (sequence.prefix || "") + asText + (sequence.suffix || "");
+      return String(start + index).padStart(Math.max(0, asInteger(opts.padTo, 0)), "0");
     }
 
-    if (sequence.type === "alphabetic") {
-      return (sequence.prefix || "") + alphabeticValue(index) + (sequence.suffix || "");
-    }
-
-    return sequence.customValues[index] || "";
+    return alphabeticValue(zeroBased);
   }
 
   function resolveColorValue(sequence, index) {

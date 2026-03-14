@@ -27,6 +27,8 @@ test("can create and manipulate a token template", async ({ page }) => {
   await page.getByRole("button", { name: "Add Text" }).click();
   await expect(page.getByRole("heading", { name: "Selected Component" })).toBeVisible();
   await expect(page.locator('form[data-form="text-component-settings"] select[name="contentMode"]')).toHaveValue("custom");
+  await expect(page.locator('form[data-form="text-component-settings"] input[name="customText"]')).toBeVisible();
+  await expect(page.locator('form[data-form="text-component-settings"] input[name="sequenceStart"]')).toBeHidden();
 
   const xInput = page.locator('form[data-form="text-component-settings"] input[name="x"]');
   const yInput = page.locator('form[data-form="text-component-settings"] input[name="y"]');
@@ -99,31 +101,34 @@ test("back face supports built-in components and image transforms", async ({ pag
   await expect(page.locator('form[data-form="image-component-settings"] input[name="mirrorX"]')).toBeChecked();
 });
 
-test("custom sequence limits print copy counts", async ({ page }) => {
+test("built-in text modes and color sequences drive the editor and print limits", async ({ page }) => {
   await page.getByRole("button", { name: "Settings" }).click();
   await expect(page.getByRole("button", { name: "Export JSON" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Import JSON" })).toBeVisible();
-
-  const textManagerOptions = await page.locator('select[name="selectedTextSequenceId"] option').allTextContents();
-  expect(textManagerOptions).not.toContain("Numeric");
-  expect(textManagerOptions).not.toContain("Alphabet");
+  await expect(page.getByText("Text Sequences")).toHaveCount(0);
 
   await page.getByRole("button", { name: "New Custom" }).first().click();
   await expect(page.locator('[data-drawer="settings"]')).toBeVisible();
-  await page.locator('form[data-form="text-sequence"] input[name="name"]').fill("Two Names");
-  await page.locator('form[data-form="text-sequence"] input[name="name"]').blur();
-  await page.locator('form[data-form="text-sequence"] select[name="type"]').selectOption("custom");
-  await page.locator('form[data-form="text-sequence"] textarea[name="customValuesText"]').fill("Goblin\nOrc");
-  await page.locator('form[data-form="text-sequence"] textarea[name="customValuesText"]').blur();
+  await page.locator('form[data-form="color-sequence"] input[name="name"]').fill("Two Colors");
+  await page.locator('form[data-form="color-sequence"] input[name="name"]').blur();
+  await page.locator('form[data-form="color-sequence"] textarea[name="valuesText"]').fill("#111111\n#eeeeee");
+  await page.locator('form[data-form="color-sequence"] textarea[name="valuesText"]').blur();
 
   await page.getByRole("tab", { name: "Designer" }).click();
   await page.getByRole("button", { name: "Create Token" }).click();
   await page.getByRole("button", { name: "Add Text" }).click();
-  await page.locator('form[data-form="text-component-settings"] select[name="contentMode"]').selectOption("sequence");
-  const componentSequenceOptions = await page.locator('form[data-form="text-component-settings"] select[name="textSequenceRef"] option').allTextContents();
-  expect(componentSequenceOptions).toContain("Numeric");
-  expect(componentSequenceOptions).toContain("Alphabet");
-  await page.locator('form[data-form="text-component-settings"] select[name="textSequenceRef"]').selectOption({ label: "Two Names" });
+  await page.locator('form[data-form="text-component-settings"] select[name="contentMode"]').selectOption("numeric");
+  await expect(page.locator('form[data-form="text-component-settings"] input[name="sequenceStart"]')).toBeVisible();
+  await expect(page.locator('form[data-form="text-component-settings"] input[name="sequencePad"]')).toBeVisible();
+  await expect(page.locator('form[data-form="text-component-settings"] input[name="customText"]')).toBeHidden();
+  await page.locator('form[data-form="text-component-settings"] select[name="colorMode"]').selectOption("sequence");
+  await page.locator('form[data-form="text-component-settings"] select[name="colorSequenceRef"]').selectOption({ label: "Two Colors" });
+
+  await page.locator('form[data-form="text-component-settings"] select[name="contentMode"]').selectOption("alphabetic");
+  await expect(page.locator('form[data-form="text-component-settings"] input[name="sequenceStart"]')).toBeVisible();
+  await expect(page.locator('form[data-form="text-component-settings"] input[name="sequencePad"]')).toBeHidden();
+  await page.locator('form[data-form="text-component-settings"] select[name="contentMode"]').selectOption("custom");
+  await expect(page.locator('form[data-form="text-component-settings"] input[name="customText"]')).toBeVisible();
 
   await page.getByRole("tab", { name: "Print" }).click();
   const copiesInput = page.locator('input[name^="copies-"]').first();

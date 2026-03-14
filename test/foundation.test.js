@@ -115,24 +115,22 @@ test("loadUiState provides editing slots for sequence forms", () => {
   });
 });
 
-test("createTextSequence handles numeric and custom definitions", () => {
+test("createTextSequence handles numeric and alphabetic definitions", () => {
   const numeric = Sequences.createTextSequence({
     name: "Numbers",
     type: "numeric",
     start: "2",
-    step: "3",
     padTo: "2"
   });
-  const custom = Sequences.createTextSequence({
-    name: "Names",
-    type: "custom",
-    customValuesText: "Goblin\nOrc\n"
+  const alphabetic = Sequences.createTextSequence({
+    name: "Letters",
+    type: "alphabetic",
+    padTo: "4"
   });
 
   assert.equal(numeric.start, 2);
-  assert.equal(numeric.step, 3);
   assert.equal(numeric.padTo, 2);
-  assert.deepEqual(custom.customValues, ["Goblin", "Orc"]);
+  assert.equal(alphabetic.padTo, 0);
 });
 
 test("createColorSequence filters invalid colors and reports finite lengths", () => {
@@ -151,18 +149,16 @@ test("parseLineList trims and removes blank lines", () => {
 
 test("resolveTextValue handles numeric and alphabetic sequences", () => {
   const numeric = Sequences.createTextSequence({
-    type: "numeric",
-    start: 3,
-    step: 2,
-    prefix: "G",
-    padTo: 2
+    type: "numeric"
   });
   const alphabetic = Sequences.createTextSequence({
     type: "alphabetic"
   });
 
-  assert.equal(Sequences.resolveTextValue(numeric, 1), "G05");
+  assert.equal(Sequences.resolveTextValue(numeric, 1, { start: 3, padTo: 2 }), "04");
   assert.equal(Sequences.resolveTextValue(alphabetic, 27), "AB");
+  assert.equal(Sequences.resolveTextValue(alphabetic, 51), "AZ");
+  assert.equal(Sequences.resolveTextValue(alphabetic, 52), "BA");
 });
 
 test("clampRect allows components to extend outside the token square", () => {
@@ -226,13 +222,8 @@ test("token templates cap border width ratio at twenty-five percent", () => {
   assert.equal(token.front.border.widthRatio, 0.25);
 });
 
-test("print max copies are capped by the shortest bounded sequence", () => {
+test("print max copies are capped by the shortest bounded color sequence", () => {
   const project = Schema.createDefaultProject();
-  const textSequence = Sequences.createTextSequence({
-    id: "t1",
-    type: "custom",
-    customValuesText: "one\ntwo\nthree"
-  });
   const colorSequence = Sequences.createColorSequence({
     id: "c1",
     valuesText: "#000000\n#ffffff"
@@ -241,15 +232,15 @@ test("print max copies are capped by the shortest bounded sequence", () => {
     front: {
       texts: [
         Tokens.createTextComponent({
-          contentMode: "sequence",
-          textSequenceRef: "t1",
+          contentMode: "numeric",
+          sequenceStart: 1,
+          sequencePad: 2,
           colorMode: "sequence",
           colorSequenceRef: "c1"
         })
       ]
     }
   });
-  project.sequences.text.push(textSequence);
   project.sequences.color.push(colorSequence);
 
   assert.equal(Print.getTokenMaxCopies(token, project), 2);

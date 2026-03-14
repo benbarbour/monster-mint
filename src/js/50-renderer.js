@@ -94,38 +94,30 @@
       );
       var box = toSvgRect(component, "text");
       var fontSize = fitFontSize(value, component.fontFamily, component.fontWeight, box.width, box.height);
-      var shadow = component.shadow.enabled
-        ? ' style="filter: drop-shadow(' + component.shadow.dx + 'px ' + component.shadow.dy + 'px ' + component.shadow.blur + 'px ' + escapeAttr(component.shadow.color) + ')"'
-        : "";
+      var borderWidth = component.textBorder ? Number(component.textBorder.width || 0) : 0;
+      var borderColor = component.textBorder && component.textBorder.color ? component.textBorder.color : "#111111";
       return [
-        '<g clip-path="url(#text-clip-' + tokenSlug + "-" + component.id + ')"' + shadow + '>',
-        '  <text x="' + (box.x + box.width / 2) + '" y="' + (box.y + box.height / 2) + '" fill="' + escapeAttr(color) + '" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-size="' + fontSize + '" text-anchor="middle" dominant-baseline="middle">' + escapeText(value) + "</text>",
+        '<g clip-path="url(#text-clip-' + tokenSlug + "-" + component.id + ')">',
+        '  <text x="' + (box.x + box.width / 2) + '" y="' + (box.y + box.height / 2) + '" fill="' + escapeAttr(color) + '" stroke="' + (borderWidth > 0 ? escapeAttr(borderColor) : "none") + '" stroke-width="' + borderWidth + '" paint-order="stroke fill" stroke-linejoin="round" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-size="' + fontSize + '" text-anchor="middle" dominant-baseline="middle">' + escapeText(value) + "</text>",
         "</g>"
       ].join("");
     }).join("");
   }
 
   function getPreviewTextValue(component, textSequences) {
-    if (component.contentMode !== "sequence") {
+    if (component.contentMode === "custom") {
       return component.customText || "Text";
     }
 
-    var sequence = textSequences.find(function (candidate) {
-      return candidate.id === component.textSequenceRef;
-    });
-    if (!sequence) {
-      return "";
+    if (component.contentMode === "numeric") {
+      return "#".repeat(Math.max(1, component.sequencePad || 0));
     }
 
-    if (sequence.type === "numeric") {
-      return (sequence.prefix || "") + "#".repeat(Math.max(1, sequence.padTo || 0)) + (sequence.suffix || "");
+    if (component.contentMode === "alphabetic") {
+      return "A";
     }
 
-    if (sequence.type === "alphabetic") {
-      return (sequence.prefix || "") + "A" + (sequence.suffix || "");
-    }
-
-    return sequence.customValues[0] || "Text";
+    return "";
   }
 
   function renderTextClipPaths(components, tokenSlug) {
