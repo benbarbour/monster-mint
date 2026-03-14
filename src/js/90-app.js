@@ -29,6 +29,8 @@
   var mountedStore = null;
   var activePrintFrame = null;
   var designerWheelPersistTimer = null;
+  var pendingPrintFieldFocus = null;
+  var printSelectionSyncTimer = null;
 
   function escapeHtml(value) {
     return String(value)
@@ -39,6 +41,7 @@
   }
 
   function render(appElement, store) {
+    var focusState = captureFocusState(appElement);
     var state = store.getState();
     var activeTab = state.ui.activeTab;
 
@@ -69,6 +72,8 @@
     ].join("");
 
     attachEvents(appElement, store);
+    restoreFocusState(appElement, focusState);
+    restorePendingPrintFieldFocus(appElement);
   }
 
   function renderPanel(tabId, activeTab, content) {
@@ -217,26 +222,46 @@
     var rows = Print.getSelectionRows(state.project);
     var layout = Print.layoutProject(state.project);
     var activePreviewPage = Math.min(state.ui.selectedPrintPreviewPage || 0, Math.max(0, layout.pages.length - 1));
+    var printPanels = state.ui.printPanels || {};
     return [
       '<div class="print-layout">',
-      '  <section class="panel-card">',
-      "    <h2>Print Settings</h2>",
-      renderPageSettingsForm(state.project.settings),
-      "  </section>",
-      '  <section class="panel-card">',
-      "    <h2>Print Selections</h2>",
-      renderPrintSelectionForm(rows),
-      "  </section>",
-      '  <section class="panel-card">',
-      '    <div class="panel-header">',
-      "      <h2>Preview</h2>",
-      '      <button class="button button-primary" type="button" data-action="print-layout">Print</button>',
-      "    </div>",
-      layout.pages.length && layout.pages[0].items.length
-        ? renderPreviewTabs(layout, state.project, activePreviewPage)
-        : '<div class="empty-state">Choose at least one token copy to generate pages.</div>',
-      "  </section>",
+      renderPrintSection({
+        key: "settings",
+        title: "Print Settings",
+        isOpen: printPanels.settings !== false,
+        content: renderPageSettingsForm(state.project.settings)
+      }),
+      renderPrintSection({
+        key: "selections",
+        title: "Print Selections",
+        isOpen: printPanels.selections !== false,
+        content: renderPrintSelectionForm(rows)
+      }),
+      renderPrintSection({
+        key: "preview",
+        title: "Preview",
+        isOpen: printPanels.preview !== false,
+        actions: '<button class="button button-primary" type="button" data-action="print-layout">Print</button>',
+        content: layout.pages.length && layout.pages[0].items.length
+          ? renderPreviewTabs(layout, state.project, activePreviewPage)
+          : '<div class="empty-state">Choose at least one token copy to generate pages.</div>'
+      }),
       "</div>"
+    ].join("");
+  }
+
+  function renderPrintSection(config) {
+    return [
+      '<section class="panel-card print-panel' + (config.isOpen ? " is-open" : " is-collapsed") + '">',
+      '  <div class="panel-header print-panel-header">',
+      '    <button class="panel-toggle" type="button" data-action="toggle-print-panel" data-panel-key="' + config.key + '" aria-expanded="' + (config.isOpen ? "true" : "false") + '">',
+      "      <h2>" + escapeHtml(config.title) + "</h2>",
+      '      <span class="panel-toggle-icon" aria-hidden="true">' + (config.isOpen ? "▾" : "▸") + "</span>",
+      "    </button>",
+      config.actions || "",
+      "  </div>",
+      config.isOpen ? config.content : "",
+      "</section>"
     ].join("");
   }
 
@@ -512,6 +537,16 @@
     bindTransferActions(appElement, store);
     bindDesignerEvents(appElement, store);
     bindPrintEvents(appElement, store);
+
+    appElement.querySelectorAll("[data-action='toggle-print-panel']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var panelKey = button.getAttribute("data-panel-key");
+        store.updateUi(function (ui) {
+          ui.printPanels = ui.printPanels || {};
+          ui.printPanels[panelKey] = !(ui.printPanels[panelKey] !== false);
+        });
+      });
+    });
   }
 
   function bindSettingsForms(appElement, store) {
@@ -1135,15 +1170,37 @@
 
     var printForm = appElement.querySelector("[data-form='print-selections']");
     if (printForm) {
-      var syncPrintSelections = function () {
+      var commitPrintSelections = function () {
         var rows = collectPrintSelectionRows(printForm, store.getState().project);
         store.updateProject(function (project) {
           project.printSelections = Print.normalizeSelections(project, rows);
         });
       };
+      var syncPrintSelections = function (event) {
+        if (event && event.target && event.target.name) {
+          pendingPrintFieldFocus = { name: event.target.name };
+        }
+        if (printSelectionSyncTimer) {
+          runtimeGlobal.clearTimeout(printSelectionSyncTimer);
+        }
+        printSelectionSyncTimer = runtimeGlobal.setTimeout(function () {
+          printSelectionSyncTimer = null;
+          commitPrintSelections();
+        }, 180);
+      };
+      var flushPrintSelections = function (event) {
+        if (event && event.target && event.target.name) {
+          pendingPrintFieldFocus = { name: event.target.name };
+        }
+        if (printSelectionSyncTimer) {
+          runtimeGlobal.clearTimeout(printSelectionSyncTimer);
+          printSelectionSyncTimer = null;
+        }
+        commitPrintSelections();
+      };
 
       printForm.addEventListener("input", syncPrintSelections);
-      printForm.addEventListener("change", syncPrintSelections);
+      printForm.addEventListener("change", flushPrintSelections);
     }
 
     var layout = Print.layoutProject(store.getState().project);
@@ -1274,6 +1331,58 @@
         mountedStore.persistProject();
       }
     }, 180);
+  }
+
+  function captureFocusState(appElement) {
+    if (!appElement || !appElement.contains(runtimeGlobal.document.activeElement)) {
+      return null;
+    }
+
+    var active = runtimeGlobal.document.activeElement;
+    if (!active || !active.name) {
+      return null;
+    }
+
+    var form = active.closest("[data-form]");
+    return {
+      form: form ? form.getAttribute("data-form") : null,
+      name: active.name,
+      selectionStart: typeof active.selectionStart === "number" ? active.selectionStart : null,
+      selectionEnd: typeof active.selectionEnd === "number" ? active.selectionEnd : null
+    };
+  }
+
+  function restoreFocusState(appElement, focusState) {
+    if (!focusState || !focusState.name) {
+      return;
+    }
+
+    var selector = (focusState.form ? '[data-form="' + focusState.form + '"] ' : "") + '[name="' + focusState.name + '"]';
+    var nextField = appElement.querySelector(selector);
+    if (!nextField || typeof nextField.focus !== "function") {
+      return;
+    }
+
+    nextField.focus({ preventScroll: true });
+    if (typeof focusState.selectionStart === "number" && typeof nextField.setSelectionRange === "function") {
+      nextField.setSelectionRange(focusState.selectionStart, focusState.selectionEnd == null ? focusState.selectionStart : focusState.selectionEnd);
+    }
+  }
+
+  function restorePendingPrintFieldFocus(appElement) {
+    if (!pendingPrintFieldFocus) {
+      return;
+    }
+
+    var focusTarget = pendingPrintFieldFocus;
+    pendingPrintFieldFocus = null;
+    runtimeGlobal.requestAnimationFrame(function () {
+      var nextField = appElement.querySelector('[data-form="print-selections"] [name="' + focusTarget.name + '"]');
+      if (!nextField || typeof nextField.focus !== "function") {
+        return;
+      }
+      nextField.focus({ preventScroll: true });
+    });
   }
 
   function getDesignerSelection(state) {

@@ -115,7 +115,12 @@ test("loadUiState provides editing slots for sequence forms", () => {
     selectedComponentType: null,
     selectedComponentId: null,
     selectedFace: "front",
-    selectedPrintPreviewPage: 0
+    selectedPrintPreviewPage: 0,
+    printPanels: {
+      settings: true,
+      selections: true,
+      preview: true
+    }
   });
 });
 

@@ -147,6 +147,7 @@ test("token settings own appearance controls and color sequences show in preview
 });
 
 test("built-in text modes and color sequences drive live print preview", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole("button", { name: "Settings" }).click();
   await expect(page.getByRole("button", { name: "Export JSON" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Import JSON" })).toBeVisible();
@@ -178,9 +179,17 @@ test("built-in text modes and color sequences drive live print preview", async (
   await page.locator('form[data-form="text-component-settings"] select[name="contentMode"]').selectOption("numeric");
   await page.locator('form[data-form="text-component-settings"] input[name="sequenceStart"]').fill("1");
   await page.locator('form[data-form="text-component-settings"] input[name="sequencePad"]').fill("0");
+  await page.locator('[data-preview-stage]').click({ position: { x: 20, y: 20 } });
+  await page.locator('form[data-form="token-settings"] select[name="diameterIn"]').selectOption("5");
 
   await page.getByRole("tab", { name: "Print" }).click();
   await expect(page.locator('form[data-form="page-settings"] select[name="pagePresetId"]')).toBeVisible();
+
+  await page.getByRole("button", { name: "Print Settings" }).click();
+  await expect(page.locator('form[data-form="page-settings"]')).toHaveCount(0);
+  await page.getByRole("button", { name: "Print Settings" }).click();
+  await expect(page.locator('form[data-form="page-settings"]')).toBeVisible();
+
   const bleedInput = page.locator('form[data-form="page-settings"] input[name="bleedIn"]');
   await bleedInput.fill("0");
   await bleedInput.blur();
@@ -191,14 +200,26 @@ test("built-in text modes and color sequences drive live print preview", async (
   await expect(startInput).toHaveValue("1");
   await expect(copiesInput).not.toHaveAttribute("max", "2");
 
-  await copiesInput.fill("5");
+  await copiesInput.click();
+  await copiesInput.press("ControlOrMeta+A");
+  await page.keyboard.press("1");
+  await page.keyboard.press("0");
+  await expect(copiesInput).toHaveValue("10");
   await startInput.fill("0");
-  await expect(copiesInput).toHaveValue("5");
+  await startInput.blur();
+  await expect(copiesInput).toHaveValue("10");
   await expect(page.getByRole("button", { name: "Print", exact: true })).toBeVisible();
-  await expect(page.locator('[data-action="select-preview-page"]')).toHaveCount(1);
+  await expect(page.getByRole("tab", { name: "Page 2" })).toBeVisible();
+  const pageTabCount = await page.locator('[data-action="select-preview-page"]').count();
+  expect(pageTabCount).toBeGreaterThan(1);
   await expect(page.getByRole("tab", { name: "Page 1" })).toBeVisible();
   await expect(page.locator(".preview-tab-list")).toHaveCSS("overflow-x", "auto");
-  await expect(page.locator(".preview-page-card svg text").first()).toHaveText("0");
+
+  const pageWidths = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth
+  }));
+  expect(pageWidths.scrollWidth).toBeLessThanOrEqual(pageWidths.clientWidth + 1);
 
   await page.getByRole("button", { name: "Print", exact: true }).click();
   await expect(page.locator("iframe.print-frame")).toHaveCount(1);

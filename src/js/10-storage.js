@@ -59,7 +59,8 @@
         selectedComponentType: typeof parsed.selectedComponentType === "string" ? parsed.selectedComponentType : null,
         selectedComponentId: typeof parsed.selectedComponentId === "string" ? parsed.selectedComponentId : null,
         selectedFace: parsed.selectedFace === "back" ? "back" : "front",
-        selectedPrintPreviewPage: Number.isFinite(parsed.selectedPrintPreviewPage) ? Math.max(0, parsed.selectedPrintPreviewPage) : 0
+        selectedPrintPreviewPage: Number.isFinite(parsed.selectedPrintPreviewPage) ? Math.max(0, parsed.selectedPrintPreviewPage) : 0,
+        printPanels: normalizePrintPanels(parsed.printPanels)
       };
     } catch (error) {
       console.warn("Failed to load UI state", error);
@@ -92,7 +93,21 @@
       selectedComponentType: null,
       selectedComponentId: null,
       selectedFace: "front",
-      selectedPrintPreviewPage: 0
+      selectedPrintPreviewPage: 0,
+      printPanels: {
+        settings: true,
+        selections: true,
+        preview: true
+      }
+    };
+  }
+
+  function normalizePrintPanels(value) {
+    var panels = value && typeof value === "object" ? value : {};
+    return {
+      settings: panels.settings !== false,
+      selections: panels.selections !== false,
+      preview: panels.preview !== false
     };
   }
 

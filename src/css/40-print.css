@@ -1,6 +1,47 @@
 .print-layout {
   display: grid;
   gap: var(--space-3);
+  min-width: 0;
+}
+
+.print-layout > * {
+  min-width: 0;
+}
+
+.print-panel {
+  min-width: 0;
+}
+
+.print-panel-header {
+  margin-bottom: 0;
+}
+
+.print-panel.is-open .print-panel-header {
+  margin-bottom: var(--space-2);
+}
+
+.panel-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.panel-toggle h2 {
+  min-width: 0;
+  margin: 0;
+}
+
+.panel-toggle-icon {
+  flex: 0 0 auto;
+  color: var(--ink-muted);
 }
 
 .print-table {
@@ -33,6 +74,9 @@
   margin-bottom: var(--space-2);
   padding: 0 0.5rem;
   border-bottom: 1px solid rgba(184, 171, 150, 0.8);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
@@ -70,6 +114,9 @@
 
 .preview-page-svg {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border: 1px solid rgba(184, 171, 150, 0.85);
   border-radius: var(--radius-sm);
   background: #fff;
