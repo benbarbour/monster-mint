@@ -59,11 +59,11 @@
       images: Array.isArray(payload.images) ? payload.images.map(createImageComponent) : [],
       texts: Array.isArray(payload.texts) ? payload.texts.map(createTextComponent) : [],
       border: {
-        enabled: payload.border?.enabled !== false,
-        widthPt: asPositive(payload.border?.widthPt, 2),
-        colorMode: payload.border?.colorMode === "sequence" ? "sequence" : "manual",
-        color: payload.border?.color || "#000000",
-        colorSequenceRef: payload.border?.colorSequenceRef || null
+        enabled: !payload.border || payload.border.enabled !== false,
+        widthPt: asPositive(payload.border && payload.border.widthPt, 2),
+        colorMode: payload.border && payload.border.colorMode === "sequence" ? "sequence" : "manual",
+        color: payload.border && payload.border.color ? payload.border.color : "#000000",
+        colorSequenceRef: payload.border && payload.border.colorSequenceRef ? payload.border.colorSequenceRef : null
       }
     };
   }
@@ -216,4 +216,3 @@
     collectBoundedSequenceLengths: collectBoundedSequenceLengths
   };
 });
-

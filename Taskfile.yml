@@ -17,6 +17,11 @@ tasks:
     cmds:
       - npm test
 
+  test:e2e:
+    desc: Run the Playwright headless browser tests
+    cmds:
+      - npm run test:e2e
+
   serve:
     desc: Build the app and serve dist/ locally at http://localhost:4173
     deps:

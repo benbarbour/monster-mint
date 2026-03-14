@@ -10,6 +10,7 @@
   );
   global.MonsterMintApp = api;
 })(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, State, Sequences, Utils, Tokens, Renderer, Print) {
+  var runtimeGlobal = typeof globalThis !== "undefined" ? globalThis : window;
   var TAB_CONFIG = [
     { id: "settings", label: "Settings" },
     { id: "designer", label: "Designer" },
@@ -324,17 +325,15 @@
     return [
       '<form class="form-grid" data-form="text-component-settings">',
       '  <label class="field">Content mode<select name="contentMode">' + renderTextContentModeOptions(component.contentMode) + "</select></label>",
-      component.contentMode === "custom"
-        ? '<label class="field">Text<input name="customText" value="' + escapeHtml(component.customText) + '"></label>'
-        : '<label class="field">Text sequence<select name="textSequenceRef">' + renderSequenceOptions(project.sequences.text, component.textSequenceRef, "No sequence") + "</select></label>",
+      renderConditionalField("contentMode:custom", component.contentMode === "custom", 'Text<input name="customText" value="' + escapeHtml(component.customText) + '">'),
+      renderConditionalField("contentMode:sequence", component.contentMode === "sequence", 'Text sequence<select name="textSequenceRef">' + renderSequenceOptions(project.sequences.text, component.textSequenceRef, "No sequence") + "</select>"),
       '  <div class="field-row two-up">',
       '    <label class="field">Font family<input name="fontFamily" value="' + escapeHtml(component.fontFamily) + '"></label>',
       '    <label class="field">Font weight<select name="fontWeight">' + renderFontWeightOptions(component.fontWeight) + "</select></label>",
       "  </div>",
       '  <label class="field">Text color mode<select name="colorMode">' + renderColorModeOptions(component.colorMode) + "</select></label>",
-      component.colorMode === "manual"
-        ? '<label class="field">Text color<input type="color" name="color" value="' + escapeHtml(component.color) + '"></label>'
-        : '<label class="field">Color sequence<select name="colorSequenceRef">' + renderSequenceOptions(project.sequences.color, component.colorSequenceRef, "No sequence") + "</select></label>",
+      renderConditionalField("colorMode:manual", component.colorMode === "manual", 'Text color<input type="color" name="color" value="' + escapeHtml(component.color) + '">'),
+      renderConditionalField("colorMode:sequence", component.colorMode === "sequence", 'Color sequence<select name="colorSequenceRef">' + renderSequenceOptions(project.sequences.color, component.colorSequenceRef, "No sequence") + "</select>"),
       renderBoundsFields(component),
       renderShadowFields(component.shadow),
       '  <div class="button-row"><button class="button button-primary" type="submit">Save Text</button></div>',
@@ -406,7 +405,7 @@
     var resetButton = appElement.querySelector("[data-action='reset-project']");
     if (resetButton) {
       resetButton.addEventListener("click", function () {
-        if (!global.confirm("Reset the current project? This clears saved tokens and sequences.")) {
+        if (!runtimeGlobal.confirm("Reset the current project? This clears saved tokens and sequences.")) {
           return;
         }
 
@@ -603,7 +602,7 @@
             ui.selectedFace = "front";
           });
         } catch (error) {
-          global.alert("Import failed. Please choose a valid Monster Mint JSON file.");
+          runtimeGlobal.alert("Import failed. Please choose a valid Monster Mint JSON file.");
           console.error(error);
         } finally {
           importInput.value = "";
@@ -821,6 +820,19 @@
 
     var textComponentForm = appElement.querySelector("[data-form='text-component-settings']");
     if (textComponentForm) {
+      var syncTextComponentVisibility = function () {
+        var contentModeField = textComponentForm.querySelector('[name="contentMode"]');
+        var colorModeField = textComponentForm.querySelector('[name="colorMode"]');
+        syncConditionalFields(textComponentForm, {
+          contentMode: contentModeField ? contentModeField.value : null,
+          colorMode: colorModeField ? colorModeField.value : null
+        });
+      };
+      textComponentForm.querySelectorAll('select[name="contentMode"], select[name="colorMode"]').forEach(function (element) {
+        element.addEventListener("change", syncTextComponentVisibility);
+      });
+      syncTextComponentVisibility();
+
       textComponentForm.addEventListener("submit", function (event) {
         event.preventDefault();
         var selection = getDesignerSelection(store.getState());
@@ -1107,6 +1119,19 @@
     return value ? String(value) : null;
   }
 
+  function syncConditionalFields(form, values) {
+    form.querySelectorAll("[data-visible-when]").forEach(function (element) {
+      var parts = element.getAttribute("data-visible-when").split(":");
+      var fieldName = parts[0];
+      var expectedValue = parts[1];
+      element.hidden = values[fieldName] !== expectedValue;
+    });
+  }
+
+  function renderConditionalField(visibleWhen, isVisible, innerHtml) {
+    return '<label class="field" data-visible-when="' + visibleWhen + '"' + (isVisible ? "" : " hidden") + ">" + innerHtml + "</label>";
+  }
+
   function renderTextSequenceList(sequences) {
     if (!sequences.length) {
       return '<div class="empty-state">No text sequences yet.</div>';
@@ -1263,7 +1288,7 @@
     }
 
     return [
-      '<form class="form-grid" data-form="print-selections">',
+      '<form class="form-grid" data-form="print-selections" novalidate>',
       '  <table class="print-table">',
       "    <thead><tr><th>Token</th><th>Copies</th><th>Start Index</th><th>Max</th></tr></thead>",
       "    <tbody>",
@@ -1353,9 +1378,9 @@
   }
 
   function openPrintWindow(layout, project, mode) {
-    var printWindow = global.open("", "_blank", "noopener,noreferrer");
+    var printWindow = runtimeGlobal.open("", "_blank", "noopener,noreferrer");
     if (!printWindow) {
-      global.alert("The print window was blocked by the browser.");
+      runtimeGlobal.alert("The print window was blocked by the browser.");
       return;
     }
 
@@ -1394,7 +1419,7 @@
 
   function mount() {
     var appElement = document.getElementById("app");
-    var store = State.createStore({ storage: global.localStorage });
+    var store = State.createStore({ storage: runtimeGlobal.localStorage });
     mountedStore = store;
     store.subscribe(function () {
       render(appElement, store);
@@ -1408,8 +1433,8 @@
       return;
     }
     bindGlobalPointerHandlers.didBind = true;
-    global.addEventListener("mousemove", handleGlobalPointerMove);
-    global.addEventListener("mouseup", handleGlobalPointerUp);
+    runtimeGlobal.addEventListener("mousemove", handleGlobalPointerMove);
+    runtimeGlobal.addEventListener("mouseup", handleGlobalPointerUp);
   }
 
   if (typeof document !== "undefined") {

@@ -50,19 +50,19 @@
     return {
       version: PROJECT_VERSION,
       meta: {
-        name: typeof project.meta?.name === "string" && project.meta.name.trim() ? project.meta.name : defaults.meta.name,
-        updatedAt: typeof project.meta?.updatedAt === "string" ? project.meta.updatedAt : timestamp()
+        name: project.meta && typeof project.meta.name === "string" && project.meta.name.trim() ? project.meta.name : defaults.meta.name,
+        updatedAt: project.meta && typeof project.meta.updatedAt === "string" ? project.meta.updatedAt : timestamp()
       },
       settings: {
-        pagePresetId: findPagePreset(project.settings?.pagePresetId) ? project.settings.pagePresetId : defaults.settings.pagePresetId,
-        pageOrientation: project.settings?.pageOrientation === "landscape" ? "landscape" : "portrait",
-        pageMarginIn: asPositiveNumber(project.settings?.pageMarginIn, defaults.settings.pageMarginIn),
-        bleedIn: asPositiveNumber(project.settings?.bleedIn, defaults.settings.bleedIn),
-        guideStyle: typeof project.settings?.guideStyle === "string" ? project.settings.guideStyle : defaults.settings.guideStyle
+        pagePresetId: project.settings && findPagePreset(project.settings.pagePresetId) ? project.settings.pagePresetId : defaults.settings.pagePresetId,
+        pageOrientation: project.settings && project.settings.pageOrientation === "landscape" ? "landscape" : "portrait",
+        pageMarginIn: asPositiveNumber(project.settings && project.settings.pageMarginIn, defaults.settings.pageMarginIn),
+        bleedIn: asPositiveNumber(project.settings && project.settings.bleedIn, defaults.settings.bleedIn),
+        guideStyle: project.settings && typeof project.settings.guideStyle === "string" ? project.settings.guideStyle : defaults.settings.guideStyle
       },
       sequences: {
-        text: Array.isArray(project.sequences?.text) ? project.sequences.text : [],
-        color: Array.isArray(project.sequences?.color) ? project.sequences.color : []
+        text: project.sequences && Array.isArray(project.sequences.text) ? project.sequences.text : [],
+        color: project.sequences && Array.isArray(project.sequences.color) ? project.sequences.color : []
       },
       tokens: Array.isArray(project.tokens) ? project.tokens.map(tokenApi.normalizeToken) : [],
       printSelections: Array.isArray(project.printSelections) ? project.printSelections : []
