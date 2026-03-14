@@ -17,7 +17,6 @@
   ];
   var designerInteraction = null;
   var mountedStore = null;
-  var NEW_SEQUENCE_ID = "__new__";
 
   function escapeHtml(value) {
     return String(value)
@@ -73,20 +72,19 @@
     });
     var selectedTextSequence = getSelectedSequence(customTextSequences, state.ui.selectedTextSequenceId);
     var selectedColorSequence = getSelectedSequence(customColorSequences, state.ui.selectedColorSequenceId);
-    var editingTextSequence = state.ui.editingTextSequenceId === NEW_SEQUENCE_ID
-      ? NEW_SEQUENCE_ID
-      : customTextSequences.find(function (sequence) {
-          return sequence.id === state.ui.editingTextSequenceId;
-        }) || null;
-    var editingColorSequence = state.ui.editingColorSequenceId === NEW_SEQUENCE_ID
-      ? NEW_SEQUENCE_ID
-      : customColorSequences.find(function (sequence) {
-          return sequence.id === state.ui.editingColorSequenceId;
-        }) || null;
+    var editingTextSequence = customTextSequences.find(function (sequence) {
+      return sequence.id === state.ui.editingTextSequenceId;
+    }) || null;
+    var editingColorSequence = customColorSequences.find(function (sequence) {
+      return sequence.id === state.ui.editingColorSequenceId;
+    }) || null;
+    var settingsDrawer = getSettingsDrawer(editingTextSequence, editingColorSequence);
     var preset = Schema.findPagePreset(state.project.settings.pagePresetId);
     return [
-      '<div class="panel-grid settings-grid">',
-      '  <section class="panel-card">',
+      '<div class="settings-shell' + (settingsDrawer ? " has-drawer" : "") + '">',
+      '  <div class="settings-main">',
+      '    <div class="panel-grid settings-grid">',
+      '      <section class="panel-card">',
       "    <h2>Page Setup</h2>",
       '    <form class="form-grid" data-form="page-settings">',
       '      <div class="field-row two-up">',
@@ -105,18 +103,62 @@
       '      <div class="field-row"><label class="field">Guide style<select name="guideStyle">' +
         renderGuideStyleOptions(state.project.settings.guideStyle) +
         "</select></label></div>",
+      '      <p class="field-help">Changes save automatically.</p>',
       "    </form>",
       '    <p class="field-help">Current page preset: ' + escapeHtml(preset ? preset.label : "Unknown") + "</p>",
-      "  </section>",
-      '  <section class="panel-card">',
+      "      </section>",
+      '      <section class="panel-card">',
       "    <h2>Text Sequences</h2>",
       renderTextSequenceManager(customTextSequences, selectedTextSequence, editingTextSequence),
-      "  </section>",
-      '  <section class="panel-card">',
+      "      </section>",
+      '      <section class="panel-card">',
       "    <h2>Color Sequences</h2>",
       renderColorSequenceManager(customColorSequences, selectedColorSequence, editingColorSequence),
-      "  </section>",
+      "      </section>",
+      "    </div>",
+      "  </div>",
+      settingsDrawer ? renderSettingsDrawer(settingsDrawer) : "",
       "</div>"
+    ].join("");
+  }
+
+  function getSettingsDrawer(editingTextSequence, editingColorSequence) {
+    if (editingTextSequence) {
+      return {
+        kind: "text",
+        title: "Text Sequence",
+        sequence: editingTextSequence
+      };
+    }
+
+    if (editingColorSequence) {
+      return {
+        kind: "color",
+        title: "Color Sequence",
+        sequence: editingColorSequence
+      };
+    }
+
+    return null;
+  }
+
+  function renderSettingsDrawer(drawer) {
+    return [
+      '<aside class="editor-drawer settings-drawer" data-drawer="settings">',
+      '  <div class="drawer-header">',
+      '    <div>',
+      '      <p class="drawer-eyebrow">Settings</p>',
+      '      <h2>' + escapeHtml(drawer.title) + "</h2>",
+      "    </div>",
+      '    <button class="button" type="button" data-action="close-settings-drawer">Close</button>',
+      "  </div>",
+      '  <div class="drawer-body">',
+      drawer.kind === "text" ? renderTextSequenceForm(drawer.sequence) : renderColorSequenceForm(drawer.sequence),
+      '    <div class="button-row drawer-actions">',
+      '      <button class="button" type="button" data-action="delete-selected-' + drawer.kind + '-sequence" data-sequence-id="' + drawer.sequence.id + '">Delete Sequence</button>',
+      "    </div>",
+      "  </div>",
+      "</aside>"
     ].join("");
   }
 
@@ -432,8 +474,7 @@
   function bindSettingsForms(appElement, store) {
     var pageSettingsForm = appElement.querySelector("[data-form='page-settings']");
     if (pageSettingsForm) {
-      pageSettingsForm.addEventListener("submit", function (event) {
-        event.preventDefault();
+      var savePageSettings = function () {
         var formData = new FormData(pageSettingsForm);
         store.updateProject(function (project) {
           project.settings.pagePresetId = String(formData.get("pagePresetId"));
@@ -442,7 +483,8 @@
           project.settings.bleedIn = Number(formData.get("bleedIn")) || project.settings.bleedIn;
           project.settings.guideStyle = String(formData.get("guideStyle"));
         });
-      });
+      };
+      pageSettingsForm.addEventListener("change", savePageSettings);
     }
 
     var textSequenceForm = appElement.querySelector("[data-form='text-sequence']");
@@ -457,8 +499,7 @@
       textTypeField.addEventListener("change", syncTextSequenceFields);
       syncTextSequenceFields();
 
-      textSequenceForm.addEventListener("submit", function (event) {
-        event.preventDefault();
+      textSequenceForm.addEventListener("change", function () {
         var formData = new FormData(textSequenceForm);
         var sequence = Sequences.createTextSequence({
           id: formData.get("id") || null,
@@ -476,19 +517,10 @@
           upsertById(project.sequences.text, sequence);
         });
         store.updateUi(function (ui) {
-          ui.editingTextSequenceId = null;
           ui.selectedTextSequenceId = sequence.id;
+          ui.editingTextSequenceId = sequence.id;
         });
       });
-
-      var cancelTextButton = textSequenceForm.querySelector("[data-action='cancel-text-edit']");
-      if (cancelTextButton) {
-        cancelTextButton.addEventListener("click", function () {
-          store.updateUi(function (ui) {
-            ui.editingTextSequenceId = null;
-          });
-        });
-      }
     }
 
     var selectedTextSequenceField = appElement.querySelector('[name="selectedTextSequenceId"]');
@@ -496,7 +528,8 @@
       selectedTextSequenceField.addEventListener("change", function () {
         store.updateUi(function (ui) {
           ui.selectedTextSequenceId = selectedTextSequenceField.value || null;
-          ui.editingTextSequenceId = null;
+          ui.editingTextSequenceId = selectedTextSequenceField.value || null;
+          ui.editingColorSequenceId = null;
         });
       });
     }
@@ -504,21 +537,16 @@
     var newTextSequenceButton = appElement.querySelector('[data-action="new-text-sequence"]');
     if (newTextSequenceButton) {
       newTextSequenceButton.addEventListener("click", function () {
-        store.updateUi(function (ui) {
-          ui.editingTextSequenceId = NEW_SEQUENCE_ID;
+        var sequence = Sequences.createTextSequence({
+          name: "New text sequence"
         });
-      });
-    }
-
-    var editSelectedTextButton = appElement.querySelector('[data-action="edit-selected-text-sequence"]');
-    if (editSelectedTextButton) {
-      editSelectedTextButton.addEventListener("click", function () {
-        var sequenceId = editSelectedTextButton.getAttribute("data-sequence-id");
-        if (!sequenceId) {
-          return;
-        }
+        store.updateProject(function (project) {
+          project.sequences.text.push(sequence);
+        });
         store.updateUi(function (ui) {
-          ui.editingTextSequenceId = sequenceId;
+          ui.selectedTextSequenceId = sequence.id;
+          ui.editingTextSequenceId = sequence.id;
+          ui.editingColorSequenceId = null;
         });
       });
     }
@@ -537,6 +565,7 @@
         });
         store.updateUi(function (ui) {
           ui.editingTextSequenceId = null;
+          ui.editingColorSequenceId = null;
           if (ui.selectedTextSequenceId === sequenceId) {
             ui.selectedTextSequenceId = null;
           }
@@ -546,8 +575,7 @@
 
     var colorSequenceForm = appElement.querySelector("[data-form='color-sequence']");
     if (colorSequenceForm) {
-      colorSequenceForm.addEventListener("submit", function (event) {
-        event.preventDefault();
+      colorSequenceForm.addEventListener("change", function () {
         var formData = new FormData(colorSequenceForm);
         var sequence = Sequences.createColorSequence({
           id: formData.get("id") || null,
@@ -559,19 +587,10 @@
           upsertById(project.sequences.color, sequence);
         });
         store.updateUi(function (ui) {
-          ui.editingColorSequenceId = null;
           ui.selectedColorSequenceId = sequence.id;
+          ui.editingColorSequenceId = sequence.id;
         });
       });
-
-      var cancelColorButton = colorSequenceForm.querySelector("[data-action='cancel-color-edit']");
-      if (cancelColorButton) {
-        cancelColorButton.addEventListener("click", function () {
-          store.updateUi(function (ui) {
-            ui.editingColorSequenceId = null;
-          });
-        });
-      }
     }
 
     var selectedColorSequenceField = appElement.querySelector('[name="selectedColorSequenceId"]');
@@ -579,7 +598,8 @@
       selectedColorSequenceField.addEventListener("change", function () {
         store.updateUi(function (ui) {
           ui.selectedColorSequenceId = selectedColorSequenceField.value || null;
-          ui.editingColorSequenceId = null;
+          ui.editingColorSequenceId = selectedColorSequenceField.value || null;
+          ui.editingTextSequenceId = null;
         });
       });
     }
@@ -587,21 +607,17 @@
     var newColorSequenceButton = appElement.querySelector('[data-action="new-color-sequence"]');
     if (newColorSequenceButton) {
       newColorSequenceButton.addEventListener("click", function () {
-        store.updateUi(function (ui) {
-          ui.editingColorSequenceId = NEW_SEQUENCE_ID;
+        var sequence = Sequences.createColorSequence({
+          name: "New color sequence",
+          valuesText: "#8a1c1c\n#3b5b92"
         });
-      });
-    }
-
-    var editSelectedColorButton = appElement.querySelector('[data-action="edit-selected-color-sequence"]');
-    if (editSelectedColorButton) {
-      editSelectedColorButton.addEventListener("click", function () {
-        var sequenceId = editSelectedColorButton.getAttribute("data-sequence-id");
-        if (!sequenceId) {
-          return;
-        }
+        store.updateProject(function (project) {
+          project.sequences.color.push(sequence);
+        });
         store.updateUi(function (ui) {
-          ui.editingColorSequenceId = sequenceId;
+          ui.selectedColorSequenceId = sequence.id;
+          ui.editingColorSequenceId = sequence.id;
+          ui.editingTextSequenceId = null;
         });
       });
     }
@@ -620,6 +636,7 @@
         });
         store.updateUi(function (ui) {
           ui.editingColorSequenceId = null;
+          ui.editingTextSequenceId = null;
           if (ui.selectedColorSequenceId === sequenceId) {
             ui.selectedColorSequenceId = null;
           }
@@ -627,6 +644,15 @@
       });
     }
 
+    var closeDrawerButton = appElement.querySelector('[data-action="close-settings-drawer"]');
+    if (closeDrawerButton) {
+      closeDrawerButton.addEventListener("click", function () {
+        store.updateUi(function (ui) {
+          ui.editingTextSequenceId = null;
+          ui.editingColorSequenceId = null;
+        });
+      });
+    }
   }
 
   function bindTransferActions(appElement, store) {
@@ -1206,14 +1232,10 @@
       sequences: sequences,
       summary: selectedSequence
         ? Sequences.summarizeTextSequence(selectedSequence)
-        : (sequences.length ? "Choose a custom sequence to edit it." : "No custom text sequences yet."),
+        : (sequences.length ? "Select a custom sequence to edit it in the drawer." : "No custom text sequences yet."),
       helperText: "Built-in text sequences stay available in token settings and are not edited here.",
       newAction: "new-text-sequence",
-      editAction: "edit-selected-text-sequence",
-      deleteAction: "delete-selected-text-sequence",
-      editor: editingSequence
-        ? renderTextSequenceForm(editingSequence === NEW_SEQUENCE_ID ? null : editingSequence)
-        : ""
+      isEditing: !!editingSequence
     });
   }
 
@@ -1224,14 +1246,10 @@
       sequences: sequences,
       summary: selectedSequence
         ? Sequences.summarizeColorSequence(selectedSequence)
-        : (sequences.length ? "Choose a custom sequence to edit it." : "No custom color sequences yet."),
+        : (sequences.length ? "Select a custom sequence to edit it in the drawer." : "No custom color sequences yet."),
       helperText: "Built-in color sequences stay available in token settings and are not edited here.",
       newAction: "new-color-sequence",
-      editAction: "edit-selected-color-sequence",
-      deleteAction: "delete-selected-color-sequence",
-      editor: editingSequence
-        ? renderColorSequenceForm(editingSequence === NEW_SEQUENCE_ID ? null : editingSequence)
-        : ""
+      isEditing: !!editingSequence
     });
   }
 
@@ -1239,15 +1257,13 @@
     var selectedSequence = config.selectedSequence;
     return [
       '<div class="sequence-manager">',
-      '  <label class="field">Custom sequence<select name="' + config.selectedName + '">' + renderSequenceOptions(config.sequences, selectedSequence ? selectedSequence.id : null, "Select a custom sequence") + "</select></label>",
+      '  <label class="field">Custom sequence<select name="' + config.selectedName + '">' + renderSequenceOptions(config.sequences, selectedSequence ? selectedSequence.id : null, "Select a custom sequence", { grouped: false }) + "</select></label>",
       '  <p class="sequence-summary">' + escapeHtml(config.summary) + "</p>",
       '  <p class="field-help">' + escapeHtml(config.helperText) + "</p>",
       '  <div class="button-row">',
       '    <button class="button button-primary" type="button" data-action="' + config.newAction + '">New Custom</button>',
-      '    <button class="button" type="button" data-action="' + config.editAction + '"' + (selectedSequence && !selectedSequence.builtIn ? ' data-sequence-id="' + selectedSequence.id + '"' : " disabled") + '>Edit</button>',
-      '    <button class="button" type="button" data-action="' + config.deleteAction + '"' + (selectedSequence && !selectedSequence.builtIn ? ' data-sequence-id="' + selectedSequence.id + '"' : " disabled") + '>Delete</button>',
+      config.isEditing ? '    <span class="field-help">Editing in drawer</span>' : "",
       "  </div>",
-      config.editor ? '  <div class="sequence-editor">' + config.editor + "</div>" : "",
       "</div>"
     ].join("");
   }
@@ -1269,10 +1285,7 @@
       "  </div>",
       '  <div class="field-row two-up"><label class="field">Suffix<input name="suffix" value="' + escapeHtml(sequence ? sequence.suffix : "") + '"></label></div>',
       '  <label class="field" data-type-only="custom"' + (type === "custom" ? "" : " hidden") + '>Custom values<textarea name="customValuesText">' + escapeHtml(sequence && sequence.type === "custom" ? sequence.customValues.join("\n") : "") + '</textarea><span class="field-help">One value per line.</span></label>',
-      '  <div class="button-row">',
-      '    <button class="button button-primary" type="submit">' + (sequence ? "Save Text Sequence" : "Add Text Sequence") + "</button>",
-      (sequence ? '    <button class="button" type="button" data-action="cancel-text-edit">Cancel</button>' : ""),
-      "  </div>",
+      '  <p class="field-help">Changes save automatically when you leave a field.</p>',
       "</form>"
     ].join("");
   }
@@ -1283,10 +1296,7 @@
       '  <input type="hidden" name="id" value="' + escapeHtml(sequence ? sequence.id : "") + '">',
       '  <label class="field">Name<input name="name" value="' + escapeHtml(sequence ? sequence.name : "") + '" required></label>',
       '  <label class="field">Color values<textarea name="valuesText" required>' + escapeHtml(sequence ? sequence.values.join("\n") : "#8a1c1c\n#3b5b92") + '</textarea><span class="field-help">One hex color per line.</span></label>',
-      '  <div class="button-row">',
-      '    <button class="button button-primary" type="submit">' + (sequence ? "Save Color Sequence" : "Add Color Sequence") + "</button>",
-      (sequence ? '    <button class="button" type="button" data-action="cancel-color-edit">Cancel</button>' : ""),
-      "  </div>",
+      '  <p class="field-help">Changes save automatically when you leave a field.</p>',
       "</form>"
     ].join("");
   }
@@ -1342,13 +1352,20 @@
     }).join("");
   }
 
-  function renderSequenceOptions(sequences, selectedId, emptyLabel) {
+  function renderSequenceOptions(sequences, selectedId, emptyLabel, options) {
+    var opts = options || {};
     var builtIns = sequences.filter(function (sequence) {
       return sequence.builtIn;
     });
     var custom = sequences.filter(function (sequence) {
       return !sequence.builtIn;
     });
+
+    if (opts.grouped === false) {
+      return ['<option value="">' + emptyLabel + "</option>"].concat(sequences.map(function (sequence) {
+        return '<option value="' + sequence.id + '"' + (selectedId === sequence.id ? " selected" : "") + ">" + escapeHtml(sequence.name) + "</option>";
+      })).join("");
+    }
 
     return ['<option value="">' + emptyLabel + "</option>"]
       .concat(renderSequenceOptionGroup("Built-in", builtIns, selectedId))

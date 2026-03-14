@@ -63,10 +63,12 @@ test("custom sequence limits print copy counts", async ({ page }) => {
   expect(textManagerOptions).not.toContain("Alphabet");
 
   await page.getByRole("button", { name: "New Custom" }).first().click();
+  await expect(page.locator('[data-drawer="settings"]')).toBeVisible();
   await page.locator('form[data-form="text-sequence"] input[name="name"]').fill("Two Names");
+  await page.locator('form[data-form="text-sequence"] input[name="name"]').blur();
   await page.locator('form[data-form="text-sequence"] select[name="type"]').selectOption("custom");
   await page.locator('form[data-form="text-sequence"] textarea[name="customValuesText"]').fill("Goblin\nOrc");
-  await page.getByRole("button", { name: "Add Text Sequence" }).click();
+  await page.locator('form[data-form="text-sequence"] textarea[name="customValuesText"]').blur();
 
   await page.getByRole("tab", { name: "Designer" }).click();
   await page.getByRole("button", { name: "Create Token" }).click();
