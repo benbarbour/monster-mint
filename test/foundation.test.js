@@ -111,7 +111,8 @@ test("loadUiState provides editing slots for sequence forms", () => {
     selectedTokenId: null,
     selectedComponentType: null,
     selectedComponentId: null,
-    selectedFace: "front"
+    selectedFace: "front",
+    selectedPrintPreviewPage: 0
   });
 });
 
@@ -256,4 +257,5 @@ test("print layout creates at least one page with placed items", () => {
 
   assert.equal(layout.pages.length >= 1, true);
   assert.equal(layout.pages[0].items.length, 3);
+  assert.equal(layout.pages[0].items[1].xIn - layout.pages[0].items[0].xIn, 1.125);
 });

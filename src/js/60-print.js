@@ -110,7 +110,7 @@
     var currentX = project.settings.pageMarginIn;
     var currentY = project.settings.pageMarginIn;
     var rowHeight = 0;
-    var gutterIn = 0.1;
+    var gutterIn = 0;
 
     items.forEach(function (item) {
       var footprint = item.token.diameterIn + project.settings.bleedIn * 2;

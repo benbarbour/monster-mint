@@ -72,34 +72,10 @@
       return sequence.id === state.ui.editingColorSequenceId;
     }) || null;
     var settingsDrawer = getSettingsDrawer(editingColorSequence);
-    var preset = Schema.findPagePreset(state.project.settings.pagePresetId);
     return [
       '<div class="settings-shell' + (settingsDrawer ? " has-drawer" : "") + '">',
       '  <div class="settings-main">',
       '    <div class="panel-grid settings-grid">',
-      '      <section class="panel-card">',
-      "    <h2>Page Setup</h2>",
-      '    <form class="form-grid" data-form="page-settings">',
-      '      <div class="field-row two-up">',
-      '        <label class="field">Page size<select name="pagePresetId">' + Schema.PAGE_PRESETS.map(function (candidate) {
-        return '<option value="' + candidate.id + '"' + (candidate.id === state.project.settings.pagePresetId ? " selected" : "") + ">" + candidate.label + "</option>";
-      }).join("") + '</select></label>',
-      '        <label class="field">Orientation<select name="pageOrientation">' +
-        '<option value="portrait"' + (state.project.settings.pageOrientation === "portrait" ? " selected" : "") + '>Portrait</option>' +
-        '<option value="landscape"' + (state.project.settings.pageOrientation === "landscape" ? " selected" : "") + '>Landscape</option>' +
-        "</select></label>",
-      "      </div>",
-      '      <div class="field-row two-up">',
-      '        <label class="field">Margin (in)<input type="number" min="0.05" step="0.05" name="pageMarginIn" value="' + state.project.settings.pageMarginIn + '"></label>',
-      '        <label class="field">Bleed (in)<input type="number" min="0.01" step="0.01" name="bleedIn" value="' + state.project.settings.bleedIn + '"></label>',
-      "      </div>",
-      '      <div class="field-row"><label class="field">Guide style<select name="guideStyle">' +
-        renderGuideStyleOptions(state.project.settings.guideStyle) +
-        "</select></label></div>",
-      '      <p class="field-help">Changes save automatically.</p>',
-      "    </form>",
-      '    <p class="field-help">Current page preset: ' + escapeHtml(preset ? preset.label : "Unknown") + "</p>",
-      "      </section>",
       '      <section class="panel-card">',
       "    <h2>Color Sequences</h2>",
       renderColorSequenceManager(customColorSequences, selectedColorSequence, editingColorSequence),
@@ -226,8 +202,13 @@
     var hasBacks = state.project.tokens.some(function (token) {
       return token.back.enabled && (token.back.images.length || token.back.texts.length || token.back.backgroundColor);
     });
+    var activePreviewPage = Math.min(state.ui.selectedPrintPreviewPage || 0, Math.max(0, layout.pages.length - 1));
     return [
       '<div class="print-layout">',
+      '  <section class="panel-card">',
+      "    <h2>Print Settings</h2>",
+      renderPageSettingsForm(state.project.settings),
+      "  </section>",
       '  <section class="panel-card">',
       "    <h2>Print Selections</h2>",
       renderPrintSelectionForm(rows),
@@ -235,16 +216,11 @@
       '  <section class="panel-card">',
       "    <h2>Preview</h2>",
       '    <div class="button-row">',
-      '      <button class="button button-primary" type="button" data-action="print-fronts">Print Fronts</button>',
-      '      <button class="button" type="button" data-action="print-backs"' + (hasBacks ? "" : " disabled") + '>Print Backs</button>',
-      '      <button class="button" type="button" data-action="print-both"' + (hasBacks ? "" : " disabled") + '>Print Both</button>',
+      '      <button class="button button-primary" type="button" data-action="print-layout">Print</button>',
       "    </div>",
       layout.pages.length && layout.pages[0].items.length
-        ? renderPreviewSection(layout, state.project, "front", "Front Pages")
+        ? renderPreviewTabs(layout, state.project, hasBacks, activePreviewPage)
         : '<div class="empty-state">Choose at least one token copy to generate pages.</div>',
-      hasBacks && layout.pages.length && layout.pages[0].items.length
-        ? renderPreviewSection(layout, state.project, "back", "Back Pages")
-        : "",
       "  </section>",
       "</div>"
     ].join("");
@@ -476,6 +452,7 @@
           ui.selectedComponentType = null;
           ui.selectedComponentId = null;
           ui.selectedFace = "front";
+          ui.selectedPrintPreviewPage = 0;
         });
       });
     }
@@ -487,21 +464,6 @@
   }
 
   function bindSettingsForms(appElement, store) {
-    var pageSettingsForm = appElement.querySelector("[data-form='page-settings']");
-    if (pageSettingsForm) {
-      var savePageSettings = function () {
-        var formData = new FormData(pageSettingsForm);
-        store.updateProject(function (project) {
-          project.settings.pagePresetId = String(formData.get("pagePresetId"));
-          project.settings.pageOrientation = String(formData.get("pageOrientation"));
-          project.settings.pageMarginIn = Number(formData.get("pageMarginIn")) || project.settings.pageMarginIn;
-          project.settings.bleedIn = Number(formData.get("bleedIn")) || project.settings.bleedIn;
-          project.settings.guideStyle = String(formData.get("guideStyle"));
-        });
-      };
-      pageSettingsForm.addEventListener("change", savePageSettings);
-    }
-
     var colorSequenceForm = appElement.querySelector("[data-form='color-sequence']");
     if (colorSequenceForm) {
       colorSequenceForm.addEventListener("change", function () {
@@ -622,6 +584,7 @@
             ui.selectedComponentType = null;
             ui.selectedComponentId = null;
             ui.selectedFace = "front";
+            ui.selectedPrintPreviewPage = 0;
           });
         } catch (error) {
           runtimeGlobal.alert("Import failed. Please choose a valid Monster Mint JSON file.");
@@ -991,6 +954,20 @@
   }
 
   function bindPrintEvents(appElement, store) {
+    var pageSettingsForm = appElement.querySelector("[data-form='page-settings']");
+    if (pageSettingsForm) {
+      pageSettingsForm.addEventListener("change", function () {
+        var formData = new FormData(pageSettingsForm);
+        store.updateProject(function (project) {
+          project.settings.pagePresetId = String(formData.get("pagePresetId"));
+          project.settings.pageOrientation = String(formData.get("pageOrientation"));
+          project.settings.pageMarginIn = Number(formData.get("pageMarginIn")) || project.settings.pageMarginIn;
+          project.settings.bleedIn = Number(formData.get("bleedIn")) || project.settings.bleedIn;
+          project.settings.guideStyle = String(formData.get("guideStyle"));
+        });
+      });
+    }
+
     var printForm = appElement.querySelector("[data-form='print-selections']");
     if (printForm) {
       printForm.addEventListener("submit", function (event) {
@@ -1012,32 +989,22 @@
     var layout = Print.layoutProject(store.getState().project);
     var hasPages = layout.pages.length && layout.pages[0].items.length;
 
-    var printFrontsButton = appElement.querySelector("[data-action='print-fronts']");
-    if (printFrontsButton) {
-      printFrontsButton.addEventListener("click", function () {
+    var printLayoutButton = appElement.querySelector("[data-action='print-layout']");
+    if (printLayoutButton) {
+      printLayoutButton.addEventListener("click", function () {
         if (hasPages) {
-          openPrintWindow(layout, store.getState().project, "front");
+          openPrintWindow(layout, store.getState().project);
         }
       });
     }
 
-    var printBacksButton = appElement.querySelector("[data-action='print-backs']");
-    if (printBacksButton) {
-      printBacksButton.addEventListener("click", function () {
-        if (hasPages) {
-          openPrintWindow(layout, store.getState().project, "back");
-        }
+    appElement.querySelectorAll("[data-action='select-preview-page']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        store.updateUi(function (ui) {
+          ui.selectedPrintPreviewPage = Number(button.getAttribute("data-page-index")) || 0;
+        });
       });
-    }
-
-    var printBothButton = appElement.querySelector("[data-action='print-both']");
-    if (printBothButton) {
-      printBothButton.addEventListener("click", function () {
-        if (hasPages) {
-          openPrintWindow(layout, store.getState().project, "both");
-        }
-      });
-    }
+    });
   }
 
   function handleGlobalPointerMove(event) {
@@ -1408,6 +1375,28 @@
     return "#000000";
   }
 
+  function renderPageSettingsForm(settings) {
+    return [
+      '<form class="form-grid" data-form="page-settings">',
+      '  <div class="field-row two-up">',
+      '    <label class="field">Page size<select name="pagePresetId">' + Schema.PAGE_PRESETS.map(function (candidate) {
+        return '<option value="' + candidate.id + '"' + (candidate.id === settings.pagePresetId ? " selected" : "") + ">" + candidate.label + "</option>";
+      }).join("") + '</select></label>',
+      '    <label class="field">Orientation<select name="pageOrientation">' +
+        '<option value="portrait"' + (settings.pageOrientation === "portrait" ? " selected" : "") + '>Portrait</option>' +
+        '<option value="landscape"' + (settings.pageOrientation === "landscape" ? " selected" : "") + '>Landscape</option>' +
+        "</select></label>",
+      "  </div>",
+      '  <div class="field-row two-up">',
+      '    <label class="field">Margin (in)<input type="number" min="0.05" step="0.05" name="pageMarginIn" value="' + settings.pageMarginIn + '"></label>',
+      '    <label class="field">Bleed (in)<input type="number" min="0.01" step="0.01" name="bleedIn" value="' + settings.bleedIn + '"></label>',
+      "  </div>",
+      '  <label class="field">Guide style<select name="guideStyle">' + renderGuideStyleOptions(settings.guideStyle) + "</select></label>",
+      '  <p class="field-help">Changes save automatically.</p>',
+      "</form>"
+    ].join("");
+  }
+
   function renderPrintSelectionForm(rows) {
     if (!rows.length) {
       return '<div class="empty-state">Create token templates in the designer before preparing print pages.</div>';
@@ -1435,21 +1424,34 @@
     ].join("");
   }
 
-  function renderPreviewSection(layout, project, faceName, title) {
+  function renderPreviewTabs(layout, project, hasBacks, activeIndex) {
     return [
-      "    <h3>" + title + "</h3>",
-      '    <div class="preview-page-grid">',
+      '<div class="preview-tab-list" role="tablist" aria-label="Preview pages">',
       layout.pages.map(function (page, index) {
-        return [
-          '<article class="preview-page-card">',
-          '  <p class="preview-page-label">Page ' + (index + 1) + "</p>",
-          '  <div class="preview-page-svg">',
-          renderPageSvg(page, project, faceName, true),
-          "  </div>",
-          "</article>"
-        ].join("");
+        return '<button class="preview-tab' + (index === activeIndex ? " is-active" : "") + '" type="button" role="tab" aria-selected="' + (index === activeIndex ? "true" : "false") + '" data-action="select-preview-page" data-page-index="' + index + '">Page ' + (index + 1) + "</button>";
       }).join(""),
-      "    </div>"
+      "</div>",
+      renderPreviewSection(layout.pages[activeIndex], project, activeIndex, hasBacks)
+    ].join("");
+  }
+
+  function renderPreviewSection(page, project, index, hasBacks) {
+    return [
+      '<div class="preview-page-grid preview-page-grid--pair">',
+      renderPreviewCard(page, project, "front", "Front", index),
+      hasBacks ? renderPreviewCard(page, project, "back", "Back", index) : "",
+      "</div>"
+    ].join("");
+  }
+
+  function renderPreviewCard(page, project, faceName, label, index) {
+    return [
+      '<article class="preview-page-card">',
+      '  <p class="preview-page-label">Page ' + (index + 1) + " " + label + "</p>",
+      '  <div class="preview-page-svg">',
+      renderPageSvg(page, project, faceName, true),
+      "  </div>",
+      "</article>"
     ].join("");
   }
 
@@ -1503,20 +1505,20 @@
     return parts.join("");
   }
 
-  function openPrintWindow(layout, project, mode) {
+  function openPrintWindow(layout, project) {
     var printWindow = runtimeGlobal.open("", "_blank", "noopener,noreferrer");
     if (!printWindow) {
       runtimeGlobal.alert("The print window was blocked by the browser.");
       return;
     }
 
-    var pages = [];
-    if (mode === "front" || mode === "both") {
-      pages = pages.concat(layout.pages.map(function (page) {
-        return renderPrintablePage(page, project, "front");
-      }));
-    }
-    if (mode === "back" || mode === "both") {
+    var hasBacks = project.tokens.some(function (token) {
+      return token.back.enabled;
+    });
+    var pages = layout.pages.map(function (page) {
+      return renderPrintablePage(page, project, "front");
+    });
+    if (hasBacks) {
       pages = pages.concat(layout.pages.map(function (page) {
         return renderPrintablePage(page, project, "back");
       }));

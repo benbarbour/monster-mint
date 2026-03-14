@@ -142,11 +142,14 @@ test("built-in text modes and color sequences drive the editor and print limits"
   await expect(page.locator('form[data-form="text-component-settings"] input[name="customText"]')).toBeVisible();
 
   await page.getByRole("tab", { name: "Print" }).click();
+  await expect(page.locator('form[data-form="page-settings"] select[name="guideStyle"]')).toBeVisible();
   const copiesInput = page.locator('input[name^="copies-"]').first();
   await expect(copiesInput).toHaveAttribute("max", "2");
 
   await copiesInput.fill("5");
   await page.getByRole("button", { name: "Save Print Selections" }).click();
   await expect(copiesInput).toHaveValue("2");
-  await expect(page.getByText("Page 1")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Print", exact: true })).toBeVisible();
+  await expect(page.locator('[data-action="select-preview-page"]')).toHaveCount(1);
+  await expect(page.getByText("Page 1 Front")).toBeVisible();
 });

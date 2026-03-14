@@ -58,7 +58,8 @@
         selectedTokenId: typeof parsed.selectedTokenId === "string" ? parsed.selectedTokenId : null,
         selectedComponentType: typeof parsed.selectedComponentType === "string" ? parsed.selectedComponentType : null,
         selectedComponentId: typeof parsed.selectedComponentId === "string" ? parsed.selectedComponentId : null,
-        selectedFace: parsed.selectedFace === "back" ? "back" : "front"
+        selectedFace: parsed.selectedFace === "back" ? "back" : "front",
+        selectedPrintPreviewPage: Number.isFinite(parsed.selectedPrintPreviewPage) ? Math.max(0, parsed.selectedPrintPreviewPage) : 0
       };
     } catch (error) {
       console.warn("Failed to load UI state", error);
@@ -90,7 +91,8 @@
       selectedTokenId: null,
       selectedComponentType: null,
       selectedComponentId: null,
-      selectedFace: "front"
+      selectedFace: "front",
+      selectedPrintPreviewPage: 0
     };
   }
 
