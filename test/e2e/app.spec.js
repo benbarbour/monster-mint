@@ -13,11 +13,12 @@ test("can create and manipulate a token template", async ({ page }) => {
   await expect(page.getByRole("tab", { name: "Designer" })).toHaveAttribute("aria-selected", "true");
   await page.getByRole("button", { name: "Create Token" }).click();
 
-  await expect(page.getByRole("heading", { name: "Selected Component" })).toBeVisible();
-  await expect(page.locator('select[name="selectedComponentKey"]')).toHaveValue("background:front-background");
+  await expect(page.getByRole("heading", { name: "Token", exact: true })).toBeVisible();
+  await expect(page.locator('select[name="selectedComponentKey"]')).toHaveValue("");
   await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toHaveValue("Untitled Token");
 
   await page.getByRole("button", { name: "Add Text" }).click();
+  await expect(page.getByRole("heading", { name: "Selected Component" })).toBeVisible();
   await expect(page.locator('form[data-form="text-component-settings"] select[name="contentMode"]')).toHaveValue("custom");
 
   const xInput = page.locator('form[data-form="text-component-settings"] input[name="x"]');
@@ -51,6 +52,7 @@ test("can create and manipulate a token template", async ({ page }) => {
   await expect(page.locator('form[data-form="text-component-settings"] input[name="width"]')).not.toHaveValue("0.64");
 
   await page.reload();
+  await page.locator('select[name="selectedComponentKey"]').selectOption("");
   await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toHaveValue("Untitled Token");
 });
 

@@ -16,10 +16,20 @@
 }
 
 .designer-toolbar {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.designer-toolbar-row {
   display: flex;
   flex-wrap: wrap;
   align-items: end;
   gap: 0.8rem;
+}
+
+.component-row {
+  padding-top: 0.2rem;
+  border-top: 1px solid rgba(184, 171, 150, 0.55);
 }
 
 .toolbar-field {

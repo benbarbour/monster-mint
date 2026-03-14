@@ -186,21 +186,25 @@
       '  <section class="designer-main">',
       '    <section class="panel-card designer-toolbar-card">',
       '      <div class="designer-toolbar">',
-      '        <label class="field toolbar-field">Token<select name="selectedTokenId">' + renderTokenOptions(state.project.tokens, token.id) + "</select></label>",
-      '        <div class="button-row">',
-      '          <button class="button button-primary" type="button" data-action="add-token">New Token</button>',
-      '          <button class="button" type="button" data-action="delete-token" data-token-id="' + token.id + '">Delete</button>',
+      '        <div class="designer-toolbar-row">',
+      '          <label class="field toolbar-field">Token<select name="selectedTokenId">' + renderTokenOptions(state.project.tokens, token.id) + '</select></label>',
+      '          <div class="button-row">',
+      '            <button class="button button-primary" type="button" data-action="add-token">New Token</button>',
+      '            <button class="button" type="button" data-action="delete-token" data-token-id="' + token.id + '">Delete</button>',
+      "          </div>",
+      '          <div class="face-toggle">',
+      '            <button type="button" class="' + (selection.faceName === "front" ? "is-active" : "") + '" data-face="front">Front</button>',
+      '            <button type="button" class="' + (selection.faceName === "back" ? "is-active" : "") + '" data-face="back">Back</button>',
+      "          </div>",
       "        </div>",
-      '        <div class="face-toggle">',
-      '          <button type="button" class="' + (selection.faceName === "front" ? "is-active" : "") + '" data-face="front">Front</button>',
-      '          <button type="button" class="' + (selection.faceName === "back" ? "is-active" : "") + '" data-face="back">Back</button>',
-      "        </div>",
-      '        <label class="field toolbar-field">Component<select name="selectedComponentKey">' + renderComponentOptions(componentItems, selection.selectedComponentType, selection.selectedComponentId) + "</select></label>",
-      '        <div class="button-row">',
-      '          <button class="button" type="button" data-action="add-text" data-face="' + selection.faceName + '">Add Text</button>',
-      '          <button class="button" type="button" data-action="add-image" data-face="' + selection.faceName + '">Add Image</button>',
-      '          <button class="button icon-trash" type="button" data-action="delete-component"' + (canDeleteSelectedComponent(selection) ? "" : " disabled") + ' aria-label="Delete Selected Component" title="Delete Selected Component"><span aria-hidden="true">&#128465;</span></button>',
-      '          <input class="visually-hidden" type="file" accept="image/*" data-image-upload-input>',
+      '        <div class="designer-toolbar-row component-row">',
+      '          <label class="field toolbar-field">Component<select name="selectedComponentKey">' + renderComponentOptions(componentItems, selection.selectedComponentType, selection.selectedComponentId) + '</select></label>',
+      '          <div class="button-row">',
+      '            <button class="button" type="button" data-action="add-text" data-face="' + selection.faceName + '">Add Text</button>',
+      '            <button class="button" type="button" data-action="add-image" data-face="' + selection.faceName + '">Add Image</button>',
+      '            <button class="button icon-trash" type="button" data-action="delete-component"' + (canDeleteSelectedComponent(selection) ? "" : " disabled") + ' aria-label="Delete Selected Component" title="Delete Selected Component"><span aria-hidden="true">&#128465;</span></button>',
+      '            <input class="visually-hidden" type="file" accept="image/*" data-image-upload-input>',
+      "          </div>",
       "        </div>",
       "      </div>",
       "    </section>",
@@ -226,12 +230,8 @@
       "    </div>",
       '    <div class="drawer-body">',
       '      <section class="drawer-section">',
-      "        <h3>Token</h3>",
-      renderTokenForm(token),
-      "      </section>",
-      '      <section class="drawer-section">',
-      "        <h3>Selected Component</h3>",
-      renderSelectedComponentForm(selectedComponent, selection, state.project),
+      "        <h3>" + (selectedComponent ? "Selected Component" : "Token") + "</h3>",
+      (selectedComponent ? renderSelectedComponentForm(selectedComponent, selection, state.project) : renderTokenForm(token)),
       "      </section>",
       "    </div>",
       "  </aside>",
@@ -296,10 +296,10 @@
   }
 
   function renderComponentOptions(items, selectedType, selectedId) {
-    return items.map(function (item) {
+    return ['<option value="">' + "Token settings" + "</option>"].concat(items.map(function (item) {
       var isSelected = selectedType === item.type && selectedId === item.id;
       return '<option value="' + item.type + ":" + item.id + '"' + (isSelected ? " selected" : "") + ">" + escapeHtml(item.label) + "</option>";
-    }).join("");
+    })).join("");
   }
 
   function canDeleteSelectedComponent(selection) {
@@ -747,8 +747,8 @@
         store.updateUi(function (ui) {
           ui.activeTab = "designer";
           ui.selectedTokenId = token.id;
-          ui.selectedComponentType = "background";
-          ui.selectedComponentId = "front-background";
+          ui.selectedComponentType = null;
+          ui.selectedComponentId = null;
           ui.selectedFace = "front";
         });
       });
@@ -759,8 +759,8 @@
       selectedTokenField.addEventListener("change", function () {
         store.updateUi(function (ui) {
           ui.selectedTokenId = selectedTokenField.value || null;
-          ui.selectedComponentType = "background";
-          ui.selectedComponentId = (ui.selectedFace === "back" ? "back" : "front") + "-background";
+          ui.selectedComponentType = null;
+          ui.selectedComponentId = null;
         });
       });
     }
@@ -778,8 +778,8 @@
         });
         store.updateUi(function (ui) {
           ui.selectedTokenId = ui.selectedTokenId === tokenId ? null : ui.selectedTokenId;
-          ui.selectedComponentType = "background";
-          ui.selectedComponentId = (ui.selectedFace === "back" ? "back" : "front") + "-background";
+          ui.selectedComponentType = null;
+          ui.selectedComponentId = null;
         });
       });
     });
@@ -789,8 +789,8 @@
         var faceName = button.getAttribute("data-face");
         store.updateUi(function (ui) {
           ui.selectedFace = faceName;
-          ui.selectedComponentType = "background";
-          ui.selectedComponentId = faceName + "-background";
+          ui.selectedComponentType = null;
+          ui.selectedComponentId = null;
         });
       });
     });
@@ -868,8 +868,8 @@
       selectedComponentField.addEventListener("change", function () {
         var parts = selectedComponentField.value.split(":");
         store.updateUi(function (ui) {
-          ui.selectedComponentType = parts[0] || "background";
-          ui.selectedComponentId = parts.slice(1).join(":") || ((ui.selectedFace === "back" ? "back" : "front") + "-background");
+          ui.selectedComponentType = parts[0] || null;
+          ui.selectedComponentId = parts[0] ? parts.slice(1).join(":") : null;
         });
       });
     }
@@ -892,8 +892,8 @@
           });
         });
         store.updateUi(function (ui) {
-          ui.selectedComponentType = "background";
-          ui.selectedComponentId = selection.faceName + "-background";
+          ui.selectedComponentType = null;
+          ui.selectedComponentId = null;
         });
       });
     }
@@ -1173,14 +1173,12 @@
       return candidate.id === state.ui.selectedTokenId;
     }) || state.project.tokens[0] || null;
     var faceName = state.ui.selectedFace === "back" ? "back" : "front";
-    var selectedComponentType = state.ui.selectedComponentType || "background";
-    var selectedComponentId = state.ui.selectedComponentId || (faceName + "-background");
 
     return {
       token: token,
       faceName: faceName,
-      selectedComponentType: selectedComponentType,
-      selectedComponentId: selectedComponentId
+      selectedComponentType: state.ui.selectedComponentType,
+      selectedComponentId: state.ui.selectedComponentId
     };
   }
 
