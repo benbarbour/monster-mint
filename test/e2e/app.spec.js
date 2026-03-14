@@ -57,6 +57,15 @@ test("can create and manipulate a token template", async ({ page }) => {
 
 test("custom sequence limits print copy counts", async ({ page }) => {
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Project" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export JSON" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Import JSON" })).toBeVisible();
+  await expect(page.getByText("Projects save automatically in this browser.")).toBeVisible();
+
+  const textManagerOptions = await page.locator('select[name="selectedTextSequenceId"] option').allTextContents();
+  expect(textManagerOptions).not.toContain("Numeric");
+  expect(textManagerOptions).not.toContain("Alphabet");
+
   await page.getByRole("button", { name: "New Custom" }).first().click();
   await page.locator('form[data-form="text-sequence"] input[name="name"]').fill("Two Names");
   await page.locator('form[data-form="text-sequence"] select[name="type"]').selectOption("custom");
@@ -67,6 +76,9 @@ test("custom sequence limits print copy counts", async ({ page }) => {
   await page.getByRole("button", { name: "Create Token" }).click();
   await page.getByRole("button", { name: "Add Text" }).click();
   await page.locator('form[data-form="text-component-settings"] select[name="contentMode"]').selectOption("sequence");
+  const componentSequenceOptions = await page.locator('form[data-form="text-component-settings"] select[name="textSequenceRef"] option').allTextContents();
+  expect(componentSequenceOptions).toContain("Numeric");
+  expect(componentSequenceOptions).toContain("Alphabet");
   await page.locator('form[data-form="text-component-settings"] select[name="textSequenceRef"]').selectOption({ label: "Two Names" });
   await page.getByRole("button", { name: "Save Text" }).click();
 
