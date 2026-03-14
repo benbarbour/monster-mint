@@ -165,7 +165,7 @@ test("resolveTextValue handles numeric and alphabetic sequences", () => {
   assert.equal(Sequences.resolveTextValue(alphabetic, 27), "AB");
 });
 
-test("clampRect keeps components inside the token square", () => {
+test("clampRect allows components to extend outside the token square", () => {
   const rect = Tokens.clampRect({
     x: 0.9,
     y: -0.2,
@@ -174,8 +174,8 @@ test("clampRect keeps components inside the token square", () => {
   });
 
   assert.deepEqual(rect, {
-    x: 0.7,
-    y: 0,
+    x: 0.9,
+    y: -0.2,
     width: 0.3,
     height: 0.4
   });

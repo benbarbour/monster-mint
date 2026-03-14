@@ -35,9 +35,9 @@
       '  <circle cx="50" cy="50" r="50" fill="' + escapeAttr(background) + '"></circle>',
       '  <g clip-path="url(#token-clip-' + tokenSlug + ')">',
       renderImageComponents(face.images),
+      renderTextComponents(face.texts, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive),
       "  </g>",
-      faceName === "front" && face.border.enabled ? renderBorder(face, colorSequences, sequenceIndex) : "",
-      renderTextComponents(face.texts, textSequences, colorSequences, sequenceIndex, tokenSlug),
+      faceName === "front" ? renderBorder(face, colorSequences, sequenceIndex) : "",
       opts.interactive
         ? renderInteractiveOverlays(face, selectedComponentType, selectedComponentId)
         : "",
@@ -61,6 +61,9 @@
   }
 
   function renderBorder(face, colorSequences, sequenceIndex) {
+    if (!face.border || face.border.widthRatio <= 0) {
+      return "";
+    }
     var color = Tokens.getColorValue(
       face.border.colorMode,
       face.border.color,
@@ -68,14 +71,16 @@
       colorSequences,
       sequenceIndex
     );
-    var width = Math.max(0.4, face.border.widthPt / 2);
+    var width = face.border.widthRatio * 100;
     var radius = 50 - width / 2;
     return '<circle cx="50" cy="50" r="' + radius + '" fill="none" stroke="' + escapeAttr(color) + '" stroke-width="' + width + '"></circle>';
   }
 
-  function renderTextComponents(components, textSequences, colorSequences, sequenceIndex, tokenSlug) {
+  function renderTextComponents(components, textSequences, colorSequences, sequenceIndex, tokenSlug, previewMode) {
     return components.map(function (component) {
-      var value = Tokens.getTextValue(component, textSequences, sequenceIndex);
+      var value = previewMode
+        ? getPreviewTextValue(component, textSequences)
+        : Tokens.getTextValue(component, textSequences, sequenceIndex);
       var color = Tokens.getColorValue(
         component.colorMode,
         component.color,
@@ -94,6 +99,29 @@
         "</g>"
       ].join("");
     }).join("");
+  }
+
+  function getPreviewTextValue(component, textSequences) {
+    if (component.contentMode !== "sequence") {
+      return component.customText || "Text";
+    }
+
+    var sequence = textSequences.find(function (candidate) {
+      return candidate.id === component.textSequenceRef;
+    });
+    if (!sequence) {
+      return "";
+    }
+
+    if (sequence.type === "numeric") {
+      return (sequence.prefix || "") + "#".repeat(Math.max(1, sequence.padTo || 0)) + (sequence.suffix || "");
+    }
+
+    if (sequence.type === "alphabetic") {
+      return (sequence.prefix || "") + "A" + (sequence.suffix || "");
+    }
+
+    return sequence.customValues[0] || "Text";
   }
 
   function renderTextClipPaths(components, tokenSlug) {

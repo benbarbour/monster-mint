@@ -14,6 +14,7 @@ test("can create and manipulate a token template", async ({ page }) => {
   await page.getByRole("button", { name: "Create Token" }).click();
 
   await expect(page.getByRole("heading", { name: "Selected Component" })).toBeVisible();
+  await expect(page.locator('select[name="selectedComponentKey"]')).toHaveValue("background:front-background");
   await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toHaveValue("Untitled Token");
 
   await page.getByRole("button", { name: "Add Text" }).click();
@@ -78,7 +79,6 @@ test("custom sequence limits print copy counts", async ({ page }) => {
   expect(componentSequenceOptions).toContain("Numeric");
   expect(componentSequenceOptions).toContain("Alphabet");
   await page.locator('form[data-form="text-component-settings"] select[name="textSequenceRef"]').selectOption({ label: "Two Names" });
-  await page.getByRole("button", { name: "Save Text" }).click();
 
   await page.getByRole("tab", { name: "Print" }).click();
   const copiesInput = page.locator('input[name^="copies-"]').first();

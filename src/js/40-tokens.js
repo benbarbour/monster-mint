@@ -52,6 +52,7 @@
 
   function normalizeFace(input) {
     var payload = input || {};
+    var legacyWidthPt = payload.border && Number(payload.border.widthPt);
     return {
       backgroundColorMode: payload.backgroundColorMode === "sequence" ? "sequence" : "manual",
       backgroundColor: payload.backgroundColor || "#f3e7c9",
@@ -60,7 +61,10 @@
       texts: Array.isArray(payload.texts) ? payload.texts.map(createTextComponent) : [],
       border: {
         enabled: !payload.border || payload.border.enabled !== false,
-        widthPt: asPositive(payload.border && payload.border.widthPt, 2),
+        widthRatio: asRatio(
+          payload.border && payload.border.widthRatio,
+          payload.border && payload.border.enabled === false ? 0 : (Number.isFinite(legacyWidthPt) ? legacyWidthPt / 72 : 0.03)
+        ),
         colorMode: payload.border && payload.border.colorMode === "sequence" ? "sequence" : "manual",
         color: payload.border && payload.border.color ? payload.border.color : "#000000",
         colorSequenceRef: payload.border && payload.border.colorSequenceRef ? payload.border.colorSequenceRef : null
@@ -101,10 +105,10 @@
   }
 
   function clampRect(rect) {
-    var width = clamp(rect.width, 0.05, 1);
-    var height = clamp(rect.height, 0.05, 1);
-    var x = clamp(rect.x, 0, 1 - width);
-    var y = clamp(rect.y, 0, 1 - height);
+    var width = clamp(rect.width, 0.05, 2.5);
+    var height = clamp(rect.height, 0.05, 2.5);
+    var x = clamp(rect.x, -1.5, 1.5);
+    var y = clamp(rect.y, -1.5, 1.5);
 
     return {
       x: x,
@@ -189,6 +193,11 @@
   function asPositive(value, fallback) {
     var parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  }
+
+  function asRatio(value, fallback) {
+    var parsed = Number(value);
+    return Number.isFinite(parsed) ? clamp(parsed, 0, 0.5) : fallback;
   }
 
   function asSigned(value, fallback) {
