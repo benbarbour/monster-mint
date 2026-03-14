@@ -44,6 +44,9 @@
   function normalizeProject(inputProject) {
     var project = inputProject && typeof inputProject === "object" ? inputProject : {};
     var defaults = createDefaultProject();
+    var tokenApi = typeof globalThis !== "undefined" && globalThis.MonsterMintTokens
+      ? globalThis.MonsterMintTokens
+      : { normalizeToken: function (token) { return token; } };
     return {
       version: PROJECT_VERSION,
       meta: {
@@ -61,7 +64,7 @@
         text: Array.isArray(project.sequences?.text) ? project.sequences.text : [],
         color: Array.isArray(project.sequences?.color) ? project.sequences.color : []
       },
-      tokens: Array.isArray(project.tokens) ? project.tokens : [],
+      tokens: Array.isArray(project.tokens) ? project.tokens.map(tokenApi.normalizeToken) : [],
       printSelections: Array.isArray(project.printSelections) ? project.printSelections : []
     };
   }
@@ -92,4 +95,3 @@
     findPagePreset: findPagePreset
   };
 });
-

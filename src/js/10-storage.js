@@ -52,7 +52,11 @@
       return {
         activeTab: typeof parsed.activeTab === "string" ? parsed.activeTab : "settings",
         editingTextSequenceId: typeof parsed.editingTextSequenceId === "string" ? parsed.editingTextSequenceId : null,
-        editingColorSequenceId: typeof parsed.editingColorSequenceId === "string" ? parsed.editingColorSequenceId : null
+        editingColorSequenceId: typeof parsed.editingColorSequenceId === "string" ? parsed.editingColorSequenceId : null,
+        selectedTokenId: typeof parsed.selectedTokenId === "string" ? parsed.selectedTokenId : null,
+        selectedComponentType: typeof parsed.selectedComponentType === "string" ? parsed.selectedComponentType : null,
+        selectedComponentId: typeof parsed.selectedComponentId === "string" ? parsed.selectedComponentId : null,
+        selectedFace: parsed.selectedFace === "back" ? "back" : "front"
       };
     } catch (error) {
       console.warn("Failed to load UI state", error);
@@ -78,7 +82,11 @@
     return {
       activeTab: "settings",
       editingTextSequenceId: null,
-      editingColorSequenceId: null
+      editingColorSequenceId: null,
+      selectedTokenId: null,
+      selectedComponentType: null,
+      selectedComponentId: null,
+      selectedFace: "front"
     };
   }
 

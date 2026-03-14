@@ -37,11 +37,22 @@
     return file.text();
   }
 
+  function readDataUrlFile(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        resolve(String(reader.result || ""));
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
   return {
     uid: uid,
     parseLineList: parseLineList,
     downloadTextFile: downloadTextFile,
-    readTextFile: readTextFile
+    readTextFile: readTextFile,
+    readDataUrlFile: readDataUrlFile
   };
 });
-

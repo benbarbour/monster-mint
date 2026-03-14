@@ -6,6 +6,7 @@ const Utils = require("../src/js/05-utils.js");
 const Storage = require("../src/js/10-storage.js");
 const State = require("../src/js/20-state.js");
 const Sequences = require("../src/js/30-sequences.js");
+const Tokens = require("../src/js/40-tokens.js");
 
 function createMemoryStorage() {
   const map = new Map();
@@ -73,6 +74,20 @@ test("state store persists updates and active tab changes", () => {
   assert.equal(savedUi.activeTab, "designer");
 });
 
+test("state store can update without persisting until requested", () => {
+  const storage = createMemoryStorage();
+  const store = State.createStore({ storage });
+
+  store.updateProject((project) => {
+    project.meta.name = "Draft";
+  }, { persist: false });
+  assert.equal(storage.getItem(Schema.STORAGE_KEY), null);
+
+  store.persistProject();
+  const savedProject = JSON.parse(storage.getItem(Schema.STORAGE_KEY));
+  assert.equal(savedProject.meta.name, "Draft");
+});
+
 test("loadUiState provides editing slots for sequence forms", () => {
   const storage = createMemoryStorage();
   const uiState = Storage.loadUiState(storage);
@@ -80,7 +95,11 @@ test("loadUiState provides editing slots for sequence forms", () => {
   assert.deepEqual(uiState, {
     activeTab: "settings",
     editingTextSequenceId: null,
-    editingColorSequenceId: null
+    editingColorSequenceId: null,
+    selectedTokenId: null,
+    selectedComponentType: null,
+    selectedComponentId: null,
+    selectedFace: "front"
   });
 });
 
@@ -116,4 +135,36 @@ test("createColorSequence filters invalid colors and reports finite lengths", ()
 
 test("parseLineList trims and removes blank lines", () => {
   assert.deepEqual(Utils.parseLineList("one\n\n two \n"), ["one", "two"]);
+});
+
+test("resolveTextValue handles numeric and alphabetic sequences", () => {
+  const numeric = Sequences.createTextSequence({
+    type: "numeric",
+    start: 3,
+    step: 2,
+    prefix: "G",
+    padTo: 2
+  });
+  const alphabetic = Sequences.createTextSequence({
+    type: "alphabetic"
+  });
+
+  assert.equal(Sequences.resolveTextValue(numeric, 1), "G05");
+  assert.equal(Sequences.resolveTextValue(alphabetic, 27), "AB");
+});
+
+test("clampRect keeps components inside the token square", () => {
+  const rect = Tokens.clampRect({
+    x: 0.9,
+    y: -0.2,
+    width: 0.3,
+    height: 0.4
+  });
+
+  assert.deepEqual(rect, {
+    x: 0.7,
+    y: 0,
+    width: 0.3,
+    height: 0.4
+  });
 });

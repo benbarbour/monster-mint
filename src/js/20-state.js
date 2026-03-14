@@ -29,17 +29,25 @@
       state.lastSavedAt = state.project.meta.updatedAt;
     }
 
-    function updateProject(mutator) {
+    function updateProject(mutator, options) {
+      var shouldPersist = !options || options.persist !== false;
       var nextProject = Schema.clone(state.project);
       mutator(nextProject);
       state.project = Schema.normalizeProject(nextProject);
-      save();
+      if (shouldPersist) {
+        save();
+      } else {
+        state.autosaveStatus = "Editing";
+      }
       emit();
     }
 
-    function replaceProject(project) {
+    function replaceProject(project, options) {
+      var shouldPersist = !options || options.persist !== false;
       state.project = Schema.normalizeProject(project);
-      save();
+      if (shouldPersist) {
+        save();
+      }
       emit();
     }
 
@@ -54,6 +62,11 @@
       mutator(nextUi);
       state.ui = Object.assign(Storage.defaultUiState(), nextUi);
       Storage.saveUiState(storage, state.ui);
+      emit();
+    }
+
+    function persistProject() {
+      save();
       emit();
     }
 
@@ -72,7 +85,8 @@
       updateProject: updateProject,
       replaceProject: replaceProject,
       setActiveTab: setActiveTab,
-      updateUi: updateUi
+      updateUi: updateUi,
+      persistProject: persistProject
     };
   }
 

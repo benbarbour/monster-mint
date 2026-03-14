@@ -75,6 +75,44 @@
     return Infinity;
   }
 
+  function resolveTextValue(sequence, index) {
+    if (!sequence) {
+      return "";
+    }
+
+    if (sequence.type === "numeric") {
+      var numericValue = sequence.start + sequence.step * index;
+      var asText = String(numericValue).padStart(sequence.padTo || 0, "0");
+      return (sequence.prefix || "") + asText + (sequence.suffix || "");
+    }
+
+    if (sequence.type === "alphabetic") {
+      return (sequence.prefix || "") + alphabeticValue(index) + (sequence.suffix || "");
+    }
+
+    return sequence.customValues[index] || "";
+  }
+
+  function resolveColorValue(sequence, index) {
+    if (!sequence || !Array.isArray(sequence.values)) {
+      return "";
+    }
+
+    return sequence.values[index] || "";
+  }
+
+  function alphabeticValue(index) {
+    var value = "";
+    var current = index;
+
+    do {
+      value = String.fromCharCode(65 + (current % 26)) + value;
+      current = Math.floor(current / 26) - 1;
+    } while (current >= 0);
+
+    return value;
+  }
+
   function isHexColor(value) {
     return HEX_COLOR_PATTERN.test(String(value || "").trim());
   }
@@ -90,7 +128,8 @@
     summarizeTextSequence: summarizeTextSequence,
     summarizeColorSequence: summarizeColorSequence,
     getFiniteLength: getFiniteLength,
-    isHexColor: isHexColor
+    isHexColor: isHexColor,
+    resolveTextValue: resolveTextValue,
+    resolveColorValue: resolveColorValue
   };
 });
-

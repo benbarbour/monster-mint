@@ -1,12 +1,21 @@
 (function (global, factory) {
-  var api = factory(global.MonsterMintSchema, global.MonsterMintState, global.MonsterMintSequences, global.MonsterMintUtils);
+  var api = factory(
+    global.MonsterMintSchema,
+    global.MonsterMintState,
+    global.MonsterMintSequences,
+    global.MonsterMintUtils,
+    global.MonsterMintTokens,
+    global.MonsterMintRenderer
+  );
   global.MonsterMintApp = api;
-})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, State, Sequences, Utils) {
+})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, State, Sequences, Utils, Tokens, Renderer) {
   var TAB_CONFIG = [
     { id: "settings", label: "Settings" },
     { id: "designer", label: "Designer" },
     { id: "print", label: "Print" }
   ];
+  var designerInteraction = null;
+  var mountedStore = null;
 
   function escapeHtml(value) {
     return String(value)
@@ -108,11 +117,80 @@
   }
 
   function renderDesignerPanel(state) {
+    var selection = getDesignerSelection(state);
+    var token = selection.token;
+
+    if (!token) {
+      return [
+        '<div class="empty-state designer-placeholder">',
+        "  <h2>No token templates yet</h2>",
+        "  <p>Create a token to start placing images and text blocks.</p>",
+        '  <div class="button-row" style="justify-content:center">',
+        '    <button class="button button-primary" type="button" data-action="add-token">Create Token</button>',
+        "  </div>",
+        "</div>"
+      ].join("");
+    }
+
+    var face = token[selection.faceName];
+    var selectedComponent = getSelectedComponent(face, selection.selectedComponentType, selection.selectedComponentId);
     return [
-      '<div class="empty-state">',
-      "  <h2>Designer foundation ready</h2>",
-      "  <p>The token editor will appear here once the sequence and template layers are in place.</p>",
-      "  <p>Autosave is already active. Updated: " + escapeHtml(new Date(state.project.meta.updatedAt).toLocaleString()) + "</p>",
+      '<div class="designer-layout">',
+      '  <aside class="designer-column">',
+      '    <section class="panel-card">',
+      "      <h2>Tokens</h2>",
+      '      <div class="token-toolbar">',
+      '        <button class="button button-primary" type="button" data-action="add-token">New Token</button>',
+      '        <button class="button" type="button" data-action="duplicate-token" data-token-id="' + token.id + '">Duplicate</button>',
+      '        <button class="button" type="button" data-action="delete-token" data-token-id="' + token.id + '">Delete</button>',
+      "      </div>",
+      renderTokenList(state.project.tokens, token.id),
+      "    </section>",
+      "  </aside>",
+      '  <section class="designer-column">',
+      '    <section class="panel-card preview-shell">',
+      '      <div class="preview-toolbar">',
+      '        <div class="face-toggle">',
+      '          <button type="button" class="' + (selection.faceName === "front" ? "is-active" : "") + '" data-face="front">Front</button>',
+      '          <button type="button" class="' + (selection.faceName === "back" ? "is-active" : "") + '" data-face="back">Back</button>',
+      "        </div>",
+      '        <button class="button" type="button" data-action="add-text" data-face="' + selection.faceName + '">Add Text</button>',
+      '        <button class="button" type="button" data-action="add-image" data-face="' + selection.faceName + '">Add Image</button>',
+      '        <input class="visually-hidden" type="file" accept="image/*" data-image-upload-input>',
+      "      </div>",
+      '      <div class="preview-stage" data-preview-stage>',
+      Renderer.renderTokenSvg(token, state.project, {
+        face: selection.faceName,
+        sequenceIndex: 0,
+        interactive: true,
+        selectedComponentType: selection.selectedComponentType,
+        selectedComponentId: selection.selectedComponentId
+      }),
+      "      </div>",
+      '      <p class="preview-note">Drag to move. Use the lower-right handle to resize. Components stay inside the token square.</p>',
+      "    </section>",
+      '    <section class="panel-card">',
+      "      <h2>Components</h2>",
+      renderComponentList(face, selection.selectedComponentType, selection.selectedComponentId),
+      '      <div class="component-toolbar">',
+      '        <button class="button" type="button" data-action="delete-component"' + (selectedComponent ? "" : " disabled") + '>Delete Selected</button>',
+      "      </div>",
+      "    </section>",
+      "  </section>",
+      '  <aside class="designer-column">',
+      '    <section class="panel-card">',
+      "      <h2>Token</h2>",
+      renderTokenForm(token),
+      "    </section>",
+      '    <section class="panel-card">',
+      "      <h2>" + (selection.faceName === "front" ? "Front" : "Back") + " Face</h2>",
+      renderFaceForm(token, state.project, selection.faceName),
+      "    </section>",
+      '    <section class="panel-card">',
+      "      <h2>Selected Component</h2>",
+      renderSelectedComponentForm(selectedComponent, selection, state.project),
+      "    </section>",
+      "  </aside>",
       "</div>"
     ].join("");
   }
@@ -122,6 +200,167 @@
       '<div class="empty-state">',
       "  <h2>Print pipeline pending</h2>",
       "  <p>Page layout, previews, and print rendering will be added after the designer is in place.</p>",
+      "</div>"
+    ].join("");
+  }
+
+  function renderTokenList(tokens, selectedTokenId) {
+    return '<div class="token-list">' + tokens.map(function (token) {
+      return [
+        '<button class="token-card' + (token.id === selectedTokenId ? " is-selected" : "") + '" type="button" data-action="select-token" data-token-id="' + token.id + '">',
+        "  <strong>" + escapeHtml(token.name) + "</strong>",
+        "  <span>" + token.diameterIn + '&quot; token</span>',
+        "</button>"
+      ].join("");
+    }).join("") + "</div>";
+  }
+
+  function renderComponentList(face, selectedType, selectedId) {
+    var items = face.images.map(function (component) {
+      return { type: "image", id: component.id, label: component.name || "Image" };
+    }).concat(face.texts.map(function (component) {
+      return {
+        type: "text",
+        id: component.id,
+        label: component.contentMode === "sequence" ? "Sequence text" : (component.customText || "Custom text")
+      };
+    }));
+
+    if (!items.length) {
+      return '<div class="empty-state">No text or image components on this face.</div>';
+    }
+
+    return '<div class="component-list">' + items.map(function (item) {
+      return [
+        '<button class="component-item' + (selectedType === item.type && selectedId === item.id ? " is-selected" : "") + '" type="button" data-action="select-component" data-component-type="' + item.type + '" data-component-id="' + item.id + '">',
+        "  " + escapeHtml(item.label),
+        "  <small>" + escapeHtml(item.type) + "</small>",
+        "</button>"
+      ].join("");
+    }).join("") + "</div>";
+  }
+
+  function renderTokenForm(token) {
+    return [
+      '<form class="form-grid" data-form="token-settings">',
+      '  <label class="field">Name<input name="name" value="' + escapeHtml(token.name) + '" required></label>',
+      '  <label class="field">Diameter<select name="diameterIn">' + Schema.TOKEN_SIZES.map(function (size) {
+        return '<option value="' + size + '"' + (size === token.diameterIn ? " selected" : "") + ">" + size + '&quot;</option>';
+      }).join("") + "</select></label>",
+      '  <div class="button-row"><button class="button button-primary" type="submit">Save Token</button></div>',
+      "</form>"
+    ].join("");
+  }
+
+  function renderFaceForm(token, project, faceName) {
+    var face = token[faceName];
+    return [
+      '<form class="form-grid" data-form="face-settings">',
+      faceName === "back"
+        ? '<label class="field"><span>Back enabled</span><select name="enabled"><option value="true"' + (face.enabled ? " selected" : "") + '>Enabled</option><option value="false"' + (!face.enabled ? " selected" : "") + '>Disabled</option></select></label>'
+        : "",
+      '<label class="field">Background color mode<select name="backgroundColorMode">' +
+        renderColorModeOptions(face.backgroundColorMode) +
+        "</select></label>",
+      face.backgroundColorMode === "manual"
+        ? '<label class="field">Background color<input type="color" name="backgroundColor" value="' + escapeHtml(face.backgroundColor) + '"></label>'
+        : '<label class="field">Background sequence<select name="backgroundColorSequenceRef">' + renderSequenceOptions(project.sequences.color, face.backgroundColorSequenceRef, "No sequence") + "</select></label>",
+      faceName === "front"
+        ? [
+          '<label class="field">Border enabled<select name="borderEnabled">',
+          '<option value="true"' + (face.border.enabled ? " selected" : "") + '>Enabled</option>',
+          '<option value="false"' + (!face.border.enabled ? " selected" : "") + '>Disabled</option>',
+          "</select></label>",
+          face.border.enabled ? '<label class="field">Border width (pt)<input type="number" min="0.5" step="0.5" name="borderWidthPt" value="' + face.border.widthPt + '"></label>' : "",
+          face.border.enabled ? '<label class="field">Border color mode<select name="borderColorMode">' + renderColorModeOptions(face.border.colorMode) + "</select></label>" : "",
+          face.border.enabled && face.border.colorMode === "manual"
+            ? '<label class="field">Border color<input type="color" name="borderColor" value="' + escapeHtml(face.border.color) + '"></label>'
+            : "",
+          face.border.enabled && face.border.colorMode === "sequence"
+            ? '<label class="field">Border sequence<select name="borderColorSequenceRef">' + renderSequenceOptions(project.sequences.color, face.border.colorSequenceRef, "No sequence") + "</select></label>"
+            : ""
+        ].join("")
+        : "",
+      '  <div class="button-row"><button class="button button-primary" type="submit">Save Face</button></div>',
+      "</form>"
+    ].join("");
+  }
+
+  function renderSelectedComponentForm(component, selection, project) {
+    if (!component) {
+      return '<div class="empty-state">Select a text block or image to edit it.</div>';
+    }
+
+    if (selection.selectedComponentType === "text") {
+      return renderTextComponentForm(component, project);
+    }
+
+    return renderImageComponentForm(component);
+  }
+
+  function renderTextComponentForm(component, project) {
+    return [
+      '<form class="form-grid" data-form="text-component-settings">',
+      '  <label class="field">Content mode<select name="contentMode">' + renderTextContentModeOptions(component.contentMode) + "</select></label>",
+      component.contentMode === "custom"
+        ? '<label class="field">Text<input name="customText" value="' + escapeHtml(component.customText) + '"></label>'
+        : '<label class="field">Text sequence<select name="textSequenceRef">' + renderSequenceOptions(project.sequences.text, component.textSequenceRef, "No sequence") + "</select></label>",
+      '  <div class="field-row two-up">',
+      '    <label class="field">Font family<input name="fontFamily" value="' + escapeHtml(component.fontFamily) + '"></label>',
+      '    <label class="field">Font weight<select name="fontWeight">' + renderFontWeightOptions(component.fontWeight) + "</select></label>",
+      "  </div>",
+      '  <label class="field">Text color mode<select name="colorMode">' + renderColorModeOptions(component.colorMode) + "</select></label>",
+      component.colorMode === "manual"
+        ? '<label class="field">Text color<input type="color" name="color" value="' + escapeHtml(component.color) + '"></label>'
+        : '<label class="field">Color sequence<select name="colorSequenceRef">' + renderSequenceOptions(project.sequences.color, component.colorSequenceRef, "No sequence") + "</select></label>",
+      renderBoundsFields(component),
+      renderShadowFields(component.shadow),
+      '  <div class="button-row"><button class="button button-primary" type="submit">Save Text</button></div>',
+      "</form>"
+    ].join("");
+  }
+
+  function renderImageComponentForm(component) {
+    return [
+      '<form class="form-grid" data-form="image-component-settings">',
+      '  <label class="field">Label<input name="name" value="' + escapeHtml(component.name) + '"></label>',
+      '  <label class="field">Fit<select name="fit">' + renderImageFitOptions(component.fit) + "</select></label>",
+      renderBoundsFields(component),
+      '  <div class="button-row">',
+      '    <button class="button button-primary" type="submit">Save Image</button>',
+      '    <button class="button" type="button" data-action="replace-image">Replace Image</button>',
+      '    <input class="visually-hidden" type="file" accept="image/*" data-replace-image-input>',
+      "  </div>",
+      "</form>"
+    ].join("");
+  }
+
+  function renderBoundsFields(component) {
+    return [
+      '<div class="field-row two-up">',
+      '  <label class="field">X<input type="number" min="0" max="1" step="0.01" name="x" value="' + component.x.toFixed(2) + '"></label>',
+      '  <label class="field">Y<input type="number" min="0" max="1" step="0.01" name="y" value="' + component.y.toFixed(2) + '"></label>',
+      "</div>",
+      '<div class="field-row two-up">',
+      '  <label class="field">Width<input type="number" min="0.05" max="1" step="0.01" name="width" value="' + component.width.toFixed(2) + '"></label>',
+      '  <label class="field">Height<input type="number" min="0.05" max="1" step="0.01" name="height" value="' + component.height.toFixed(2) + '"></label>',
+      "</div>"
+    ].join("");
+  }
+
+  function renderShadowFields(shadow) {
+    return [
+      '<label class="field">Drop shadow<select name="shadowEnabled">',
+      '<option value="false"' + (!shadow.enabled ? " selected" : "") + '>Disabled</option>',
+      '<option value="true"' + (shadow.enabled ? " selected" : "") + '>Enabled</option>',
+      "</select></label>",
+      '<div class="field-row two-up">',
+      '  <label class="field">Shadow X<input type="number" step="0.5" name="shadowDx" value="' + shadow.dx + '"></label>',
+      '  <label class="field">Shadow Y<input type="number" step="0.5" name="shadowDy" value="' + shadow.dy + '"></label>',
+      "</div>",
+      '<div class="field-row two-up">',
+      '  <label class="field">Blur<input type="number" min="0" step="0.5" name="shadowBlur" value="' + shadow.blur + '"></label>',
+      '  <label class="field">Shadow color<input type="color" name="shadowColor" value="' + normalizeColorInput(shadow.color) + '"></label>',
       "</div>"
     ].join("");
   }
@@ -153,12 +392,17 @@
         store.updateUi(function (ui) {
           ui.editingTextSequenceId = null;
           ui.editingColorSequenceId = null;
+          ui.selectedTokenId = null;
+          ui.selectedComponentType = null;
+          ui.selectedComponentId = null;
+          ui.selectedFace = "front";
         });
       });
     }
 
     bindSettingsForms(appElement, store);
     bindTransferActions(appElement, store);
+    bindDesignerEvents(appElement, store);
   }
 
   function bindSettingsForms(appElement, store) {
@@ -205,15 +449,7 @@
         });
 
         store.updateProject(function (project) {
-          var existingIndex = project.sequences.text.findIndex(function (candidate) {
-            return candidate.id === sequence.id;
-          });
-
-          if (existingIndex >= 0) {
-            project.sequences.text[existingIndex] = sequence;
-          } else {
-            project.sequences.text.push(sequence);
-          }
+          upsertById(project.sequences.text, sequence);
         });
         store.updateUi(function (ui) {
           ui.editingTextSequenceId = null;
@@ -266,15 +502,7 @@
         });
 
         store.updateProject(function (project) {
-          var existingIndex = project.sequences.color.findIndex(function (candidate) {
-            return candidate.id === sequence.id;
-          });
-
-          if (existingIndex >= 0) {
-            project.sequences.color[existingIndex] = sequence;
-          } else {
-            project.sequences.color.push(sequence);
-          }
+          upsertById(project.sequences.color, sequence);
         });
         store.updateUi(function (ui) {
           ui.editingColorSequenceId = null;
@@ -346,6 +574,10 @@
           store.updateUi(function (ui) {
             ui.editingTextSequenceId = null;
             ui.editingColorSequenceId = null;
+            ui.selectedTokenId = null;
+            ui.selectedComponentType = null;
+            ui.selectedComponentId = null;
+            ui.selectedFace = "front";
           });
         } catch (error) {
           global.alert("Import failed. Please choose a valid Monster Mint JSON file.");
@@ -355,6 +587,451 @@
         }
       });
     }
+  }
+
+  function bindDesignerEvents(appElement, store) {
+    appElement.querySelectorAll("[data-action='add-token']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var token = Tokens.createTokenTemplate({});
+        store.updateProject(function (project) {
+          project.tokens.push(token);
+        });
+        store.updateUi(function (ui) {
+          ui.activeTab = "designer";
+          ui.selectedTokenId = token.id;
+          ui.selectedComponentType = null;
+          ui.selectedComponentId = null;
+          ui.selectedFace = "front";
+        });
+      });
+    });
+
+    appElement.querySelectorAll("[data-action='select-token']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        store.updateUi(function (ui) {
+          ui.selectedTokenId = button.getAttribute("data-token-id");
+          ui.selectedComponentType = null;
+          ui.selectedComponentId = null;
+        });
+      });
+    });
+
+    appElement.querySelectorAll("[data-action='duplicate-token']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var tokenId = button.getAttribute("data-token-id");
+        var selection = getDesignerSelection(store.getState());
+        if (!selection.token || selection.token.id !== tokenId) {
+          return;
+        }
+
+        var duplicate = Tokens.createTokenTemplate(Schema.clone(selection.token));
+        duplicate.name = selection.token.name + " Copy";
+        store.updateProject(function (project) {
+          project.tokens.push(duplicate);
+        });
+        store.updateUi(function (ui) {
+          ui.selectedTokenId = duplicate.id;
+          ui.selectedComponentType = null;
+          ui.selectedComponentId = null;
+          ui.selectedFace = "front";
+        });
+      });
+    });
+
+    appElement.querySelectorAll("[data-action='delete-token']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var tokenId = button.getAttribute("data-token-id");
+        store.updateProject(function (project) {
+          project.tokens = project.tokens.filter(function (token) {
+            return token.id !== tokenId;
+          });
+        });
+        store.updateUi(function (ui) {
+          if (ui.selectedTokenId === tokenId) {
+            ui.selectedTokenId = null;
+            ui.selectedComponentType = null;
+            ui.selectedComponentId = null;
+          }
+        });
+      });
+    });
+
+    appElement.querySelectorAll("[data-face]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        store.updateUi(function (ui) {
+          ui.selectedFace = button.getAttribute("data-face");
+          ui.selectedComponentType = null;
+          ui.selectedComponentId = null;
+        });
+      });
+    });
+
+    var tokenForm = appElement.querySelector("[data-form='token-settings']");
+    if (tokenForm) {
+      tokenForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var selection = getDesignerSelection(store.getState());
+        if (!selection.token) {
+          return;
+        }
+        var formData = new FormData(tokenForm);
+        store.updateProject(function (project) {
+          var token = findToken(project, selection.token.id);
+          token.name = String(formData.get("name")) || token.name;
+          token.diameterIn = Number(formData.get("diameterIn")) || token.diameterIn;
+        });
+      });
+    }
+
+    var faceForm = appElement.querySelector("[data-form='face-settings']");
+    if (faceForm) {
+      faceForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var selection = getDesignerSelection(store.getState());
+        if (!selection.token) {
+          return;
+        }
+        var formData = new FormData(faceForm);
+        store.updateProject(function (project) {
+          var token = findToken(project, selection.token.id);
+          var face = token[selection.faceName];
+          if (selection.faceName === "back") {
+            face.enabled = String(formData.get("enabled")) === "true";
+          }
+          face.backgroundColorMode = String(formData.get("backgroundColorMode"));
+          face.backgroundColor = String(formData.get("backgroundColor") || face.backgroundColor);
+          face.backgroundColorSequenceRef = nullableValue(formData.get("backgroundColorSequenceRef"));
+          if (selection.faceName === "front") {
+            face.border.enabled = String(formData.get("borderEnabled")) === "true";
+            face.border.widthPt = Number(formData.get("borderWidthPt")) || face.border.widthPt;
+            face.border.colorMode = String(formData.get("borderColorMode") || face.border.colorMode);
+            face.border.color = String(formData.get("borderColor") || face.border.color);
+            face.border.colorSequenceRef = nullableValue(formData.get("borderColorSequenceRef"));
+          }
+        });
+      });
+    }
+
+    appElement.querySelectorAll("[data-action='add-text']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var selection = getDesignerSelection(store.getState());
+        if (!selection.token) {
+          return;
+        }
+        var component = Tokens.createTextComponent({});
+        store.updateProject(function (project) {
+          var token = findToken(project, selection.token.id);
+          token[selection.faceName].texts.push(component);
+        });
+        store.updateUi(function (ui) {
+          ui.selectedComponentType = "text";
+          ui.selectedComponentId = component.id;
+        });
+      });
+    });
+
+    var addImageInput = appElement.querySelector("[data-image-upload-input]");
+    appElement.querySelectorAll("[data-action='add-image']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        if (addImageInput) {
+          addImageInput.click();
+        }
+      });
+    });
+
+    if (addImageInput) {
+      addImageInput.addEventListener("change", async function () {
+        var file = addImageInput.files && addImageInput.files[0];
+        var selection = getDesignerSelection(store.getState());
+        if (!file || !selection.token) {
+          return;
+        }
+        var source = await Utils.readDataUrlFile(file);
+        var component = Tokens.createImageComponent({
+          source: source,
+          name: file.name
+        });
+        store.updateProject(function (project) {
+          var token = findToken(project, selection.token.id);
+          token[selection.faceName].images.push(component);
+        });
+        store.updateUi(function (ui) {
+          ui.selectedComponentType = "image";
+          ui.selectedComponentId = component.id;
+        });
+        addImageInput.value = "";
+      });
+    }
+
+    appElement.querySelectorAll("[data-action='select-component']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        store.updateUi(function (ui) {
+          ui.selectedComponentType = button.getAttribute("data-component-type");
+          ui.selectedComponentId = button.getAttribute("data-component-id");
+        });
+      });
+    });
+
+    var deleteComponentButton = appElement.querySelector("[data-action='delete-component']");
+    if (deleteComponentButton) {
+      deleteComponentButton.addEventListener("click", function () {
+        var selection = getDesignerSelection(store.getState());
+        if (!selection.token || !selection.selectedComponentId) {
+          return;
+        }
+        store.updateProject(function (project) {
+          var token = findToken(project, selection.token.id);
+          var face = token[selection.faceName];
+          face.images = face.images.filter(function (component) {
+            return component.id !== selection.selectedComponentId;
+          });
+          face.texts = face.texts.filter(function (component) {
+            return component.id !== selection.selectedComponentId;
+          });
+        });
+        store.updateUi(function (ui) {
+          ui.selectedComponentType = null;
+          ui.selectedComponentId = null;
+        });
+      });
+    }
+
+    var textComponentForm = appElement.querySelector("[data-form='text-component-settings']");
+    if (textComponentForm) {
+      textComponentForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var selection = getDesignerSelection(store.getState());
+        if (!selection.token || selection.selectedComponentType !== "text") {
+          return;
+        }
+        var formData = new FormData(textComponentForm);
+        store.updateProject(function (project) {
+          var component = findComponent(project, selection, "text");
+          if (!component) {
+            return;
+          }
+          component.contentMode = String(formData.get("contentMode"));
+          component.customText = String(formData.get("customText") || "");
+          component.textSequenceRef = nullableValue(formData.get("textSequenceRef"));
+          component.fontFamily = String(formData.get("fontFamily") || component.fontFamily);
+          component.fontWeight = String(formData.get("fontWeight") || component.fontWeight);
+          component.colorMode = String(formData.get("colorMode"));
+          component.color = String(formData.get("color") || component.color);
+          component.colorSequenceRef = nullableValue(formData.get("colorSequenceRef"));
+          applyBoundsFromForm(component, formData);
+          component.shadow.enabled = String(formData.get("shadowEnabled")) === "true";
+          component.shadow.dx = Number(formData.get("shadowDx")) || 0;
+          component.shadow.dy = Number(formData.get("shadowDy")) || 0;
+          component.shadow.blur = Number(formData.get("shadowBlur")) || 0;
+          component.shadow.color = String(formData.get("shadowColor") || component.shadow.color);
+        });
+      });
+    }
+
+    var imageComponentForm = appElement.querySelector("[data-form='image-component-settings']");
+    if (imageComponentForm) {
+      imageComponentForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var selection = getDesignerSelection(store.getState());
+        if (!selection.token || selection.selectedComponentType !== "image") {
+          return;
+        }
+        var formData = new FormData(imageComponentForm);
+        store.updateProject(function (project) {
+          var component = findComponent(project, selection, "image");
+          if (!component) {
+            return;
+          }
+          component.name = String(formData.get("name") || component.name);
+          component.fit = String(formData.get("fit") || component.fit);
+          applyBoundsFromForm(component, formData);
+        });
+      });
+
+      var replaceImageButton = imageComponentForm.querySelector("[data-action='replace-image']");
+      var replaceImageInput = imageComponentForm.querySelector("[data-replace-image-input]");
+      if (replaceImageButton && replaceImageInput) {
+        replaceImageButton.addEventListener("click", function () {
+          replaceImageInput.click();
+        });
+        replaceImageInput.addEventListener("change", async function () {
+          var file = replaceImageInput.files && replaceImageInput.files[0];
+          var selection = getDesignerSelection(store.getState());
+          if (!file || !selection.token || selection.selectedComponentType !== "image") {
+            return;
+          }
+          var source = await Utils.readDataUrlFile(file);
+          store.updateProject(function (project) {
+            var component = findComponent(project, selection, "image");
+            if (component) {
+              component.source = source;
+              component.name = file.name;
+            }
+          });
+          replaceImageInput.value = "";
+        });
+      }
+    }
+
+    appElement.querySelectorAll("[data-drag-mode]").forEach(function (element) {
+      element.addEventListener("mousedown", function (event) {
+        var selection = getDesignerSelection(store.getState());
+        if (!selection.token) {
+          return;
+        }
+        event.preventDefault();
+        var componentElement = event.target.closest("[data-component-id]");
+        if (!componentElement) {
+          return;
+        }
+
+        var componentId = componentElement.getAttribute("data-component-id");
+        var componentType = componentElement.getAttribute("data-component-type");
+        var mode = event.target.getAttribute("data-drag-mode") || "move";
+        var component = getSelectedComponent(selection.token[selection.faceName], componentType, componentId);
+        if (!component) {
+          return;
+        }
+
+        var svgElement = event.target.ownerSVGElement;
+        designerInteraction = {
+          tokenId: selection.token.id,
+          faceName: selection.faceName,
+          componentId: componentId,
+          componentType: componentType,
+          mode: mode,
+          startClientX: event.clientX,
+          startClientY: event.clientY,
+          previewRect: svgElement.getBoundingClientRect(),
+          startRect: {
+            x: component.x,
+            y: component.y,
+            width: component.width,
+            height: component.height
+          }
+        };
+
+        store.updateUi(function (ui) {
+          ui.selectedComponentType = componentType;
+          ui.selectedComponentId = componentId;
+        });
+      });
+    });
+  }
+
+  function handleGlobalPointerMove(event) {
+    if (!designerInteraction || !mountedStore) {
+      return;
+    }
+
+    var deltaX = (event.clientX - designerInteraction.startClientX) / designerInteraction.previewRect.width;
+    var deltaY = (event.clientY - designerInteraction.startClientY) / designerInteraction.previewRect.height;
+    mountedStore.updateProject(function (project) {
+      var token = findToken(project, designerInteraction.tokenId);
+      if (!token) {
+        return;
+      }
+      var selection = {
+        token: token,
+        faceName: designerInteraction.faceName,
+        selectedComponentId: designerInteraction.componentId
+      };
+      var component = findComponent(project, selection, designerInteraction.componentType);
+      if (!component) {
+        return;
+      }
+
+      if (designerInteraction.mode === "resize") {
+        Tokens.updateComponentRect(component, {
+          x: designerInteraction.startRect.x,
+          y: designerInteraction.startRect.y,
+          width: designerInteraction.startRect.width + deltaX,
+          height: designerInteraction.startRect.height + deltaY
+        });
+      } else {
+        Tokens.updateComponentRect(component, {
+          x: designerInteraction.startRect.x + deltaX,
+          y: designerInteraction.startRect.y + deltaY,
+          width: designerInteraction.startRect.width,
+          height: designerInteraction.startRect.height
+        });
+      }
+    }, { persist: false });
+  }
+
+  function handleGlobalPointerUp() {
+    if (!designerInteraction || !mountedStore) {
+      return;
+    }
+
+    designerInteraction = null;
+    mountedStore.persistProject();
+  }
+
+  function getDesignerSelection(state) {
+    var token = state.project.tokens.find(function (candidate) {
+      return candidate.id === state.ui.selectedTokenId;
+    }) || state.project.tokens[0] || null;
+
+    return {
+      token: token,
+      faceName: state.ui.selectedFace === "back" ? "back" : "front",
+      selectedComponentType: state.ui.selectedComponentType,
+      selectedComponentId: state.ui.selectedComponentId
+    };
+  }
+
+  function getSelectedComponent(face, type, componentId) {
+    if (!face || !componentId) {
+      return null;
+    }
+
+    return (type === "image" ? face.images : face.texts).find(function (component) {
+      return component.id === componentId;
+    }) || null;
+  }
+
+  function findToken(project, tokenId) {
+    return project.tokens.find(function (token) {
+      return token.id === tokenId;
+    }) || null;
+  }
+
+  function findComponent(project, selection, type) {
+    var token = findToken(project, selection.token.id);
+    if (!token) {
+      return null;
+    }
+    var face = token[selection.faceName];
+    var collection = type === "image" ? face.images : face.texts;
+    return collection.find(function (component) {
+      return component.id === selection.selectedComponentId;
+    }) || null;
+  }
+
+  function applyBoundsFromForm(component, formData) {
+    Tokens.updateComponentRect(component, {
+      x: Number(formData.get("x")),
+      y: Number(formData.get("y")),
+      width: Number(formData.get("width")),
+      height: Number(formData.get("height"))
+    });
+  }
+
+  function upsertById(collection, value) {
+    var index = collection.findIndex(function (candidate) {
+      return candidate.id === value.id;
+    });
+
+    if (index >= 0) {
+      collection[index] = value;
+    } else {
+      collection.push(value);
+    }
+  }
+
+  function nullableValue(value) {
+    return value ? String(value) : null;
   }
 
   function renderTextSequenceList(sequences) {
@@ -410,9 +1087,7 @@
       '  <input type="hidden" name="id" value="' + escapeHtml(sequence ? sequence.id : "") + '">',
       '  <label class="field">Name<input name="name" value="' + escapeHtml(sequence ? sequence.name : "") + '" required></label>',
       '  <div class="field-row two-up">',
-      '    <label class="field">Type<select name="type">' +
-        renderTextTypeOptions(type) +
-        "</select></label>",
+      '    <label class="field">Type<select name="type">' + renderTextTypeOptions(type) + "</select></label>",
       '    <label class="field">Pad digits<input type="number" min="0" step="1" name="padTo" value="' + escapeHtml(sequence && sequence.type === "numeric" ? sequence.padTo : 0) + '"></label>',
       "  </div>",
       '  <div class="field-row three-up" data-type-only="numeric"' + (type === "numeric" ? "" : " hidden") + '>',
@@ -420,9 +1095,7 @@
       '    <label class="field">Step<input type="number" step="1" name="step" value="' + escapeHtml(sequence && sequence.type === "numeric" ? sequence.step : 1) + '"></label>',
       '    <label class="field">Prefix<input name="prefix" value="' + escapeHtml(sequence ? sequence.prefix : "") + '"></label>',
       "  </div>",
-      '  <div class="field-row two-up">',
-      '    <label class="field">Suffix<input name="suffix" value="' + escapeHtml(sequence ? sequence.suffix : "") + '"></label>',
-      "  </div>",
+      '  <div class="field-row two-up"><label class="field">Suffix<input name="suffix" value="' + escapeHtml(sequence ? sequence.suffix : "") + '"></label></div>',
       '  <label class="field" data-type-only="custom"' + (type === "custom" ? "" : " hidden") + '>Custom values<textarea name="customValuesText">' + escapeHtml(sequence && sequence.type === "custom" ? sequence.customValues.join("\n") : "") + '</textarea><span class="field-help">One value per line.</span></label>',
       '  <div class="button-row">',
       '    <button class="button button-primary" type="submit">' + (sequence ? "Save Text Sequence" : "Add Text Sequence") + "</button>",
@@ -463,13 +1136,72 @@
     }).join("");
   }
 
+  function renderTextContentModeOptions(currentValue) {
+    return [
+      { id: "custom", label: "Custom text" },
+      { id: "sequence", label: "Sequence" }
+    ].map(function (option) {
+      return '<option value="' + option.id + '"' + (currentValue === option.id ? " selected" : "") + ">" + option.label + "</option>";
+    }).join("");
+  }
+
+  function renderColorModeOptions(currentValue) {
+    return [
+      { id: "manual", label: "Manual" },
+      { id: "sequence", label: "Sequence" }
+    ].map(function (option) {
+      return '<option value="' + option.id + '"' + (currentValue === option.id ? " selected" : "") + ">" + option.label + "</option>";
+    }).join("");
+  }
+
+  function renderFontWeightOptions(currentValue) {
+    return ["400", "500", "600", "700", "800"].map(function (value) {
+      return '<option value="' + value + '"' + (currentValue === value ? " selected" : "") + ">" + value + "</option>";
+    }).join("");
+  }
+
+  function renderImageFitOptions(currentValue) {
+    return [
+      { id: "cover", label: "Cover" },
+      { id: "contain", label: "Contain" },
+      { id: "stretch", label: "Stretch" }
+    ].map(function (option) {
+      return '<option value="' + option.id + '"' + (currentValue === option.id ? " selected" : "") + ">" + option.label + "</option>";
+    }).join("");
+  }
+
+  function renderSequenceOptions(sequences, selectedId, emptyLabel) {
+    return ['<option value="">' + emptyLabel + "</option>"].concat(sequences.map(function (sequence) {
+      return '<option value="' + sequence.id + '"' + (selectedId === sequence.id ? " selected" : "") + ">" + escapeHtml(sequence.name) + "</option>";
+    })).join("");
+  }
+
+  function normalizeColorInput(value) {
+    if (typeof value === "string" && value.startsWith("#")) {
+      return value;
+    }
+
+    return "#000000";
+  }
+
   function mount() {
     var appElement = document.getElementById("app");
     var store = State.createStore({ storage: global.localStorage });
+    mountedStore = store;
     store.subscribe(function () {
       render(appElement, store);
     });
+    bindGlobalPointerHandlers();
     render(appElement, store);
+  }
+
+  function bindGlobalPointerHandlers() {
+    if (bindGlobalPointerHandlers.didBind) {
+      return;
+    }
+    bindGlobalPointerHandlers.didBind = true;
+    global.addEventListener("mousemove", handleGlobalPointerMove);
+    global.addEventListener("mouseup", handleGlobalPointerUp);
   }
 
   if (typeof document !== "undefined") {
