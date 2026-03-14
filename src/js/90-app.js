@@ -12,7 +12,6 @@
 })(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, State, Sequences, Utils, Tokens, Renderer, Print) {
   var runtimeGlobal = typeof globalThis !== "undefined" ? globalThis : window;
   var TAB_CONFIG = [
-    { id: "settings", label: "Settings" },
     { id: "designer", label: "Designer" },
     { id: "print", label: "Print" }
   ];
@@ -39,10 +38,17 @@
       '      <h1 class="app-title">Monster Mint</h1>',
       '      <p class="app-subtitle">Design printable tabletop token sheets in one self-contained browser app.</p>',
       "    </div>",
+      '    <div class="app-menu" role="toolbar" aria-label="Project actions">',
+      '      <button class="menu-button" type="button" data-action="export-project" aria-label="Export JSON" title="Export JSON"><span aria-hidden="true">&#8595;</span></button>',
+      '      <button class="menu-button" type="button" data-action="import-project" aria-label="Import JSON" title="Import JSON"><span aria-hidden="true">&#8593;</span></button>',
+      '      <button class="menu-button" type="button" data-action="reset-project" aria-label="Reset Project" title="Reset Project"><span aria-hidden="true">&#8635;</span></button>',
+      '      <button class="menu-button' + (activeTab === "settings" ? " is-active" : "") + '" type="button" data-action="open-settings" aria-label="Settings" title="Settings"><span aria-hidden="true">&#9881;</span></button>',
+      '      <input class="visually-hidden" type="file" accept="application/json,.json" data-import-input>',
+      "    </div>",
       "  </header>",
-      '  <nav class="tabs" aria-label="Main tabs">',
+      '  <nav class="tabs" aria-label="Main tabs" role="tablist">',
       TAB_CONFIG.map(function (tab) {
-        return '<button class="tab-button' + (tab.id === activeTab ? " is-active" : "") + '" type="button" data-tab="' + tab.id + '">' + tab.label + "</button>";
+        return '<button class="tab-button' + (tab.id === activeTab ? " is-active" : "") + '" type="button" role="tab" aria-selected="' + (tab.id === activeTab ? "true" : "false") + '" data-tab="' + tab.id + '">' + tab.label + "</button>";
       }).join(""),
       "  </nav>",
       renderPanel("settings", activeTab, renderSettingsPanel(state)),
@@ -99,13 +105,8 @@
       '      <div class="field-row"><label class="field">Guide style<select name="guideStyle">' +
         renderGuideStyleOptions(state.project.settings.guideStyle) +
         "</select></label></div>",
-      '      <div class="button-row"><button class="button button-primary" type="submit">Save Page Settings</button></div>',
       "    </form>",
       '    <p class="field-help">Current page preset: ' + escapeHtml(preset ? preset.label : "Unknown") + "</p>",
-      "  </section>",
-      '  <section class="panel-card">',
-      "    <h2>Project</h2>",
-      renderProjectPanel(state),
       "  </section>",
       '  <section class="panel-card">',
       "    <h2>Text Sequences</h2>",
@@ -115,21 +116,6 @@
       "    <h2>Color Sequences</h2>",
       renderColorSequenceManager(customColorSequences, selectedColorSequence, editingColorSequence),
       "  </section>",
-      "</div>"
-    ].join("");
-  }
-
-  function renderProjectPanel(state) {
-    return [
-      '<div class="form-grid">',
-      '  <label class="field">Project name<input class="project-name-input" name="project-name" value="' + escapeHtml(state.project.meta.name) + '"></label>',
-      '  <div class="project-actions">',
-      '    <button class="button button-icon button-primary" type="button" data-action="export-project" aria-label="Export JSON" title="Export JSON"><span aria-hidden="true">&#8595;</span></button>',
-      '    <button class="button button-icon" type="button" data-action="import-project" aria-label="Import JSON" title="Import JSON"><span aria-hidden="true">&#8593;</span></button>',
-      '    <button class="button" type="button" data-action="reset-project">Reset Project</button>',
-      '    <input class="visually-hidden" type="file" accept="application/json,.json" data-import-input>',
-      "  </div>",
-      '  <p class="field-help">Projects save automatically in this browser.</p>',
       "</div>"
     ].join("");
   }
@@ -409,12 +395,10 @@
       });
     });
 
-    var nameInput = appElement.querySelector("[name='project-name']");
-    if (nameInput) {
-      nameInput.addEventListener("change", function () {
-        store.updateProject(function (project) {
-          project.meta.name = nameInput.value || "Untitled Project";
-        });
+    var settingsButton = appElement.querySelector("[data-action='open-settings']");
+    if (settingsButton) {
+      settingsButton.addEventListener("click", function () {
+        store.setActiveTab("settings");
       });
     }
 
@@ -650,8 +634,10 @@
     if (exportButton) {
       exportButton.addEventListener("click", function () {
         var state = store.getState();
-        var safeName = state.project.meta.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "monster-mint";
-        Utils.downloadTextFile(safeName + ".json", JSON.stringify(state.project, null, 2));
+        var safeName = state.project.meta && state.project.meta.name && state.project.meta.name !== "Untitled Project"
+          ? state.project.meta.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
+          : "monster-mint";
+        Utils.downloadTextFile((safeName || "monster-mint") + ".json", JSON.stringify(state.project, null, 2));
       });
     }
 

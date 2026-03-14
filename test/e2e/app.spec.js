@@ -10,8 +10,7 @@ test.beforeEach(async ({ page }) => {
 
 test("can create and manipulate a token template", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Monster Mint" })).toBeVisible();
-
-  await page.getByRole("button", { name: "Designer" }).click();
+  await expect(page.getByRole("tab", { name: "Designer" })).toHaveAttribute("aria-selected", "true");
   await page.getByRole("button", { name: "Create Token" }).click();
 
   await expect(page.getByRole("heading", { name: "Selected Component" })).toBeVisible();
@@ -51,16 +50,13 @@ test("can create and manipulate a token template", async ({ page }) => {
   await expect(page.locator('form[data-form="text-component-settings"] input[name="width"]')).not.toHaveValue("0.64");
 
   await page.reload();
-  await page.getByRole("button", { name: "Designer" }).click();
   await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toHaveValue("Untitled Token");
 });
 
 test("custom sequence limits print copy counts", async ({ page }) => {
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Project" })).toBeVisible();
+  await page.getByRole("button", { name: "Settings" }).click();
   await expect(page.getByRole("button", { name: "Export JSON" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Import JSON" })).toBeVisible();
-  await expect(page.getByText("Projects save automatically in this browser.")).toBeVisible();
 
   const textManagerOptions = await page.locator('select[name="selectedTextSequenceId"] option').allTextContents();
   expect(textManagerOptions).not.toContain("Numeric");
@@ -72,7 +68,7 @@ test("custom sequence limits print copy counts", async ({ page }) => {
   await page.locator('form[data-form="text-sequence"] textarea[name="customValuesText"]').fill("Goblin\nOrc");
   await page.getByRole("button", { name: "Add Text Sequence" }).click();
 
-  await page.getByRole("button", { name: "Designer" }).click();
+  await page.getByRole("tab", { name: "Designer" }).click();
   await page.getByRole("button", { name: "Create Token" }).click();
   await page.getByRole("button", { name: "Add Text" }).click();
   await page.locator('form[data-form="text-component-settings"] select[name="contentMode"]').selectOption("sequence");
@@ -82,7 +78,7 @@ test("custom sequence limits print copy counts", async ({ page }) => {
   await page.locator('form[data-form="text-component-settings"] select[name="textSequenceRef"]').selectOption({ label: "Two Names" });
   await page.getByRole("button", { name: "Save Text" }).click();
 
-  await page.getByRole("button", { name: "Print" }).click();
+  await page.getByRole("tab", { name: "Print" }).click();
   const copiesInput = page.locator('input[name^="copies-"]').first();
   await expect(copiesInput).toHaveAttribute("max", "2");
 

@@ -103,7 +103,7 @@ test("loadUiState provides editing slots for sequence forms", () => {
   const uiState = Storage.loadUiState(storage);
 
   assert.deepEqual(uiState, {
-    activeTab: "settings",
+    activeTab: "designer",
     editingTextSequenceId: null,
     editingColorSequenceId: null,
     selectedTextSequenceId: null,
