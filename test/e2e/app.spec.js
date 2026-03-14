@@ -82,9 +82,7 @@ test("token settings own appearance controls and color sequences show in preview
   await expect(page.locator('form[data-form="token-settings"] input[name="borderWidthRatio"]')).toHaveAttribute("max", "0.25");
   const tokenBorderPicker = page.locator('.color-picker-field').filter({ hasText: "Token border" });
   await tokenBorderPicker.locator("summary").click();
-  await page.locator('select[name="borderColorMode"]').selectOption("sequence");
-  await tokenBorderPicker.locator("summary").click();
-  await page.locator('select[name="borderColorSequenceRef"]').selectOption({ label: "Rainbow" });
+  await page.locator('select[name="borderColorSource"]').selectOption({ label: "Rainbow" });
 
   await expect(page.locator('[data-preview-stage] svg circle[stroke="#ff0000"]')).toHaveCount(1);
 
@@ -131,9 +129,7 @@ test("built-in text modes and color sequences drive the editor and print limits"
   await expect(page.locator('form[data-form="text-component-settings"] input[name="customText"]')).toBeHidden();
   const textColorPicker = page.locator('form[data-form="text-component-settings"] .color-picker-field').filter({ hasText: "Text color" });
   await textColorPicker.locator("summary").click();
-  await page.locator('form[data-form="text-component-settings"] select[name="colorMode"]').selectOption("sequence");
-  await textColorPicker.locator("summary").click();
-  await page.locator('form[data-form="text-component-settings"] select[name="colorSequenceRef"]').selectOption({ label: "Two Colors" });
+  await page.locator('form[data-form="text-component-settings"] select[name="colorSource"]').selectOption({ label: "Two Colors" });
 
   await page.locator('form[data-form="text-component-settings"] select[name="contentMode"]').selectOption("alphabetic");
   await expect(page.locator('form[data-form="text-component-settings"] input[name="sequenceStart"]')).toBeVisible();
@@ -142,7 +138,7 @@ test("built-in text modes and color sequences drive the editor and print limits"
   await expect(page.locator('form[data-form="text-component-settings"] input[name="customText"]')).toBeVisible();
 
   await page.getByRole("tab", { name: "Print" }).click();
-  await expect(page.locator('form[data-form="page-settings"] select[name="guideStyle"]')).toBeVisible();
+  await expect(page.locator('form[data-form="page-settings"] select[name="pagePresetId"]')).toBeVisible();
   const copiesInput = page.locator('input[name^="copies-"]').first();
   await expect(copiesInput).toHaveAttribute("max", "2");
 
@@ -151,5 +147,5 @@ test("built-in text modes and color sequences drive the editor and print limits"
   await expect(copiesInput).toHaveValue("2");
   await expect(page.getByRole("button", { name: "Print", exact: true })).toBeVisible();
   await expect(page.locator('[data-action="select-preview-page"]')).toHaveCount(1);
-  await expect(page.getByText("Page 1 Front")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Page 1" })).toBeVisible();
 });

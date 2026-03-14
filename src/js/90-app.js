@@ -199,9 +199,6 @@
   function renderPrintPanel(state) {
     var rows = Print.getSelectionRows(state.project);
     var layout = Print.layoutProject(state.project);
-    var hasBacks = state.project.tokens.some(function (token) {
-      return token.back.enabled && (token.back.images.length || token.back.texts.length || token.back.backgroundColor);
-    });
     var activePreviewPage = Math.min(state.ui.selectedPrintPreviewPage || 0, Math.max(0, layout.pages.length - 1));
     return [
       '<div class="print-layout">',
@@ -214,12 +211,12 @@
       renderPrintSelectionForm(rows),
       "  </section>",
       '  <section class="panel-card">',
-      "    <h2>Preview</h2>",
-      '    <div class="button-row">',
+      '    <div class="panel-header">',
+      "      <h2>Preview</h2>",
       '      <button class="button button-primary" type="button" data-action="print-layout">Print</button>',
       "    </div>",
       layout.pages.length && layout.pages[0].items.length
-        ? renderPreviewTabs(layout, state.project, hasBacks, activePreviewPage)
+        ? renderPreviewTabs(layout, state.project, activePreviewPage)
         : '<div class="empty-state">Choose at least one token copy to generate pages.</div>',
       "  </section>",
       "</div>"
@@ -270,9 +267,8 @@
       '  <p class="field-help">Editing ' + escapeHtml(faceName === "front" ? "front" : "back") + ' face appearance.</p>',
       renderColorPicker({
         label: "Background",
-        modeName: "backgroundColorMode",
+        sourceName: "backgroundColorSource",
         colorName: "backgroundColor",
-        sequenceName: "backgroundColorSequenceRef",
         currentMode: face.backgroundColorMode,
         currentColor: face.backgroundColor,
         currentSequenceRef: face.backgroundColorSequenceRef,
@@ -281,9 +277,8 @@
       '  <label class="field">Border width<input type="range" min="0" max="0.25" step="0.01" name="borderWidthRatio" value="' + face.border.widthRatio.toFixed(2) + '"><span class="field-help">' + Math.round(face.border.widthRatio * 100) + '% of token width</span></label>',
       renderColorPicker({
         label: "Token border",
-        modeName: "borderColorMode",
+        sourceName: "borderColorSource",
         colorName: "borderColor",
-        sequenceName: "borderColorSequenceRef",
         currentMode: face.border.colorMode,
         currentColor: face.border.color,
         currentSequenceRef: face.border.colorSequenceRef,
@@ -326,9 +321,8 @@
       "  </div>",
       renderColorPicker({
         label: "Text color",
-        modeName: "colorMode",
+        sourceName: "colorSource",
         colorName: "color",
-        sequenceName: "colorSequenceRef",
         currentMode: component.colorMode,
         currentColor: component.color,
         currentSequenceRef: component.colorSequenceRef,
@@ -386,9 +380,8 @@
       '<label class="field">Text border<input type="number" min="0" max="8" step="0.1" name="textBorderWidth" value="' + textBorder.width + '"><span class="field-help">0 turns it off.</span></label>',
       renderColorPicker({
         label: "Text border color",
-        modeName: "textBorderColorMode",
+        sourceName: "textBorderColorSource",
         colorName: "textBorderColor",
-        sequenceName: "textBorderColorSequenceRef",
         currentMode: textBorder.colorMode,
         currentColor: textBorder.color,
         currentSequenceRef: textBorder.colorSequenceRef,
@@ -398,11 +391,14 @@
   }
 
   function renderColorPicker(config) {
-    var mode = config.currentMode === "sequence" ? "sequence" : "manual";
-    var summary = mode === "sequence"
-      ? "Sequence: " + getSequenceName(config.sequences, config.currentSequenceRef)
-      : (config.currentColor || "#000000");
-    var swatch = mode === "manual"
+    var sourceValue = config.currentMode === "sequence" && config.currentSequenceRef
+      ? config.currentSequenceRef
+      : "manual";
+    var isManual = sourceValue === "manual";
+    var summary = isManual
+      ? (config.currentColor || "#000000")
+      : "Sequence: " + getSequenceName(config.sequences, sourceValue);
+    var swatch = isManual
       ? (config.currentColor || "#000000")
       : (config.currentColor || "#ffffff");
 
@@ -412,13 +408,20 @@
       '  <details class="color-picker" data-color-picker>',
       '    <summary class="color-picker-summary"><span class="color-picker-swatch" style="--swatch:' + escapeHtml(swatch) + '"></span><span>' + escapeHtml(summary) + "</span></summary>",
       '    <div class="color-picker-panel">',
-      '      <label class="field">Source<select name="' + config.modeName + '">' + renderColorModeOptions(mode) + "</select></label>",
-      renderConditionalField(config.modeName + ':manual', mode === "manual", 'Custom color<input type="color" name="' + config.colorName + '" value="' + normalizeColorInput(config.currentColor) + '">'),
-      renderConditionalField(config.modeName + ':sequence', mode === "sequence", 'Sequence<select name="' + config.sequenceName + '">' + renderSequenceOptions(config.sequences, config.currentSequenceRef, "No sequence") + "</select>"),
+      '      <label class="field">Color<select name="' + config.sourceName + '">' + renderColorSourceOptions(config.sequences, sourceValue) + "</select></label>",
+      renderConditionalField(config.sourceName + ':manual', isManual, 'Custom color<input type="color" name="' + config.colorName + '" value="' + normalizeColorInput(config.currentColor) + '">'),
       "    </div>",
       "  </details>",
       "</div>"
     ].join("");
+  }
+
+  function renderColorSourceOptions(sequences, selectedValue) {
+    return ['<option value="manual"' + (selectedValue === "manual" ? " selected" : "") + '>Manual</option>']
+      .concat(sequences.map(function (sequence) {
+        return '<option value="' + sequence.id + '"' + (selectedValue === sequence.id ? " selected" : "") + ">" + escapeHtml(sequence.name) + "</option>";
+      }))
+      .join("");
   }
 
   function attachEvents(appElement, store) {
@@ -656,17 +659,17 @@
 
     var tokenForm = appElement.querySelector("[data-form='token-settings']");
     if (tokenForm) {
-      tokenForm.querySelectorAll('select[name="backgroundColorMode"], select[name="borderColorMode"]').forEach(function (element) {
+      tokenForm.querySelectorAll('select[name="backgroundColorSource"], select[name="borderColorSource"]').forEach(function (element) {
         element.addEventListener("change", function () {
           syncConditionalFields(tokenForm, {
-            backgroundColorMode: tokenForm.querySelector('[name="backgroundColorMode"]').value,
-            borderColorMode: tokenForm.querySelector('[name="borderColorMode"]').value
+            backgroundColorSource: tokenForm.querySelector('[name="backgroundColorSource"]').value,
+            borderColorSource: tokenForm.querySelector('[name="borderColorSource"]').value
           });
         });
       });
       syncConditionalFields(tokenForm, {
-        backgroundColorMode: tokenForm.querySelector('[name="backgroundColorMode"]').value,
-        borderColorMode: tokenForm.querySelector('[name="borderColorMode"]').value
+        backgroundColorSource: tokenForm.querySelector('[name="backgroundColorSource"]').value,
+        borderColorSource: tokenForm.querySelector('[name="borderColorSource"]').value
       });
       tokenForm.addEventListener("change", function () {
         var selection = getDesignerSelection(store.getState());
@@ -677,17 +680,19 @@
         store.updateProject(function (project) {
           var token = findToken(project, selection.token.id);
           var face = token[selection.faceName];
+          var backgroundColorSelection = parseColorSourceValue(formData.get("backgroundColorSource"));
+          var borderColorSelection = parseColorSourceValue(formData.get("borderColorSource"));
           token.name = String(formData.get("name")) || token.name;
           token.diameterIn = Number(formData.get("diameterIn")) || token.diameterIn;
           token.back.enabled = String(formData.get("backEnabled")) === "true";
           token.borderUnderContent = formData.get("borderUnderContent") === "on";
-          face.backgroundColorMode = String(formData.get("backgroundColorMode") || face.backgroundColorMode);
+          face.backgroundColorMode = backgroundColorSelection.mode;
           face.backgroundColor = String(formData.get("backgroundColor") || face.backgroundColor);
-          face.backgroundColorSequenceRef = nullableValue(formData.get("backgroundColorSequenceRef"));
+          face.backgroundColorSequenceRef = backgroundColorSelection.sequenceRef;
           face.border.widthRatio = toNumberOrDefault(formData.get("borderWidthRatio"), face.border.widthRatio);
-          face.border.colorMode = String(formData.get("borderColorMode") || face.border.colorMode);
+          face.border.colorMode = borderColorSelection.mode;
           face.border.color = String(formData.get("borderColor") || face.border.color);
-          face.border.colorSequenceRef = nullableValue(formData.get("borderColorSequenceRef"));
+          face.border.colorSequenceRef = borderColorSelection.sequenceRef;
         });
       });
     }
@@ -792,15 +797,15 @@
     if (textComponentForm) {
       var syncTextComponentVisibility = function () {
         var contentModeField = textComponentForm.querySelector('[name="contentMode"]');
-        var colorModeField = textComponentForm.querySelector('[name="colorMode"]');
-        var textBorderColorModeField = textComponentForm.querySelector('[name="textBorderColorMode"]');
+        var colorSourceField = textComponentForm.querySelector('[name="colorSource"]');
+        var textBorderColorSourceField = textComponentForm.querySelector('[name="textBorderColorSource"]');
         syncConditionalFields(textComponentForm, {
           contentMode: contentModeField ? contentModeField.value : null,
-          colorMode: colorModeField ? colorModeField.value : null,
-          textBorderColorMode: textBorderColorModeField ? textBorderColorModeField.value : null
+          colorSource: colorSourceField ? colorSourceField.value : null,
+          textBorderColorSource: textBorderColorSourceField ? textBorderColorSourceField.value : null
         });
       };
-      textComponentForm.querySelectorAll('select[name="contentMode"], select[name="colorMode"], select[name="textBorderColorMode"]').forEach(function (element) {
+      textComponentForm.querySelectorAll('select[name="contentMode"], select[name="colorSource"], select[name="textBorderColorSource"]').forEach(function (element) {
         element.addEventListener("change", syncTextComponentVisibility);
       });
       syncTextComponentVisibility();
@@ -816,6 +821,8 @@
           if (!component) {
             return;
           }
+          var textColorSelection = parseColorSourceValue(formData.get("colorSource"));
+          var textBorderColorSelection = parseColorSourceValue(formData.get("textBorderColorSource"));
           component.name = String(formData.get("name") || component.name);
           component.contentMode = String(formData.get("contentMode"));
           component.customText = String(formData.get("customText") || "");
@@ -823,14 +830,14 @@
           component.sequencePad = toNonNegativeInteger(formData.get("sequencePad"), component.sequencePad);
           component.fontFamily = String(formData.get("fontFamily") || component.fontFamily);
           component.fontWeight = String(formData.get("fontWeight") || component.fontWeight);
-          component.colorMode = String(formData.get("colorMode"));
+          component.colorMode = textColorSelection.mode;
           component.color = String(formData.get("color") || component.color);
-          component.colorSequenceRef = nullableValue(formData.get("colorSequenceRef"));
+          component.colorSequenceRef = textColorSelection.sequenceRef;
           applyBoundsFromForm(component, formData);
           component.textBorder.width = toNumberOrDefault(formData.get("textBorderWidth"), component.textBorder.width);
-          component.textBorder.colorMode = String(formData.get("textBorderColorMode") || component.textBorder.colorMode);
+          component.textBorder.colorMode = textBorderColorSelection.mode;
           component.textBorder.color = String(formData.get("textBorderColor") || component.textBorder.color);
-          component.textBorder.colorSequenceRef = nullableValue(formData.get("textBorderColorSequenceRef"));
+          component.textBorder.colorSequenceRef = textBorderColorSelection.sequenceRef;
         });
       });
     }
@@ -963,7 +970,6 @@
           project.settings.pageOrientation = String(formData.get("pageOrientation"));
           project.settings.pageMarginIn = Number(formData.get("pageMarginIn")) || project.settings.pageMarginIn;
           project.settings.bleedIn = Number(formData.get("bleedIn")) || project.settings.bleedIn;
-          project.settings.guideStyle = String(formData.get("guideStyle"));
         });
       });
     }
@@ -1187,7 +1193,7 @@
       element.hidden = !isVisible;
       element.style.display = isVisible ? "" : "none";
       element.querySelectorAll("input, select, textarea, button").forEach(function (control) {
-        if (control.name === "contentMode" || control.name === "colorMode") {
+        if (control.name === "contentMode" || control.name === "colorSource" || control.name === "textBorderColorSource" || control.name === "backgroundColorSource" || control.name === "borderColorSource") {
           return;
         }
         control.disabled = !isVisible;
@@ -1201,6 +1207,13 @@
 
   function renderConditionalBlock(visibleWhen, isVisible, innerHtml) {
     return '<div data-visible-when="' + visibleWhen + '"' + (isVisible ? "" : ' hidden style="display:none"') + ">" + innerHtml + "</div>";
+  }
+
+  function parseColorSourceValue(value) {
+    var source = value ? String(value) : "manual";
+    return source === "manual"
+      ? { mode: "manual", sequenceRef: null }
+      : { mode: "sequence", sequenceRef: source };
   }
 
   function renderTextSequenceManager(sequences, selectedSequence, editingSequence) {
@@ -1277,13 +1290,6 @@
       '  <p class="field-help">Changes save automatically when you leave a field.</p>',
       "</form>"
     ].join("");
-  }
-
-  function renderGuideStyleOptions(currentValue) {
-    return ["none", "cut", "punch", "cut-and-punch"].map(function (value) {
-      var label = value === "cut-and-punch" ? "Cut and punch" : value.charAt(0).toUpperCase() + value.slice(1);
-      return '<option value="' + value + '"' + (currentValue === value ? " selected" : "") + ">" + label + "</option>";
-    }).join("");
   }
 
   function renderTextTypeOptions(currentValue) {
@@ -1391,7 +1397,6 @@
       '    <label class="field">Margin (in)<input type="number" min="0.05" step="0.05" name="pageMarginIn" value="' + settings.pageMarginIn + '"></label>',
       '    <label class="field">Bleed (in)<input type="number" min="0.01" step="0.01" name="bleedIn" value="' + settings.bleedIn + '"></label>',
       "  </div>",
-      '  <label class="field">Guide style<select name="guideStyle">' + renderGuideStyleOptions(settings.guideStyle) + "</select></label>",
       '  <p class="field-help">Changes save automatically.</p>',
       "</form>"
     ].join("");
@@ -1424,85 +1429,127 @@
     ].join("");
   }
 
-  function renderPreviewTabs(layout, project, hasBacks, activeIndex) {
+  function renderPreviewTabs(layout, project, activeIndex) {
     return [
       '<div class="preview-tab-list" role="tablist" aria-label="Preview pages">',
       layout.pages.map(function (page, index) {
         return '<button class="preview-tab' + (index === activeIndex ? " is-active" : "") + '" type="button" role="tab" aria-selected="' + (index === activeIndex ? "true" : "false") + '" data-action="select-preview-page" data-page-index="' + index + '">Page ' + (index + 1) + "</button>";
       }).join(""),
       "</div>",
-      renderPreviewSection(layout.pages[activeIndex], project, activeIndex, hasBacks)
+      renderPreviewSection(layout.pages[activeIndex], project, activeIndex)
     ].join("");
   }
 
-  function renderPreviewSection(page, project, index, hasBacks) {
+  function renderPreviewSection(page, project, index) {
     return [
-      '<div class="preview-page-grid preview-page-grid--pair">',
-      renderPreviewCard(page, project, "front", "Front", index),
-      hasBacks ? renderPreviewCard(page, project, "back", "Back", index) : "",
+      '<div class="preview-page-grid">',
+      renderPreviewCard(page, project, index),
       "</div>"
     ].join("");
   }
 
-  function renderPreviewCard(page, project, faceName, label, index) {
+  function renderPreviewCard(page, project, index) {
     return [
       '<article class="preview-page-card">',
-      '  <p class="preview-page-label">Page ' + (index + 1) + " " + label + "</p>",
+      '  <p class="preview-page-label">Page ' + (index + 1) + "</p>",
       '  <div class="preview-page-svg">',
-      renderPageSvg(page, project, faceName, true),
+      renderPageSvg(page, project, true),
       "  </div>",
       "</article>"
     ].join("");
   }
 
-  function renderPageSvg(page, project, faceName, isPreview) {
+  function renderPageSvg(page, project, isPreview) {
     var pageWidth = page.pageWidthIn * 100;
     var pageHeight = page.pageHeightIn * 100;
     return [
       '<svg viewBox="0 0 ' + pageWidth + " " + pageHeight + '" xmlns="http://www.w3.org/2000/svg"' + (isPreview ? "" : ' width="100%" height="100%"') + '>',
       '  <rect x="0" y="0" width="' + pageWidth + '" height="' + pageHeight + '" fill="#ffffff"></rect>',
       page.items.map(function (item) {
-        return renderPageItem(item, project, faceName);
+        return renderPageCellFill(item, project);
       }).join(""),
+      page.items.map(function (item) {
+        return renderPageItem(item, project);
+      }).join(""),
+      renderCutLines(page),
       "</svg>"
     ].join("");
   }
 
-  function renderPageItem(item, project, faceName) {
+  function renderPageCellFill(item, project) {
+    var face = item.token[item.faceName];
+    var fill = getPageCellFill(face, project.sequences.color, item.sequenceIndex);
+    return '<rect x="' + (item.cellXIn * 100) + '" y="' + (item.cellYIn * 100) + '" width="' + (item.cellSizeIn * 100) + '" height="' + (item.cellSizeIn * 100) + '" fill="' + escapeHtml(fill) + '"></rect>';
+  }
+
+  function renderPageItem(item, project) {
     var x = item.xIn * 100;
     var y = item.yIn * 100;
     var size = item.diameterIn * 100;
-    var centerX = x + size / 2;
-    var centerY = y + size / 2;
-    var guideStyle = project.settings.guideStyle;
-    var tokenSvg = faceName === "back" && !item.token.back.enabled
-      ? ""
-      : Renderer.renderTokenSvg(item.token, project, {
-        face: faceName,
+    return Renderer.renderTokenSvg(item.token, project, {
+        face: item.faceName,
         sequenceIndex: item.sequenceIndex,
         interactive: false,
+        outerSquareFill: getPageCellFill(item.token[item.faceName], project.sequences.color, item.sequenceIndex),
         svgAttributes: 'x="' + x + '" y="' + y + '" width="' + size + '" height="' + size + '"'
       });
-
-    return [
-      renderGuideMarks(centerX, centerY, size / 2, guideStyle),
-      tokenSvg
-    ].join("");
   }
 
-  function renderGuideMarks(centerX, centerY, radius, guideStyle) {
-    var parts = [];
+  function renderCutLines(page) {
+    var bounds = getPageGridBounds(page);
+    if (!bounds) {
+      return "";
+    }
+    return collectInternalBoundaries(page, "x").map(function (value) {
+      return '<line x1="' + value + '" y1="' + bounds.minY + '" x2="' + value + '" y2="' + bounds.maxY + '" stroke="#7f7f7f" stroke-width="0.75" stroke-dasharray="2 2"></line>';
+    }).concat(collectInternalBoundaries(page, "y").map(function (value) {
+      return '<line x1="' + bounds.minX + '" y1="' + value + '" x2="' + bounds.maxX + '" y2="' + value + '" stroke="#7f7f7f" stroke-width="0.75" stroke-dasharray="2 2"></line>';
+    })).join("");
+  }
 
-    if (guideStyle === "cut" || guideStyle === "cut-and-punch") {
-      parts.push('<circle cx="' + centerX + '" cy="' + centerY + '" r="' + radius + '" fill="none" stroke="#777777" stroke-width="0.75"></circle>');
+  function getPageGridBounds(page) {
+    if (!page.items.length) {
+      return null;
+    }
+    var minX = Math.min.apply(Math, page.items.map(function (item) { return item.cellXIn * 100; }));
+    var minY = Math.min.apply(Math, page.items.map(function (item) { return item.cellYIn * 100; }));
+    var maxX = Math.max.apply(Math, page.items.map(function (item) { return (item.cellXIn + item.cellSizeIn) * 100; }));
+    var maxY = Math.max.apply(Math, page.items.map(function (item) { return (item.cellYIn + item.cellSizeIn) * 100; }));
+    return { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
+  }
+
+  function collectInternalBoundaries(page, axis) {
+    var values = page.items.map(function (item) {
+      return axis === "x"
+        ? (item.cellXIn + item.cellSizeIn) * 100
+        : (item.cellYIn + item.cellSizeIn) * 100;
+    }).filter(function (value, index, all) {
+      return all.indexOf(value) === index;
+    }).sort(function (a, b) {
+      return a - b;
+    });
+    values.pop();
+    return values;
+  }
+
+  function getPageCellFill(face, colorSequences, sequenceIndex) {
+    if (face.border && face.border.widthRatio > 0) {
+      return Tokens.getColorValue(
+        face.border.colorMode,
+        face.border.color,
+        face.border.colorSequenceRef,
+        colorSequences,
+        sequenceIndex
+      );
     }
 
-    if (guideStyle === "punch" || guideStyle === "cut-and-punch") {
-      parts.push('<line x1="' + (centerX - 4) + '" y1="' + centerY + '" x2="' + (centerX + 4) + '" y2="' + centerY + '" stroke="#999999" stroke-width="0.6"></line>');
-      parts.push('<line x1="' + centerX + '" y1="' + (centerY - 4) + '" x2="' + centerX + '" y2="' + (centerY + 4) + '" stroke="#999999" stroke-width="0.6"></line>');
-    }
-
-    return parts.join("");
+    return Tokens.getColorValue(
+      face.backgroundColorMode,
+      face.backgroundColor,
+      face.backgroundColorSequenceRef,
+      colorSequences,
+      sequenceIndex
+    );
   }
 
   function openPrintWindow(layout, project) {
@@ -1512,17 +1559,9 @@
       return;
     }
 
-    var hasBacks = project.tokens.some(function (token) {
-      return token.back.enabled;
-    });
     var pages = layout.pages.map(function (page) {
-      return renderPrintablePage(page, project, "front");
+      return renderPrintablePage(page, project);
     });
-    if (hasBacks) {
-      pages = pages.concat(layout.pages.map(function (page) {
-        return renderPrintablePage(page, project, "back");
-      }));
-    }
 
     printWindow.document.write([
       "<!doctype html><html><head><title>Monster Mint Print</title><style>",
@@ -1537,10 +1576,10 @@
     printWindow.document.close();
   }
 
-  function renderPrintablePage(page, project, faceName) {
+  function renderPrintablePage(page, project) {
     return [
       '<div class="print-page" style="width:' + page.pageWidthIn + "in;height:" + page.pageHeightIn + 'in;">',
-      renderPageSvg(page, project, faceName, false),
+      renderPageSvg(page, project, false),
       "</div>"
     ].join("");
   }

@@ -24,6 +24,7 @@
     var tokenSlug = token.id.replace(/[^a-z0-9_-]/gi, "");
     var svgAttributes = opts.svgAttributes ? " " + opts.svgAttributes : "";
     var borderMarkup = renderBorder(face, colorSequences, sequenceIndex);
+    var outerSquareFill = opts.outerSquareFill || "#f6efe2";
 
     return [
       '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" data-preview-svg' + svgAttributes + '>',
@@ -31,7 +32,7 @@
       '    <clipPath id="token-clip-' + tokenSlug + '"><circle cx="50" cy="50" r="50"></circle></clipPath>',
       renderTextClipPaths(face.texts, tokenSlug),
       "  </defs>",
-      '  <rect x="0" y="0" width="100" height="100" fill="#f6efe2"></rect>',
+      '  <rect x="0" y="0" width="100" height="100" fill="' + escapeAttr(outerSquareFill) + '"></rect>',
       '  <circle cx="50" cy="50" r="50" fill="' + escapeAttr(background) + '"></circle>',
       token.borderUnderContent ? borderMarkup : "",
       '  <g clip-path="url(#token-clip-' + tokenSlug + ')">',

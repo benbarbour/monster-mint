@@ -184,6 +184,18 @@
   margin-top: 0;
 }
 
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.panel-header h2 {
+  margin: 0;
+}
+
 .placeholder-list {
   margin: 0;
   padding-left: 1.2rem;

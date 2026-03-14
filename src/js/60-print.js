@@ -100,7 +100,8 @@
         items.push({
           tokenId: token.id,
           token: token,
-          sequenceIndex: selection.sequenceStartIndex + copyIndex
+          sequenceIndex: selection.sequenceStartIndex + copyIndex,
+          faceCount: token.back.enabled ? 2 : 1
         });
       }
     });
@@ -114,9 +115,10 @@
 
     items.forEach(function (item) {
       var footprint = item.token.diameterIn + project.settings.bleedIn * 2;
-      var cellSize = footprint + gutterIn;
+      var rowWidth = footprint * item.faceCount + gutterIn * Math.max(0, item.faceCount - 1);
+      var cellSize = footprint;
 
-      if (currentX + cellSize > project.settings.pageMarginIn + availableWidth) {
+      if (currentX + rowWidth > project.settings.pageMarginIn + availableWidth) {
         currentX = project.settings.pageMarginIn;
         currentY += rowHeight + gutterIn;
         rowHeight = 0;
@@ -130,17 +132,12 @@
         rowHeight = 0;
       }
 
-      currentPage.items.push({
-        tokenId: item.tokenId,
-        token: item.token,
-        sequenceIndex: item.sequenceIndex,
-        xIn: currentX + project.settings.bleedIn,
-        yIn: currentY + project.settings.bleedIn,
-        diameterIn: item.token.diameterIn,
-        bleedIn: project.settings.bleedIn
-      });
+      currentPage.items.push(createCellItem(item, "front", currentX, currentY, footprint, project.settings.bleedIn));
+      if (item.faceCount === 2) {
+        currentPage.items.push(createCellItem(item, "back", currentX + footprint + gutterIn, currentY, footprint, project.settings.bleedIn));
+      }
 
-      currentX += cellSize;
+      currentX += rowWidth + gutterIn;
       rowHeight = Math.max(rowHeight, cellSize);
     });
 
@@ -160,6 +157,22 @@
       pageWidthIn: pageWidthIn,
       pageHeightIn: pageHeightIn,
       items: []
+    };
+  }
+
+  function createCellItem(item, faceName, cellXIn, cellYIn, footprintIn, bleedIn) {
+    return {
+      tokenId: item.tokenId,
+      token: item.token,
+      faceName: faceName,
+      sequenceIndex: item.sequenceIndex,
+      cellXIn: cellXIn,
+      cellYIn: cellYIn,
+      cellSizeIn: footprintIn,
+      xIn: cellXIn + bleedIn,
+      yIn: cellYIn + bleedIn,
+      diameterIn: item.token.diameterIn,
+      bleedIn: bleedIn
     };
   }
 
