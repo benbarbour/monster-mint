@@ -9,9 +9,16 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("can create and manipulate a token template", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
   await expect(page.getByRole("heading", { name: "Monster Mint" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Designer" })).toHaveAttribute("aria-selected", "true");
   await page.getByRole("button", { name: "Create Token" }).click();
+
+  const initialScroll = await page.evaluate(() => ({
+    scrollHeight: document.documentElement.scrollHeight,
+    clientHeight: document.documentElement.clientHeight
+  }));
+  expect(initialScroll.scrollHeight).toBeLessThanOrEqual(initialScroll.clientHeight + 1);
 
   await expect(page.getByRole("heading", { name: "Token", exact: true })).toBeVisible();
   await expect(page.locator('select[name="selectedComponentKey"]')).toHaveValue("");
