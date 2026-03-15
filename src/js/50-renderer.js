@@ -109,8 +109,6 @@
       );
       var box = toSvgRect(component, "text");
       var fontSize = fitFontSize(value, component.fontFamily, component.fontWeight, box.width, box.height);
-      var textMetrics = getTextMetrics(value, component.fontFamily, component.fontWeight, fontSize);
-      var textBaselineY = getTextBaselineY(box, textMetrics);
       var borderWidth = component.textBorder ? Number(component.textBorder.width || 0) : 0;
       var borderColor = component.textBorder
         ? Tokens.getColorValue(
@@ -124,7 +122,7 @@
       var isSelected = previewMode && selectedComponentType === "text" && selectedComponentId === component.id;
       return [
         '<g clip-path="url(#text-clip-' + tokenSlug + "-" + component.id + ')" data-component-id="' + component.id + '" data-component-type="text"' + (isSelected ? ' data-drag-mode="move"' : "") + '>',
-        '  <text x="' + (box.x + box.width / 2) + '" y="' + textBaselineY + '" fill="' + escapeAttr(color) + '" stroke="' + (borderWidth > 0 ? escapeAttr(borderColor) : "none") + '" stroke-width="' + borderWidth + '" paint-order="stroke fill" stroke-linejoin="round" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-style="normal" font-size="' + fontSize + '" text-anchor="middle">' + escapeText(value) + "</text>",
+        '  <text x="' + (box.x + box.width / 2) + '" y="' + (box.y + box.height / 2) + '" fill="' + escapeAttr(color) + '" stroke="' + (borderWidth > 0 ? escapeAttr(borderColor) : "none") + '" stroke-width="' + borderWidth + '" paint-order="stroke fill" stroke-linejoin="round" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-style="normal" font-size="' + fontSize + '" text-anchor="middle" dominant-baseline="middle">' + escapeText(value) + "</text>",
         "</g>"
       ].join("");
     }).join("");
@@ -238,10 +236,6 @@
       descent: descent,
       height: ascent + descent
     };
-  }
-
-  function getTextBaselineY(box, metrics) {
-    return box.y + (box.height + metrics.ascent - metrics.descent) / 2;
   }
 
   function toSvgRect(component, type) {
