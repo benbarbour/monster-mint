@@ -25,6 +25,7 @@
     var tokenSlug = token.id.replace(/[^a-z0-9_-]/gi, "");
     var svgAttributes = opts.svgAttributes ? " " + opts.svgAttributes : "";
     var borderMarkup = renderBorder(face, colorSequences, sequenceIndex);
+    var backgroundInsetMarkup = renderBackgroundInset(face, background, tokenBaseFill);
     var outerSquareFill = opts.outerSquareFill || "#f6efe2";
 
     return [
@@ -35,6 +36,7 @@
       "  </defs>",
       '  <rect x="0" y="0" width="100" height="100" fill="' + escapeAttr(outerSquareFill) + '"></rect>',
       '  <circle cx="50" cy="50" r="50" fill="' + escapeAttr(tokenBaseFill) + '"></circle>',
+      backgroundInsetMarkup,
       token.borderUnderContent ? borderMarkup : "",
       '  <g clip-path="url(#token-clip-' + tokenSlug + ')">',
       renderImageComponents(face.images, opts.interactive, selectedComponentType, selectedComponentId),
@@ -81,6 +83,16 @@
     var width = face.border.widthRatio * 100;
     var radius = 50 - width / 2;
     return '<circle cx="50" cy="50" r="' + radius + '" fill="none" stroke="' + escapeAttr(color) + '" stroke-width="' + width + '"></circle>';
+  }
+
+  function renderBackgroundInset(face, background, tokenBaseFill) {
+    if (tokenBaseFill === background || !face.border || face.border.widthRatio <= 0) {
+      return "";
+    }
+
+    var borderWidth = face.border.widthRatio * 100;
+    var radius = Math.max(0, 50 - borderWidth);
+    return '<circle cx="50" cy="50" r="' + radius + '" fill="' + escapeAttr(background) + '"></circle>';
   }
 
   function renderTextComponents(components, textSequences, colorSequences, sequenceIndex, tokenSlug, previewMode, selectedComponentType, selectedComponentId) {
