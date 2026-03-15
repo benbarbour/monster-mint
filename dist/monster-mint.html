@@ -1796,8 +1796,6 @@ button {
 })(typeof globalThis !== "undefined" ? globalThis : window, function (Tokens, Sequences) {
   var fitCanvas = typeof document !== "undefined" ? document.createElement("canvas") : null;
   var fitContext = fitCanvas ? fitCanvas.getContext("2d") : null;
-  var measureSvg = null;
-  var measureText = null;
 
   function renderTokenSvg(token, project, options) {
     var opts = options || {};
@@ -1903,7 +1901,7 @@ button {
       );
       var box = toSvgRect(component, "text");
       var fontSize = fitFontSize(value, component.fontFamily, component.fontWeight, box.width, box.height);
-      var textBounds = measureTextBounds(value, component.fontFamily, component.fontWeight, fontSize);
+      var textBounds = getTextMetrics(value, component.fontFamily, component.fontWeight, fontSize);
       var baselineY = box.y + box.height / 2 - (textBounds.y + textBounds.height / 2);
       var borderWidth = component.textBorder ? Number(component.textBorder.width || 0) : 0;
       var borderColor = component.textBorder
@@ -2014,19 +2012,11 @@ button {
   }
 
   function getTextMetrics(text, fontFamily, fontWeight, fontSize) {
-    var bounds = measureTextBounds(text, fontFamily, fontWeight, fontSize);
-    if (bounds) {
-      return {
-        width: bounds.width,
-        ascent: Math.max(0, -bounds.y),
-        descent: Math.max(0, bounds.y + bounds.height),
-        height: bounds.height
-      };
-    }
-
     if (!fitContext || !text || !fontSize) {
       return {
         width: 0,
+        x: 0,
+        y: -fontSize * 0.68,
         ascent: fontSize * 0.68,
         descent: fontSize * 0.22,
         height: fontSize * 0.9
@@ -2034,54 +2024,77 @@ button {
     }
 
     fitContext.font = fontWeight + " " + fontSize + "px " + fontFamily;
+    fitContext.textAlign = "center";
+    fitContext.textBaseline = "alphabetic";
     var metrics = fitContext.measureText(text);
-    var ascent = metrics.actualBoundingBoxAscent || fontSize * 0.68;
-    var descent = metrics.actualBoundingBoxDescent || fontSize * 0.22;
+    var approxWidth = Math.max(1, Math.ceil((metrics.width || fontSize) + fontSize * 2));
+    var ascent = Math.max(1, Math.ceil(metrics.actualBoundingBoxAscent || fontSize * 0.68));
+    var descent = Math.max(1, Math.ceil(metrics.actualBoundingBoxDescent || fontSize * 0.22));
+    var approxHeight = Math.max(1, ascent + descent + Math.ceil(fontSize * 2));
+    var baselineX = Math.ceil(approxWidth / 2);
+    var baselineY = Math.ceil(fontSize + ascent);
+
+    fitCanvas.width = approxWidth;
+    fitCanvas.height = approxHeight;
+    fitContext.clearRect(0, 0, approxWidth, approxHeight);
+    fitContext.font = fontWeight + " " + fontSize + "px " + fontFamily;
+    fitContext.textAlign = "center";
+    fitContext.textBaseline = "alphabetic";
+    fitContext.fillStyle = "#000000";
+    fitContext.fillText(text, baselineX, baselineY);
+
+    var imageData = fitContext.getImageData(0, 0, approxWidth, approxHeight);
+    var bounds = getAlphaBounds(imageData.data, approxWidth, approxHeight);
+    if (!bounds) {
+      return {
+        width: metrics.width || 0,
+        x: 0,
+        y: -ascent,
+        ascent: ascent,
+        descent: descent,
+        height: ascent + descent
+      };
+    }
+
     return {
-      width: metrics.width || 0,
-      ascent: ascent,
-      descent: descent,
-      height: ascent + descent
+      width: bounds.width,
+      x: bounds.x - baselineX,
+      y: bounds.y - baselineY,
+      ascent: Math.max(0, baselineY - bounds.y),
+      descent: Math.max(0, bounds.y + bounds.height - baselineY),
+      height: bounds.height
     };
   }
 
-  function measureTextBounds(text, fontFamily, fontWeight, fontSize) {
-    ensureMeasureTextNode();
-    if (!measureText || !text || !fontSize) {
+  function getAlphaBounds(data, width, height) {
+    var minX = width;
+    var minY = height;
+    var maxX = -1;
+    var maxY = -1;
+    var index = 3;
+
+    for (var y = 0; y < height; y += 1) {
+      for (var x = 0; x < width; x += 1) {
+        if (data[index] > 0) {
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        }
+        index += 4;
+      }
+    }
+
+    if (maxX < minX || maxY < minY) {
       return null;
     }
 
-    measureText.setAttribute("font-family", fontFamily);
-    measureText.setAttribute("font-weight", fontWeight);
-    measureText.setAttribute("font-size", fontSize);
-    measureText.textContent = text;
-    return measureText.getBBox();
-  }
-
-  function ensureMeasureTextNode() {
-    if (measureText || typeof document === "undefined" || !document.body) {
-      return;
-    }
-
-    measureSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    measureSvg.setAttribute("aria-hidden", "true");
-    measureSvg.setAttribute("width", "0");
-    measureSvg.setAttribute("height", "0");
-    measureSvg.style.position = "absolute";
-    measureSvg.style.left = "-9999px";
-    measureSvg.style.top = "-9999px";
-    measureSvg.style.visibility = "hidden";
-    measureSvg.style.pointerEvents = "none";
-    measureSvg.style.overflow = "visible";
-
-    measureText = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    measureText.setAttribute("x", "0");
-    measureText.setAttribute("y", "0");
-    measureText.setAttribute("font-style", "normal");
-    measureText.setAttribute("text-anchor", "middle");
-
-    measureSvg.appendChild(measureText);
-    document.body.appendChild(measureSvg);
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX + 1,
+      height: maxY - minY + 1
+    };
   }
 
   function toSvgRect(component, type) {
