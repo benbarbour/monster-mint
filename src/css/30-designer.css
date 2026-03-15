@@ -45,7 +45,7 @@
 .designer-drawer {
   align-self: start;
   top: 0;
-  max-height: calc(100vh - 14rem);
+  max-height: var(--designer-drawer-max-height, calc(100vh - 14rem));
 }
 
 .designer-drawer .drawer-body {

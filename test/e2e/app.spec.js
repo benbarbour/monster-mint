@@ -36,6 +36,15 @@ test("can create and manipulate a token template", async ({ page }) => {
     clientHeight: document.documentElement.clientHeight
   }));
   expect(selectedScroll.scrollHeight).toBeLessThanOrEqual(selectedScroll.clientHeight + 1);
+  const designerHeights = await page.evaluate(() => {
+    const main = document.querySelector(".designer-main");
+    const drawer = document.querySelector(".designer-drawer");
+    return {
+      mainHeight: main ? Math.round(main.getBoundingClientRect().height) : 0,
+      drawerHeight: drawer ? Math.round(drawer.getBoundingClientRect().height) : 0
+    };
+  });
+  expect(designerHeights.drawerHeight).toBeLessThanOrEqual(designerHeights.mainHeight + 1);
 
   const xInput = page.locator('form[data-form="text-component-settings"] input[name="x"]');
   const yInput = page.locator('form[data-form="text-component-settings"] input[name="y"]');

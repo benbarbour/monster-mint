@@ -31,6 +31,8 @@
   var designerWheelPersistTimer = null;
   var pendingPrintFieldFocus = null;
   var printSelectionSyncTimer = null;
+  var designerLayoutObserver = null;
+  var designerResizeQueued = false;
 
   function escapeHtml(value) {
     return String(value)
@@ -72,8 +74,41 @@
     ].join("");
 
     attachEvents(appElement, store);
+    syncDesignerDrawerHeight(appElement);
     restoreFocusState(appElement, focusState);
     restorePendingPrintFieldFocus(appElement);
+  }
+
+  function syncDesignerDrawerHeight(appElement) {
+    if (designerLayoutObserver) {
+      designerLayoutObserver.disconnect();
+      designerLayoutObserver = null;
+    }
+
+    var designerShell = appElement.querySelector(".designer-shell");
+    var designerMain = appElement.querySelector(".designer-main");
+    var designerDrawer = appElement.querySelector(".designer-drawer");
+    if (!designerShell || !designerMain || !designerDrawer) {
+      return;
+    }
+
+    var applyHeight = function () {
+      designerResizeQueued = false;
+      designerDrawer.style.maxHeight = Math.max(0, Math.round(designerMain.getBoundingClientRect().height)) + "px";
+    };
+
+    applyHeight();
+
+    if (typeof runtimeGlobal.ResizeObserver === "function") {
+      designerLayoutObserver = new runtimeGlobal.ResizeObserver(function () {
+        if (designerResizeQueued) {
+          return;
+        }
+        designerResizeQueued = true;
+        runtimeGlobal.requestAnimationFrame(applyHeight);
+      });
+      designerLayoutObserver.observe(designerMain);
+    }
   }
 
   function renderPanel(tabId, activeTab, content) {
@@ -1970,6 +2005,7 @@
       render(appElement, store);
     });
     bindGlobalPointerHandlers();
+    bindGlobalResizeHandlers(appElement);
     render(appElement, store);
   }
 
@@ -1980,6 +2016,23 @@
     bindGlobalPointerHandlers.didBind = true;
     runtimeGlobal.addEventListener("mousemove", handleGlobalPointerMove);
     runtimeGlobal.addEventListener("mouseup", handleGlobalPointerUp);
+  }
+
+  function bindGlobalResizeHandlers(appElement) {
+    if (bindGlobalResizeHandlers.didBind) {
+      return;
+    }
+    bindGlobalResizeHandlers.didBind = true;
+    runtimeGlobal.addEventListener("resize", function () {
+      if (designerResizeQueued) {
+        return;
+      }
+      designerResizeQueued = true;
+      runtimeGlobal.requestAnimationFrame(function () {
+        designerResizeQueued = false;
+        syncDesignerDrawerHeight(appElement);
+      });
+    });
   }
 
   if (typeof document !== "undefined") {
