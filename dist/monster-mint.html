@@ -535,6 +535,8 @@ button {
 
 .designer-drawer {
   align-self: start;
+  top: 0;
+  max-height: calc(100vh - 14rem);
 }
 
 .designer-drawer .drawer-body {
@@ -552,7 +554,7 @@ button {
 
 .preview-stage {
   position: relative;
-  width: min(100%, 640px, calc(100vh - 28rem));
+  width: min(100%, 640px, calc(100vh - 29.5rem));
   aspect-ratio: 1;
   margin: 0 auto;
   padding: 0.85rem;
@@ -617,12 +619,13 @@ button {
 
   .designer-drawer {
     position: static;
+    max-height: none;
   }
 }
 
 @media (max-height: 860px) {
   .preview-stage {
-    width: min(100%, 560px, calc(100vh - 26rem));
+    width: min(100%, 560px, calc(100vh - 27.5rem));
   }
 }
 

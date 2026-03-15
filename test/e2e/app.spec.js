@@ -31,6 +31,11 @@ test("can create and manipulate a token template", async ({ page }) => {
   await expect(page.locator('form[data-form="text-component-settings"] select[name="contentMode"]')).toHaveValue("custom");
   await expect(page.locator('form[data-form="text-component-settings"] input[name="customText"]')).toBeVisible();
   await expect(page.locator('form[data-form="text-component-settings"] input[name="sequenceStart"]')).toBeHidden();
+  const selectedScroll = await page.evaluate(() => ({
+    scrollHeight: document.documentElement.scrollHeight,
+    clientHeight: document.documentElement.clientHeight
+  }));
+  expect(selectedScroll.scrollHeight).toBeLessThanOrEqual(selectedScroll.clientHeight + 1);
 
   const xInput = page.locator('form[data-form="text-component-settings"] input[name="x"]');
   const yInput = page.locator('form[data-form="text-component-settings"] input[name="y"]');
