@@ -109,7 +109,8 @@
       );
       var box = toSvgRect(component, "text");
       var fontSize = fitFontSize(value, component.fontFamily, component.fontWeight, box.width, box.height);
-      var textDy = getTextVerticalOffsetEm(value, component.fontFamily, component.fontWeight, fontSize);
+      var textMetrics = getTextMetrics(value, component.fontFamily, component.fontWeight, fontSize);
+      var textBaselineY = getTextBaselineY(box, textMetrics);
       var borderWidth = component.textBorder ? Number(component.textBorder.width || 0) : 0;
       var borderColor = component.textBorder
         ? Tokens.getColorValue(
@@ -123,7 +124,7 @@
       var isSelected = previewMode && selectedComponentType === "text" && selectedComponentId === component.id;
       return [
         '<g clip-path="url(#text-clip-' + tokenSlug + "-" + component.id + ')" data-component-id="' + component.id + '" data-component-type="text"' + (isSelected ? ' data-drag-mode="move"' : "") + '>',
-        '  <text x="' + (box.x + box.width / 2) + '" y="' + (box.y + box.height / 2) + '" dy="' + textDy + 'em" fill="' + escapeAttr(color) + '" stroke="' + (borderWidth > 0 ? escapeAttr(borderColor) : "none") + '" stroke-width="' + borderWidth + '" paint-order="stroke fill" stroke-linejoin="round" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-style="normal" font-size="' + fontSize + '" text-anchor="middle">' + escapeText(value) + "</text>",
+        '  <text x="' + (box.x + box.width / 2) + '" y="' + textBaselineY + '" fill="' + escapeAttr(color) + '" stroke="' + (borderWidth > 0 ? escapeAttr(borderColor) : "none") + '" stroke-width="' + borderWidth + '" paint-order="stroke fill" stroke-linejoin="round" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-style="normal" font-size="' + fontSize + '" text-anchor="middle">' + escapeText(value) + "</text>",
         "</g>"
       ].join("");
     }).join("");
@@ -202,10 +203,9 @@
 
     while (max - min > 0.2) {
       var mid = (min + max) / 2;
-      fitContext.font = fontWeight + " " + mid + "px " + fontFamily;
-      var metrics = fitContext.measureText(text);
-      var width = metrics.width;
-      var height = (metrics.actualBoundingBoxAscent || mid * 0.7) + (metrics.actualBoundingBoxDescent || mid * 0.3);
+      var measured = getTextMetrics(text, fontFamily, fontWeight, mid);
+      var width = measured.width;
+      var height = measured.height;
 
       if (width <= boxWidth * 0.94 && height <= boxHeight * 0.9) {
         best = mid;
@@ -218,18 +218,30 @@
     return Math.max(3, Number(best.toFixed(2)));
   }
 
-  function getTextVerticalOffsetEm(text, fontFamily, fontWeight, fontSize) {
+  function getTextMetrics(text, fontFamily, fontWeight, fontSize) {
     if (!fitContext || !text || !fontSize) {
-      return "0.30";
+      return {
+        width: 0,
+        ascent: fontSize * 0.68,
+        descent: fontSize * 0.22,
+        height: fontSize * 0.9
+      };
     }
 
     fitContext.font = fontWeight + " " + fontSize + "px " + fontFamily;
     var metrics = fitContext.measureText(text);
-    var ascent = metrics.actualBoundingBoxAscent || fontSize * 0.7;
-    var descent = metrics.actualBoundingBoxDescent || fontSize * 0.3;
-    var offsetEm = (ascent - descent) / (2 * fontSize);
-    var clamped = Math.min(0.34, Math.max(0.18, offsetEm));
-    return clamped.toFixed(2);
+    var ascent = metrics.actualBoundingBoxAscent || fontSize * 0.68;
+    var descent = metrics.actualBoundingBoxDescent || fontSize * 0.22;
+    return {
+      width: metrics.width || 0,
+      ascent: ascent,
+      descent: descent,
+      height: ascent + descent
+    };
+  }
+
+  function getTextBaselineY(box, metrics) {
+    return box.y + (box.height + metrics.ascent - metrics.descent) / 2;
   }
 
   function toSvgRect(component, type) {
