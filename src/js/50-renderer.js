@@ -193,35 +193,32 @@
   }
 
   function fitFontSize(text, fontFamily, fontWeight, boxWidth, boxHeight) {
-    if (!fitContext || !text) {
+    if (!text) {
       return Math.max(3, boxHeight * 0.65);
     }
 
-    var min = 1;
-    var max = Math.max(3, boxHeight * 2);
-    var best = min;
-    fitContext.textAlign = "center";
-    fitContext.textBaseline = "middle";
-
-    while (max - min > 0.05) {
-      var mid = (min + max) / 2;
-      var measured = getTextMetrics(text, fontFamily, fontWeight, mid);
-      var width = measured.width;
-      var height = measured.height;
-
-      if (width <= boxWidth && height <= boxHeight) {
-        best = mid;
-        min = mid;
-      } else {
-        max = mid;
+    var probeSize = 100;
+    var probeMetrics = getTextMetrics(text, fontFamily, fontWeight, probeSize);
+    if (probeMetrics.width > 0 && probeMetrics.height > 0) {
+      var fitted = probeSize * Math.min(boxWidth / probeMetrics.width, boxHeight / probeMetrics.height);
+      var refinedMetrics = getTextMetrics(text, fontFamily, fontWeight, fitted);
+      if (refinedMetrics.width > 0 && refinedMetrics.height > 0) {
+        fitted = fitted * Math.min(boxWidth / refinedMetrics.width, boxHeight / refinedMetrics.height);
       }
+
+      return Math.max(3, Number((fitted * 0.999).toFixed(2)));
     }
 
-    var bestMetrics = getTextMetrics(text, fontFamily, fontWeight, best);
-    var widthScale = bestMetrics.width > 0 ? boxWidth / bestMetrics.width : 1;
-    var heightScale = bestMetrics.height > 0 ? boxHeight / bestMetrics.height : 1;
-    var fitted = best * Math.min(widthScale, heightScale) * 0.999;
-    return Math.max(3, Number(fitted.toFixed(2)));
+    if (!fitContext) {
+      return Math.max(3, boxHeight * 0.65);
+    }
+
+    fitContext.textAlign = "center";
+    fitContext.textBaseline = "middle";
+    fitContext.font = fontWeight + " " + boxHeight + "px " + fontFamily;
+    var fallbackMetrics = fitContext.measureText(text);
+    var fallbackWidth = fallbackMetrics.width || boxHeight;
+    return Math.max(3, Number((boxHeight * Math.min(1, boxWidth / fallbackWidth) * 0.999).toFixed(2)));
   }
 
   function getTextMetrics(text, fontFamily, fontWeight, fontSize) {
