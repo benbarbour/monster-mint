@@ -19,6 +19,7 @@
       colorSequences,
       sequenceIndex
     );
+    var tokenBaseFill = opts.tokenBaseFill || background;
     var selectedComponentType = opts.selectedComponentType;
     var selectedComponentId = opts.selectedComponentId;
     var tokenSlug = token.id.replace(/[^a-z0-9_-]/gi, "");
@@ -33,7 +34,7 @@
       renderTextClipPaths(face.texts, tokenSlug),
       "  </defs>",
       '  <rect x="0" y="0" width="100" height="100" fill="' + escapeAttr(outerSquareFill) + '"></rect>',
-      '  <circle cx="50" cy="50" r="50" fill="' + escapeAttr(background) + '"></circle>',
+      '  <circle cx="50" cy="50" r="50" fill="' + escapeAttr(tokenBaseFill) + '"></circle>',
       token.borderUnderContent ? borderMarkup : "",
       '  <g clip-path="url(#token-clip-' + tokenSlug + ')">',
       renderImageComponents(face.images, opts.interactive, selectedComponentType, selectedComponentId),

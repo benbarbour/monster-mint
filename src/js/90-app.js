@@ -1808,11 +1808,13 @@
     var x = item.xIn * 100;
     var y = item.yIn * 100;
     var size = item.diameterIn * 100;
+    var cellFill = getPageCellFill(item.token[item.faceName], project.sequences.color, item.sequenceIndex);
     return Renderer.renderTokenSvg(item.token, project, {
         face: item.faceName,
         sequenceIndex: item.sequenceIndex,
         interactive: false,
-        outerSquareFill: getPageCellFill(item.token[item.faceName], project.sequences.color, item.sequenceIndex),
+        outerSquareFill: cellFill,
+        tokenBaseFill: cellFill,
         svgAttributes: 'x="' + x + '" y="' + y + '" width="' + size + '" height="' + size + '"'
       });
   }
