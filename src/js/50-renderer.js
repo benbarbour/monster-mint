@@ -203,13 +203,13 @@
     fitContext.textAlign = "center";
     fitContext.textBaseline = "middle";
 
-    while (max - min > 0.2) {
+    while (max - min > 0.05) {
       var mid = (min + max) / 2;
       var measured = getTextMetrics(text, fontFamily, fontWeight, mid);
       var width = measured.width;
       var height = measured.height;
 
-      if (width <= boxWidth * 0.985 && height <= boxHeight * 0.985) {
+      if (width <= boxWidth && height <= boxHeight) {
         best = mid;
         min = mid;
       } else {
@@ -217,7 +217,11 @@
       }
     }
 
-    return Math.max(3, Number(best.toFixed(2)));
+    var bestMetrics = getTextMetrics(text, fontFamily, fontWeight, best);
+    var widthScale = bestMetrics.width > 0 ? boxWidth / bestMetrics.width : 1;
+    var heightScale = bestMetrics.height > 0 ? boxHeight / bestMetrics.height : 1;
+    var fitted = best * Math.min(widthScale, heightScale) * 0.999;
+    return Math.max(3, Number(fitted.toFixed(2)));
   }
 
   function getTextMetrics(text, fontFamily, fontWeight, fontSize) {
