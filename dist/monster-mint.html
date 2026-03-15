@@ -1796,6 +1796,8 @@ button {
 })(typeof globalThis !== "undefined" ? globalThis : window, function (Tokens, Sequences) {
   var fitCanvas = typeof document !== "undefined" ? document.createElement("canvas") : null;
   var fitContext = fitCanvas ? fitCanvas.getContext("2d") : null;
+  var measureSvg = null;
+  var measureText = null;
 
   function renderTokenSvg(token, project, options) {
     var opts = options || {};
@@ -1901,6 +1903,8 @@ button {
       );
       var box = toSvgRect(component, "text");
       var fontSize = fitFontSize(value, component.fontFamily, component.fontWeight, box.width, box.height);
+      var textBounds = measureTextBounds(value, component.fontFamily, component.fontWeight, fontSize);
+      var baselineY = box.y + box.height / 2 - (textBounds.y + textBounds.height / 2);
       var borderWidth = component.textBorder ? Number(component.textBorder.width || 0) : 0;
       var borderColor = component.textBorder
         ? Tokens.getColorValue(
@@ -1914,7 +1918,7 @@ button {
       var isSelected = previewMode && selectedComponentType === "text" && selectedComponentId === component.id;
       return [
         '<g clip-path="url(#text-clip-' + tokenSlug + "-" + component.id + ')" data-component-id="' + component.id + '" data-component-type="text"' + (isSelected ? ' data-drag-mode="move"' : "") + '>',
-        '  <text x="' + (box.x + box.width / 2) + '" y="' + (box.y + box.height / 2) + '" fill="' + escapeAttr(color) + '" stroke="' + (borderWidth > 0 ? escapeAttr(borderColor) : "none") + '" stroke-width="' + borderWidth + '" paint-order="stroke fill" stroke-linejoin="round" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-style="normal" font-size="' + fontSize + '" text-anchor="middle" dominant-baseline="middle">' + escapeText(value) + "</text>",
+        '  <text x="' + (box.x + box.width / 2) + '" y="' + baselineY + '" fill="' + escapeAttr(color) + '" stroke="' + (borderWidth > 0 ? escapeAttr(borderColor) : "none") + '" stroke-width="' + borderWidth + '" paint-order="stroke fill" stroke-linejoin="round" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-style="normal" font-size="' + fontSize + '" text-anchor="middle">' + escapeText(value) + "</text>",
         "</g>"
       ].join("");
     }).join("");
@@ -1997,7 +2001,7 @@ button {
       var width = measured.width;
       var height = measured.height;
 
-      if (width <= boxWidth * 0.94 && height <= boxHeight * 0.9) {
+      if (width <= boxWidth * 0.985 && height <= boxHeight * 0.985) {
         best = mid;
         min = mid;
       } else {
@@ -2009,6 +2013,16 @@ button {
   }
 
   function getTextMetrics(text, fontFamily, fontWeight, fontSize) {
+    var bounds = measureTextBounds(text, fontFamily, fontWeight, fontSize);
+    if (bounds) {
+      return {
+        width: bounds.width,
+        ascent: Math.max(0, -bounds.y),
+        descent: Math.max(0, bounds.y + bounds.height),
+        height: bounds.height
+      };
+    }
+
     if (!fitContext || !text || !fontSize) {
       return {
         width: 0,
@@ -2028,6 +2042,45 @@ button {
       descent: descent,
       height: ascent + descent
     };
+  }
+
+  function measureTextBounds(text, fontFamily, fontWeight, fontSize) {
+    ensureMeasureTextNode();
+    if (!measureText || !text || !fontSize) {
+      return null;
+    }
+
+    measureText.setAttribute("font-family", fontFamily);
+    measureText.setAttribute("font-weight", fontWeight);
+    measureText.setAttribute("font-size", fontSize);
+    measureText.textContent = text;
+    return measureText.getBBox();
+  }
+
+  function ensureMeasureTextNode() {
+    if (measureText || typeof document === "undefined" || !document.body) {
+      return;
+    }
+
+    measureSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    measureSvg.setAttribute("aria-hidden", "true");
+    measureSvg.setAttribute("width", "0");
+    measureSvg.setAttribute("height", "0");
+    measureSvg.style.position = "absolute";
+    measureSvg.style.left = "-9999px";
+    measureSvg.style.top = "-9999px";
+    measureSvg.style.visibility = "hidden";
+    measureSvg.style.pointerEvents = "none";
+    measureSvg.style.overflow = "visible";
+
+    measureText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    measureText.setAttribute("x", "0");
+    measureText.setAttribute("y", "0");
+    measureText.setAttribute("font-style", "normal");
+    measureText.setAttribute("text-anchor", "middle");
+
+    measureSvg.appendChild(measureText);
+    document.body.appendChild(measureSvg);
   }
 
   function toSvgRect(component, type) {
