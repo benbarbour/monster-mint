@@ -159,6 +159,8 @@
     var face = token[selection.faceName];
     var selectedComponent = getSelectedComponent(face, selection.selectedComponentType, selection.selectedComponentId);
     var componentItems = getComponentItems(face, selection.faceName);
+    var copyFaceTarget = selection.faceName === "front" ? "back" : "front";
+    var copyFaceTitle = selection.faceName === "front" ? "Copy Front to Back" : "Copy Back to Front";
     return [
       '<div class="designer-shell">',
       '  <section class="designer-main">',
@@ -175,6 +177,7 @@
       '            <button type="button" class="' + (selection.faceName === "front" ? "is-active" : "") + '" data-face="front">Front</button>',
       '            <button type="button" class="' + (selection.faceName === "back" ? "is-active" : "") + '" data-face="back">Back</button>',
       "          </div>",
+      '          <button class="button" type="button" data-action="copy-face" data-source-face="' + selection.faceName + '" data-target-face="' + copyFaceTarget + '" aria-label="' + copyFaceTitle + '" title="' + copyFaceTitle + '">Copy</button>',
       "        </div>",
       '        <div class="designer-toolbar-row component-row">',
       '          <label class="field toolbar-field">Component<select name="selectedComponentKey">' + renderComponentOptions(componentItems, selection.selectedComponentType, selection.selectedComponentId) + '</select></label>',
@@ -787,6 +790,22 @@
           ui.selectedFace = faceName;
           ui.selectedComponentType = null;
           ui.selectedComponentId = null;
+        });
+      });
+    });
+
+    appElement.querySelectorAll("[data-action='copy-face']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var selection = getDesignerSelection(store.getState());
+        if (!selection.token) {
+          return;
+        }
+
+        var sourceFaceName = button.getAttribute("data-source-face") || selection.faceName;
+        var targetFaceName = button.getAttribute("data-target-face") || (sourceFaceName === "front" ? "back" : "front");
+        store.updateProject(function (project) {
+          var token = findToken(project, selection.token.id);
+          Tokens.copyFaceContent(token, sourceFaceName, targetFaceName);
         });
       });
     });

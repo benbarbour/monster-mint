@@ -396,9 +396,33 @@
     return nextFace;
   }
 
+  function copyFaceContent(token, sourceFaceName, targetFaceName) {
+    if (!token || !token[sourceFaceName] || !token[targetFaceName] || sourceFaceName === targetFaceName) {
+      return token;
+    }
+
+    if (targetFaceName === "back") {
+      token.back = cloneBackFace({
+        enabled: true,
+        backgroundColorMode: token[sourceFaceName].backgroundColorMode,
+        backgroundColor: token[sourceFaceName].backgroundColor,
+        backgroundColorSequenceRef: token[sourceFaceName].backgroundColorSequenceRef,
+        images: token[sourceFaceName].images,
+        texts: token[sourceFaceName].texts,
+        border: token[sourceFaceName].border
+      });
+      token.back.enabled = true;
+      return token;
+    }
+
+    token.front = cloneFace(token[sourceFaceName]);
+    return token;
+  }
+
   return {
     createTokenTemplate: createTokenTemplate,
     cloneTokenTemplate: cloneTokenTemplate,
+    copyFaceContent: copyFaceContent,
     createTextComponent: createTextComponent,
     createImageComponent: createImageComponent,
     normalizeToken: normalizeToken,

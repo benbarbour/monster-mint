@@ -86,6 +86,7 @@ test("token settings own appearance controls and color sequences show in preview
   const componentOptions = await page.locator('select[name="selectedComponentKey"] option').allTextContents();
   expect(componentOptions).not.toContain("Background");
   expect(componentOptions).not.toContain("Border");
+  await expect(page.getByRole("button", { name: "Copy Front to Back" })).toBeVisible();
 
   await expect(page.locator('form[data-form="token-settings"] input[name="borderWidthRatio"]')).toHaveAttribute("max", "0.25");
   const tokenBorderPicker = page.locator('.color-picker-field').filter({ hasText: "Token border" });
@@ -94,7 +95,7 @@ test("token settings own appearance controls and color sequences show in preview
 
   await expect(page.locator('[data-preview-stage] svg circle[stroke="#ff0000"]')).toHaveCount(1);
 
-  await page.getByRole("button", { name: "Back" }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.locator('form[data-form="token-settings"]')).toBeVisible();
 
   await page.getByRole("button", { name: "Add Image" }).click();
@@ -118,6 +119,12 @@ test("token settings own appearance controls and color sequences show in preview
   await expect(page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]')).toHaveValue("45");
   await expect(page.locator('form[data-form="image-component-settings"] input[name="mirrorX"]')).toBeChecked();
   await expect(page.locator('[data-preview-stage] svg g[data-component-type="image"][transform*="rotate(45"]')).toHaveCount(1);
+  await page.getByRole("button", { name: "Copy Back to Front" }).click();
+  await page.getByRole("button", { name: "Front", exact: true }).click();
+  const copiedFrontOptions = await page.locator('select[name="selectedComponentKey"] option').allTextContents();
+  expect(copiedFrontOptions).toContain("token.svg");
+  await page.locator('select[name="selectedComponentKey"]').selectOption({ label: "token.svg" });
+  await expect(page.locator('form[data-form="image-component-settings"] input[name="scale"]')).toBeVisible();
 
   const scaleBeforeWheel = await page.locator('form[data-form="image-component-settings"] input[name="scale"]').inputValue();
   const previewStage = page.locator('[data-preview-stage]');
