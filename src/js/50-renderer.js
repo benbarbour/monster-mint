@@ -109,7 +109,6 @@
       );
       var box = toSvgRect(component, "text");
       var fontSize = fitFontSize(value, component.fontFamily, component.fontWeight, box.width, box.height);
-      var baselineY = getTextBaselineY(value, component.fontFamily, component.fontWeight, fontSize, box.y + box.height / 2);
       var borderWidth = component.textBorder ? Number(component.textBorder.width || 0) : 0;
       var borderColor = component.textBorder
         ? Tokens.getColorValue(
@@ -123,7 +122,7 @@
       var isSelected = previewMode && selectedComponentType === "text" && selectedComponentId === component.id;
       return [
         '<g clip-path="url(#text-clip-' + tokenSlug + "-" + component.id + ')" data-component-id="' + component.id + '" data-component-type="text"' + (isSelected ? ' data-drag-mode="move"' : "") + '>',
-        '  <text x="' + (box.x + box.width / 2) + '" y="' + baselineY + '" fill="' + escapeAttr(color) + '" stroke="' + (borderWidth > 0 ? escapeAttr(borderColor) : "none") + '" stroke-width="' + borderWidth + '" paint-order="stroke fill" stroke-linejoin="round" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-style="normal" font-size="' + fontSize + '" text-anchor="middle">' + escapeText(value) + "</text>",
+        '  <text x="' + (box.x + box.width / 2) + '" y="' + (box.y + box.height / 2) + '" dy="0.35em" fill="' + escapeAttr(color) + '" stroke="' + (borderWidth > 0 ? escapeAttr(borderColor) : "none") + '" stroke-width="' + borderWidth + '" paint-order="stroke fill" stroke-linejoin="round" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-style="normal" font-size="' + fontSize + '" text-anchor="middle">' + escapeText(value) + "</text>",
         "</g>"
       ].join("");
     }).join("");
@@ -216,18 +215,6 @@
     }
 
     return Math.max(3, Number(best.toFixed(2)));
-  }
-
-  function getTextBaselineY(text, fontFamily, fontWeight, fontSize, centerY) {
-    if (!fitContext || !text) {
-      return centerY + fontSize * 0.35;
-    }
-
-    fitContext.font = fontWeight + " " + fontSize + "px " + fontFamily;
-    var metrics = fitContext.measureText(text);
-    var ascent = metrics.actualBoundingBoxAscent || fontSize * 0.7;
-    var descent = metrics.actualBoundingBoxDescent || fontSize * 0.3;
-    return Number((centerY + (ascent - descent) / 2).toFixed(2));
   }
 
   function toSvgRect(component, type) {
