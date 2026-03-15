@@ -31,6 +31,13 @@ test("can create and manipulate a token template", async ({ page }) => {
   await expect(page.locator('form[data-form="text-component-settings"] select[name="contentMode"]')).toHaveValue("custom");
   await expect(page.locator('form[data-form="text-component-settings"] input[name="customText"]')).toBeVisible();
   await expect(page.locator('form[data-form="text-component-settings"] input[name="sequenceStart"]')).toBeHidden();
+  const textNode = page.locator('[data-preview-stage] svg text').first();
+  const initialFontSize = Number(await textNode.getAttribute("font-size"));
+  await page.locator('form[data-form="text-component-settings"] input[name="textBorderWidth"]').fill("6");
+  await page.locator('form[data-form="text-component-settings"] input[name="textBorderWidth"]').blur();
+  await expect(textNode).toHaveAttribute("stroke-width", "6");
+  const strokedFontSize = Number(await textNode.getAttribute("font-size"));
+  expect(strokedFontSize).toBeLessThan(initialFontSize);
   const selectedScroll = await page.evaluate(() => ({
     scrollHeight: document.documentElement.scrollHeight,
     clientHeight: document.documentElement.clientHeight

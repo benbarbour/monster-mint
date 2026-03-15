@@ -108,10 +108,10 @@
         sequenceIndex
       );
       var box = toSvgRect(component, "text");
-      var fontSize = fitFontSize(value, component.fontFamily, component.fontWeight, box.width, box.height);
-      var textBounds = getTextMetrics(value, component.fontFamily, component.fontWeight, fontSize);
-      var baselineY = box.y + box.height / 2 - (textBounds.y + textBounds.height / 2);
       var borderWidth = component.textBorder ? Number(component.textBorder.width || 0) : 0;
+      var fontSize = fitFontSize(value, component.fontFamily, component.fontWeight, box.width, box.height, borderWidth);
+      var textBounds = getTextMetrics(value, component.fontFamily, component.fontWeight, fontSize, borderWidth);
+      var baselineY = box.y + box.height / 2 - (textBounds.y + textBounds.height / 2);
       var borderColor = component.textBorder
         ? Tokens.getColorValue(
           component.textBorder.colorMode,
@@ -190,18 +190,21 @@
     ].join("");
   }
 
-  function fitFontSize(text, fontFamily, fontWeight, boxWidth, boxHeight) {
+  function fitFontSize(text, fontFamily, fontWeight, boxWidth, boxHeight, strokeWidth) {
     if (!text) {
       return Math.max(3, boxHeight * 0.65);
     }
 
+    var padding = Math.max(0, Number(strokeWidth || 0));
+    var availableWidth = Math.max(1, boxWidth - padding);
+    var availableHeight = Math.max(1, boxHeight - padding);
     var probeSize = 100;
-    var probeMetrics = getTextMetrics(text, fontFamily, fontWeight, probeSize);
+    var probeMetrics = getTextMetrics(text, fontFamily, fontWeight, probeSize, padding);
     if (probeMetrics.width > 0 && probeMetrics.height > 0) {
-      var fitted = probeSize * Math.min(boxWidth / probeMetrics.width, boxHeight / probeMetrics.height);
-      var refinedMetrics = getTextMetrics(text, fontFamily, fontWeight, fitted);
+      var fitted = probeSize * Math.min(availableWidth / probeMetrics.width, availableHeight / probeMetrics.height);
+      var refinedMetrics = getTextMetrics(text, fontFamily, fontWeight, fitted, padding);
       if (refinedMetrics.width > 0 && refinedMetrics.height > 0) {
-        fitted = fitted * Math.min(boxWidth / refinedMetrics.width, boxHeight / refinedMetrics.height);
+        fitted = fitted * Math.min(availableWidth / refinedMetrics.width, availableHeight / refinedMetrics.height);
       }
 
       return Math.max(3, Number((fitted * 0.999).toFixed(2)));
@@ -216,24 +219,27 @@
     fitContext.font = fontWeight + " " + boxHeight + "px " + fontFamily;
     var fallbackMetrics = fitContext.measureText(text);
     var fallbackWidth = fallbackMetrics.width || boxHeight;
-    return Math.max(3, Number((boxHeight * Math.min(1, boxWidth / fallbackWidth) * 0.999).toFixed(2)));
+    return Math.max(3, Number((availableHeight * Math.min(1, availableWidth / fallbackWidth) * 0.999).toFixed(2)));
   }
 
-  function getTextMetrics(text, fontFamily, fontWeight, fontSize) {
+  function getTextMetrics(text, fontFamily, fontWeight, fontSize, strokeWidth) {
     if (!fitContext || !text || !fontSize) {
+      var fallbackStroke = Math.max(0, Number(strokeWidth || 0));
       return {
         width: 0,
         x: 0,
-        y: -fontSize * 0.68,
-        ascent: fontSize * 0.68,
-        descent: fontSize * 0.22,
-        height: fontSize * 0.9
+        y: -(fontSize * 0.68 + fallbackStroke / 2),
+        ascent: fontSize * 0.68 + fallbackStroke / 2,
+        descent: fontSize * 0.22 + fallbackStroke / 2,
+        height: fontSize * 0.9 + fallbackStroke
       };
     }
 
     fitContext.font = fontWeight + " " + fontSize + "px " + fontFamily;
     fitContext.textAlign = "center";
     fitContext.textBaseline = "alphabetic";
+    fitContext.lineJoin = "round";
+    fitContext.lineWidth = Math.max(0, Number(strokeWidth || 0));
     var metrics = fitContext.measureText(text);
     var approxWidth = Math.max(1, Math.ceil((metrics.width || fontSize) + fontSize * 2));
     var ascent = Math.max(1, Math.ceil(metrics.actualBoundingBoxAscent || fontSize * 0.68));
@@ -248,7 +254,13 @@
     fitContext.font = fontWeight + " " + fontSize + "px " + fontFamily;
     fitContext.textAlign = "center";
     fitContext.textBaseline = "alphabetic";
+    fitContext.lineJoin = "round";
+    fitContext.lineWidth = Math.max(0, Number(strokeWidth || 0));
     fitContext.fillStyle = "#000000";
+    if (fitContext.lineWidth > 0) {
+      fitContext.strokeStyle = "#000000";
+      fitContext.strokeText(text, baselineX, baselineY);
+    }
     fitContext.fillText(text, baselineX, baselineY);
 
     var imageData = fitContext.getImageData(0, 0, approxWidth, approxHeight);
