@@ -181,7 +181,7 @@
       ? ' transform="rotate(' + Number(component.rotationDeg || 0) + " " + centerX + " " + centerY + ')"'
       : "";
     return [
-      '<g clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="' + type + '"' + transform + '>',
+      '<g data-component-id="' + component.id + '" data-component-type="' + type + '"' + transform + '>',
       renderSelectionBox(box),
       '  <rect x="' + handleX + '" y="' + handleY + '" width="4" height="4" rx="1" fill="#ffffff" stroke="#111111" stroke-width="0.6" data-drag-mode="resize"></rect>',
       type === "image"
