@@ -3508,10 +3508,25 @@ button {
   var normalizeColorInput = Ui.normalizeColorInput;
   var toNumberOrDefault = Ui.toNumberOrDefault;
 
+  function naturalLabelCompare(left, right) {
+    return String(left || "").localeCompare(String(right || ""), undefined, {
+      numeric: true,
+      sensitivity: "base"
+    });
+  }
+
+  function sortByLabel(items, getLabel) {
+    return items.slice().sort(function (left, right) {
+      return naturalLabelCompare(getLabel(left), getLabel(right));
+    });
+  }
+
   function renderDefaultTokenSettingsForm(tokenDefaults, colorSequences) {
     return [
       '<form class="form-grid" data-form="token-defaults">',
-      '  <label class="field">Diameter<select name="defaultDiameterIn">' + Schema.TOKEN_SIZES.map(function (size) {
+      '  <label class="field">Diameter<select name="defaultDiameterIn">' + Schema.TOKEN_SIZES.slice().sort(function (left, right) {
+        return Number(left) - Number(right);
+      }).map(function (size) {
         return '<option value="' + size + '"' + (size === tokenDefaults.diameterIn ? " selected" : "") + ">" + size + '&quot;</option>';
       }).join("") + "</select></label>",
       renderBackgroundControls({
@@ -3645,7 +3660,9 @@ button {
 
   function renderColorSourceOptions(sequences, selectedValue) {
     return ['<option value="manual"' + (selectedValue === "manual" ? " selected" : "") + '>Manual</option>']
-      .concat(sequences.map(function (sequence) {
+      .concat(sortByLabel(sequences, function (sequence) {
+        return sequence.name;
+      }).map(function (sequence) {
         return '<option value="' + sequence.id + '"' + (selectedValue === sequence.id ? " selected" : "") + ">" + escapeHtml(sequence.name) + "</option>";
       }))
       .join("");
@@ -3834,17 +3851,21 @@ button {
   }
 
   function renderTextContentModeOptions(currentValue) {
-    return [
+    return sortByLabel([
       { id: "numeric", label: "Number Sequence" },
       { id: "alphabetic", label: "Alphabet Sequence" },
       { id: "custom", label: "Custom Text" }
-    ].map(function (option) {
+    ], function (option) {
+      return option.label;
+    }).map(function (option) {
       return '<option value="' + option.id + '"' + (currentValue === option.id ? " selected" : "") + ">" + option.label + "</option>";
     }).join("");
   }
 
   function renderFontWeightOptions(currentValue) {
-    return ["400", "500", "600", "700", "800"].map(function (value) {
+    return ["400", "500", "600", "700", "800"].slice().sort(function (left, right) {
+      return Number(left) - Number(right);
+    }).map(function (value) {
       return '<option value="' + value + '"' + (currentValue === value ? " selected" : "") + ">" + value + "</option>";
     }).join("");
   }
@@ -3854,22 +3875,30 @@ button {
     if (currentValue && !options.some(function (option) { return option.value === currentValue; })) {
       options.push({ value: currentValue, label: currentValue });
     }
-    return options.map(function (option) {
+    return sortByLabel(options, function (option) {
+      return option.label;
+    }).map(function (option) {
       return '<option value="' + escapeHtml(option.value) + '"' + (currentValue === option.value ? " selected" : "") + ">" + escapeHtml(option.label) + "</option>";
     }).join("");
   }
 
   function renderSequenceOptions(sequences, selectedId, emptyLabel, options) {
     var opts = options || {};
-    var builtIns = sequences.filter(function (sequence) {
+    var builtIns = sortByLabel(sequences.filter(function (sequence) {
       return sequence.builtIn;
+    }), function (sequence) {
+      return sequence.name;
     });
-    var custom = sequences.filter(function (sequence) {
+    var custom = sortByLabel(sequences.filter(function (sequence) {
       return !sequence.builtIn;
+    }), function (sequence) {
+      return sequence.name;
     });
 
     if (opts.grouped === false) {
-      return ['<option value="">' + emptyLabel + "</option>"].concat(sequences.map(function (sequence) {
+      return ['<option value="">' + emptyLabel + "</option>"].concat(sortByLabel(sequences, function (sequence) {
+        return sequence.name;
+      }).map(function (sequence) {
         return '<option value="' + sequence.id + '"' + (selectedId === sequence.id ? " selected" : "") + ">" + escapeHtml(sequence.name) + "</option>";
       })).join("");
     }
@@ -4188,6 +4217,13 @@ button {
   var runtimeGlobal = typeof globalThis !== "undefined" ? globalThis : window;
   var escapeHtml = Ui.escapeHtml;
 
+  function naturalLabelCompare(left, right) {
+    return String(left || "").localeCompare(String(right || ""), undefined, {
+      numeric: true,
+      sensitivity: "base"
+    });
+  }
+
   function renderPanel(state, helpers) {
     var selection = helpers.getDesignerSelection(state);
     var token = selection.token;
@@ -4263,7 +4299,9 @@ button {
   }
 
   function renderTokenOptions(tokens, selectedTokenId) {
-    return tokens.map(function (token) {
+    return tokens.slice().sort(function (left, right) {
+      return naturalLabelCompare(left.name + " (" + left.diameterIn + '")', right.name + " (" + right.diameterIn + '")');
+    }).map(function (token) {
       return '<option value="' + token.id + '"' + (token.id === selectedTokenId ? " selected" : "") + ">" + escapeHtml(token.name) + " (" + token.diameterIn + '&quot;)</option>';
     }).join("");
   }
@@ -4280,7 +4318,9 @@ button {
   }
 
   function renderComponentOptions(items, selectedType, selectedId) {
-    return ['<option value="">' + "Token settings" + "</option>"].concat(items.map(function (item) {
+    return ['<option value="">' + "Token settings" + "</option>"].concat(items.slice().sort(function (left, right) {
+      return naturalLabelCompare(left.label, right.label);
+    }).map(function (item) {
       var isSelected = selectedType === item.type && selectedId === item.id;
       return '<option value="' + item.type + ":" + item.id + '"' + (isSelected ? " selected" : "") + ">" + escapeHtml(item.label) + "</option>";
     })).join("");
@@ -4295,7 +4335,9 @@ button {
     return [
       '<form class="form-grid" data-form="token-settings">',
       '  <label class="field">Name<input name="name" value="' + escapeHtml(token.name) + '" required></label>',
-      '  <label class="field">Diameter<select name="diameterIn">' + Schema.TOKEN_SIZES.map(function (size) {
+      '  <label class="field">Diameter<select name="diameterIn">' + Schema.TOKEN_SIZES.slice().sort(function (left, right) {
+        return Number(left) - Number(right);
+      }).map(function (size) {
         return '<option value="' + size + '"' + (size === token.diameterIn ? " selected" : "") + ">" + size + '&quot;</option>';
       }).join("") + "</select></label>",
       '  <p class="field-help">Editing token appearance.</p>',
@@ -4690,6 +4732,13 @@ button {
   var activePrintFrame = null;
   var printSelectionSyncTimer = null;
 
+  function naturalLabelCompare(left, right) {
+    return String(left || "").localeCompare(String(right || ""), undefined, {
+      numeric: true,
+      sensitivity: "base"
+    });
+  }
+
   function renderPanel(state) {
     var rows = Print.getSelectionRows(state.project);
     var layout = Print.layoutProject(state.project);
@@ -4809,12 +4858,20 @@ button {
     return [
       '<form class="form-grid" data-form="page-settings">',
       '  <div class="field-row two-up">',
-      '    <label class="field">Page size<select name="pagePresetId">' + Schema.PAGE_PRESETS.map(function (candidate) {
+      '    <label class="field">Page size<select name="pagePresetId">' + Schema.PAGE_PRESETS.slice().sort(function (left, right) {
+        return naturalLabelCompare(left.label, right.label);
+      }).map(function (candidate) {
         return '<option value="' + candidate.id + '"' + (candidate.id === settings.pagePresetId ? " selected" : "") + ">" + candidate.label + "</option>";
       }).join("") + '</select></label>',
       '    <label class="field">Orientation<select name="pageOrientation">' +
-        '<option value="portrait"' + (settings.pageOrientation === "portrait" ? " selected" : "") + '>Portrait</option>' +
-        '<option value="landscape"' + (settings.pageOrientation === "landscape" ? " selected" : "") + '>Landscape</option>' +
+        [
+          { value: "landscape", label: "Landscape" },
+          { value: "portrait", label: "Portrait" }
+        ].sort(function (left, right) {
+          return naturalLabelCompare(left.label, right.label);
+        }).map(function (option) {
+          return '<option value="' + option.value + '"' + (settings.pageOrientation === option.value ? " selected" : "") + ">" + option.label + "</option>";
+        }).join("") +
         "</select></label>",
       "  </div>",
       '  <div class="field-row two-up">',

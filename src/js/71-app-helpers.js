@@ -26,10 +26,25 @@
   var normalizeColorInput = Ui.normalizeColorInput;
   var toNumberOrDefault = Ui.toNumberOrDefault;
 
+  function naturalLabelCompare(left, right) {
+    return String(left || "").localeCompare(String(right || ""), undefined, {
+      numeric: true,
+      sensitivity: "base"
+    });
+  }
+
+  function sortByLabel(items, getLabel) {
+    return items.slice().sort(function (left, right) {
+      return naturalLabelCompare(getLabel(left), getLabel(right));
+    });
+  }
+
   function renderDefaultTokenSettingsForm(tokenDefaults, colorSequences) {
     return [
       '<form class="form-grid" data-form="token-defaults">',
-      '  <label class="field">Diameter<select name="defaultDiameterIn">' + Schema.TOKEN_SIZES.map(function (size) {
+      '  <label class="field">Diameter<select name="defaultDiameterIn">' + Schema.TOKEN_SIZES.slice().sort(function (left, right) {
+        return Number(left) - Number(right);
+      }).map(function (size) {
         return '<option value="' + size + '"' + (size === tokenDefaults.diameterIn ? " selected" : "") + ">" + size + '&quot;</option>';
       }).join("") + "</select></label>",
       renderBackgroundControls({
@@ -163,7 +178,9 @@
 
   function renderColorSourceOptions(sequences, selectedValue) {
     return ['<option value="manual"' + (selectedValue === "manual" ? " selected" : "") + '>Manual</option>']
-      .concat(sequences.map(function (sequence) {
+      .concat(sortByLabel(sequences, function (sequence) {
+        return sequence.name;
+      }).map(function (sequence) {
         return '<option value="' + sequence.id + '"' + (selectedValue === sequence.id ? " selected" : "") + ">" + escapeHtml(sequence.name) + "</option>";
       }))
       .join("");
@@ -352,17 +369,21 @@
   }
 
   function renderTextContentModeOptions(currentValue) {
-    return [
+    return sortByLabel([
       { id: "numeric", label: "Number Sequence" },
       { id: "alphabetic", label: "Alphabet Sequence" },
       { id: "custom", label: "Custom Text" }
-    ].map(function (option) {
+    ], function (option) {
+      return option.label;
+    }).map(function (option) {
       return '<option value="' + option.id + '"' + (currentValue === option.id ? " selected" : "") + ">" + option.label + "</option>";
     }).join("");
   }
 
   function renderFontWeightOptions(currentValue) {
-    return ["400", "500", "600", "700", "800"].map(function (value) {
+    return ["400", "500", "600", "700", "800"].slice().sort(function (left, right) {
+      return Number(left) - Number(right);
+    }).map(function (value) {
       return '<option value="' + value + '"' + (currentValue === value ? " selected" : "") + ">" + value + "</option>";
     }).join("");
   }
@@ -372,22 +393,30 @@
     if (currentValue && !options.some(function (option) { return option.value === currentValue; })) {
       options.push({ value: currentValue, label: currentValue });
     }
-    return options.map(function (option) {
+    return sortByLabel(options, function (option) {
+      return option.label;
+    }).map(function (option) {
       return '<option value="' + escapeHtml(option.value) + '"' + (currentValue === option.value ? " selected" : "") + ">" + escapeHtml(option.label) + "</option>";
     }).join("");
   }
 
   function renderSequenceOptions(sequences, selectedId, emptyLabel, options) {
     var opts = options || {};
-    var builtIns = sequences.filter(function (sequence) {
+    var builtIns = sortByLabel(sequences.filter(function (sequence) {
       return sequence.builtIn;
+    }), function (sequence) {
+      return sequence.name;
     });
-    var custom = sequences.filter(function (sequence) {
+    var custom = sortByLabel(sequences.filter(function (sequence) {
       return !sequence.builtIn;
+    }), function (sequence) {
+      return sequence.name;
     });
 
     if (opts.grouped === false) {
-      return ['<option value="">' + emptyLabel + "</option>"].concat(sequences.map(function (sequence) {
+      return ['<option value="">' + emptyLabel + "</option>"].concat(sortByLabel(sequences, function (sequence) {
+        return sequence.name;
+      }).map(function (sequence) {
         return '<option value="' + sequence.id + '"' + (selectedId === sequence.id ? " selected" : "") + ">" + escapeHtml(sequence.name) + "</option>";
       })).join("");
     }

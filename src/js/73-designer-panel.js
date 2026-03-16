@@ -10,6 +10,13 @@
   var runtimeGlobal = typeof globalThis !== "undefined" ? globalThis : window;
   var escapeHtml = Ui.escapeHtml;
 
+  function naturalLabelCompare(left, right) {
+    return String(left || "").localeCompare(String(right || ""), undefined, {
+      numeric: true,
+      sensitivity: "base"
+    });
+  }
+
   function renderPanel(state, helpers) {
     var selection = helpers.getDesignerSelection(state);
     var token = selection.token;
@@ -85,7 +92,9 @@
   }
 
   function renderTokenOptions(tokens, selectedTokenId) {
-    return tokens.map(function (token) {
+    return tokens.slice().sort(function (left, right) {
+      return naturalLabelCompare(left.name + " (" + left.diameterIn + '")', right.name + " (" + right.diameterIn + '")');
+    }).map(function (token) {
       return '<option value="' + token.id + '"' + (token.id === selectedTokenId ? " selected" : "") + ">" + escapeHtml(token.name) + " (" + token.diameterIn + '&quot;)</option>';
     }).join("");
   }
@@ -102,7 +111,9 @@
   }
 
   function renderComponentOptions(items, selectedType, selectedId) {
-    return ['<option value="">' + "Token settings" + "</option>"].concat(items.map(function (item) {
+    return ['<option value="">' + "Token settings" + "</option>"].concat(items.slice().sort(function (left, right) {
+      return naturalLabelCompare(left.label, right.label);
+    }).map(function (item) {
       var isSelected = selectedType === item.type && selectedId === item.id;
       return '<option value="' + item.type + ":" + item.id + '"' + (isSelected ? " selected" : "") + ">" + escapeHtml(item.label) + "</option>";
     })).join("");
@@ -117,7 +128,9 @@
     return [
       '<form class="form-grid" data-form="token-settings">',
       '  <label class="field">Name<input name="name" value="' + escapeHtml(token.name) + '" required></label>',
-      '  <label class="field">Diameter<select name="diameterIn">' + Schema.TOKEN_SIZES.map(function (size) {
+      '  <label class="field">Diameter<select name="diameterIn">' + Schema.TOKEN_SIZES.slice().sort(function (left, right) {
+        return Number(left) - Number(right);
+      }).map(function (size) {
         return '<option value="' + size + '"' + (size === token.diameterIn ? " selected" : "") + ">" + size + '&quot;</option>';
       }).join("") + "</select></label>",
       '  <p class="field-help">Editing token appearance.</p>',

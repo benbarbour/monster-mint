@@ -122,6 +122,43 @@ test("can create and manipulate a token template", async ({ page }) => {
   await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toHaveValue("Untitled Token");
 });
 
+test("designer dropdowns are sorted", async ({ page }) => {
+  await page.getByRole("button", { name: "Create Token" }).click();
+  await page.locator('form[data-form="token-settings"] input[name="name"]').fill("Zulu");
+  await page.locator('form[data-form="token-settings"] input[name="name"]').blur();
+
+  await page.getByRole("button", { name: "New Token" }).click();
+  await page.locator('form[data-form="token-settings"] input[name="name"]').fill("Alpha");
+  await page.locator('form[data-form="token-settings"] input[name="name"]').blur();
+
+  await page.getByRole("button", { name: "New Token" }).click();
+  await page.locator('form[data-form="token-settings"] input[name="name"]').fill("Mint 2");
+  await page.locator('form[data-form="token-settings"] input[name="name"]').blur();
+
+  const tokenOptions = await page.locator('select[name="selectedTokenId"] option').allTextContents();
+  expect(tokenOptions).toEqual([
+    'Alpha (1")',
+    'Mint 2 (1")',
+    'Zulu (1")'
+  ]);
+
+  await page.locator('select[name="selectedTokenId"]').selectOption({ label: 'Alpha (1")' });
+  await page.getByRole("button", { name: "Add Text" }).click();
+  await page.locator('form[data-form="text-component-settings"] input[name="name"]').fill("Zulu Text");
+  await page.locator('form[data-form="text-component-settings"] input[name="name"]').blur();
+
+  await page.getByRole("button", { name: "Add Text" }).click();
+  await page.locator('form[data-form="text-component-settings"] input[name="name"]').fill("Alpha Text");
+  await page.locator('form[data-form="text-component-settings"] input[name="name"]').blur();
+
+  const componentOptions = await page.locator('select[name="selectedComponentKey"] option').allTextContents();
+  expect(componentOptions).toEqual([
+    "Token settings",
+    "Alpha Text",
+    "Zulu Text"
+  ]);
+});
+
 test("token settings own appearance controls and color sequences show in preview", async ({ page }) => {
   await page.getByRole("button", { name: "Settings" }).click();
   await expect(page.locator('form[data-form="token-defaults"]')).toBeVisible();

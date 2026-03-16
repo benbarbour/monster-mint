@@ -13,6 +13,13 @@
   var activePrintFrame = null;
   var printSelectionSyncTimer = null;
 
+  function naturalLabelCompare(left, right) {
+    return String(left || "").localeCompare(String(right || ""), undefined, {
+      numeric: true,
+      sensitivity: "base"
+    });
+  }
+
   function renderPanel(state) {
     var rows = Print.getSelectionRows(state.project);
     var layout = Print.layoutProject(state.project);
@@ -132,12 +139,20 @@
     return [
       '<form class="form-grid" data-form="page-settings">',
       '  <div class="field-row two-up">',
-      '    <label class="field">Page size<select name="pagePresetId">' + Schema.PAGE_PRESETS.map(function (candidate) {
+      '    <label class="field">Page size<select name="pagePresetId">' + Schema.PAGE_PRESETS.slice().sort(function (left, right) {
+        return naturalLabelCompare(left.label, right.label);
+      }).map(function (candidate) {
         return '<option value="' + candidate.id + '"' + (candidate.id === settings.pagePresetId ? " selected" : "") + ">" + candidate.label + "</option>";
       }).join("") + '</select></label>',
       '    <label class="field">Orientation<select name="pageOrientation">' +
-        '<option value="portrait"' + (settings.pageOrientation === "portrait" ? " selected" : "") + '>Portrait</option>' +
-        '<option value="landscape"' + (settings.pageOrientation === "landscape" ? " selected" : "") + '>Landscape</option>' +
+        [
+          { value: "landscape", label: "Landscape" },
+          { value: "portrait", label: "Portrait" }
+        ].sort(function (left, right) {
+          return naturalLabelCompare(left.label, right.label);
+        }).map(function (option) {
+          return '<option value="' + option.value + '"' + (settings.pageOrientation === option.value ? " selected" : "") + ">" + option.label + "</option>";
+        }).join("") +
         "</select></label>",
       "  </div>",
       '  <div class="field-row two-up">',
