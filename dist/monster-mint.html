@@ -3025,10 +3025,10 @@ button {
   }
 
   function renderImageResizeHandles(box, component) {
-    var inset = Math.min(4, box.width / 6);
-    var visibleWidth = Math.max(8, box.width - inset * 2);
-    var handleHeight = 5;
-    var topX = box.x + (box.width - visibleWidth) / 2;
+    var handleOverhang = 6;
+    var visibleWidth = Math.max(8, box.width + handleOverhang * 2);
+    var handleHeight = 8;
+    var topX = box.x - handleOverhang;
     var topY = box.y - handleHeight / 2;
     var bottomY = box.y + box.height - handleHeight / 2;
     var cursor = getResizeCursor(component.rotationDeg || 0);
@@ -3039,10 +3039,11 @@ button {
   }
 
   function renderImageResizeHandle(x, y, width, height, mode, cursor) {
+    var midY = y + height / 2;
     return [
-      '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="2" fill="rgba(255,255,255,0.001)" pointer-events="all" data-drag-mode="' + mode + '" cursor="' + cursor + '"></rect>',
-      '<line x1="' + x + '" y1="' + (y + height / 2) + '" x2="' + (x + width) + '" y2="' + (y + height / 2) + '" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" pointer-events="none"></line>',
-      '<line x1="' + x + '" y1="' + (y + height / 2) + '" x2="' + (x + width) + '" y2="' + (y + height / 2) + '" stroke="#111111" stroke-width="0.55" stroke-linecap="round" stroke-dasharray="2 2" stroke-dashoffset="2" pointer-events="none"></line>'
+      '<line x1="' + x + '" y1="' + midY + '" x2="' + (x + width) + '" y2="' + midY + '" stroke="rgba(255,255,255,0.001)" stroke-width="' + height + '" stroke-linecap="round" pointer-events="stroke" data-drag-mode="' + mode + '" cursor="' + cursor + '"></line>',
+      '<line x1="' + x + '" y1="' + midY + '" x2="' + (x + width) + '" y2="' + midY + '" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" pointer-events="none"></line>',
+      '<line x1="' + x + '" y1="' + midY + '" x2="' + (x + width) + '" y2="' + midY + '" stroke="#111111" stroke-width="0.55" stroke-linecap="round" stroke-dasharray="2 2" stroke-dashoffset="2" pointer-events="none"></line>'
     ].join("");
   }
 
@@ -4758,10 +4759,22 @@ button {
           project.printSelections = Print.normalizeSelections(project, rows);
         });
       };
-      var syncPrintSelections = function (event) {
-        if (event && event.target && event.target.name) {
-          helpers.setPendingPrintFieldFocus({ name: event.target.name });
+      var normalizeCommittedField = function (field) {
+        if (!field || !field.name) {
+          return;
         }
+        var rows = Print.getSelectionRows(store.getState().project);
+        var matched = rows.find(function (row) {
+          return field.name === "copies-" + row.tokenId || field.name === "start-" + row.tokenId;
+        });
+        if (!matched) {
+          return;
+        }
+        field.value = field.name.indexOf("copies-") === 0
+          ? String(matched.copies)
+          : String(matched.sequenceStart);
+      };
+      var syncPrintSelections = function () {
         if (printSelectionSyncTimer) {
           runtimeGlobal.clearTimeout(printSelectionSyncTimer);
         }
@@ -4771,14 +4784,12 @@ button {
         }, 180);
       };
       var flushPrintSelections = function (event) {
-        if (event && event.target && event.target.name) {
-          helpers.setPendingPrintFieldFocus({ name: event.target.name });
-        }
         if (printSelectionSyncTimer) {
           runtimeGlobal.clearTimeout(printSelectionSyncTimer);
           printSelectionSyncTimer = null;
         }
         commitPrintSelections();
+        normalizeCommittedField(event && event.target);
       };
 
       printForm.addEventListener("input", syncPrintSelections);
@@ -5066,7 +5077,6 @@ button {
   var designerInteraction = null;
   var mountedStore = null;
   var designerWheelPersistTimer = null;
-  var pendingPrintFieldFocus = null;
   var designerLayoutObserver = null;
   var designerResizeQueued = false;
   var designerTransientPreview = null;
@@ -5158,8 +5168,7 @@ button {
   };
   var PRINT_PANEL_HELPERS = {
     toNonNegativeNumberOrDefault: toNonNegativeNumberOrDefault,
-    collectPrintSelectionRows: collectPrintSelectionRows,
-    setPendingPrintFieldFocus: setPendingPrintFieldFocus
+    collectPrintSelectionRows: collectPrintSelectionRows
   };
 
   function render(appView, store) {
@@ -5175,7 +5184,6 @@ button {
     renderDesignerTransientPreview(appElement);
     syncRenderedFormState(appElement, state);
     restoreFocusState(appElement, focusState);
-    restorePendingPrintFieldFocus(appElement);
   }
 
   function syncDesignerDrawerHeight(appElement) {
@@ -5614,9 +5622,12 @@ button {
     setFormFieldValue(form, "height", preview.componentState.height, 2);
   }
 
-  function setFormFieldValue(form, name, value, fixedDigits) {
+  function setFormFieldValue(form, name, value, fixedDigits, skipName) {
     var field = form.querySelector('[name="' + name + '"]');
     if (!field) {
+      return;
+    }
+    if (skipName && field.name === skipName) {
       return;
     }
     field.value = typeof fixedDigits === "number" ? Number(value).toFixed(fixedDigits) : String(value);
@@ -5682,10 +5693,12 @@ button {
     if (!printForm) {
       return;
     }
+    var activeElement = runtimeGlobal.document && runtimeGlobal.document.activeElement;
+    var activeName = activeElement && printForm.contains(activeElement) ? activeElement.name : null;
 
     Print.getSelectionRows(state.project).forEach(function (row) {
-      setFormFieldValue(printForm, "copies-" + row.tokenId, row.copies);
-      setFormFieldValue(printForm, "start-" + row.tokenId, row.sequenceStart);
+      setFormFieldValue(printForm, "copies-" + row.tokenId, row.copies, null, activeName);
+      setFormFieldValue(printForm, "start-" + row.tokenId, row.sequenceStart, null, activeName);
     });
   }
 
@@ -6315,26 +6328,6 @@ button {
     if (typeof focusState.selectionStart === "number" && typeof nextField.setSelectionRange === "function") {
       nextField.setSelectionRange(focusState.selectionStart, focusState.selectionEnd == null ? focusState.selectionStart : focusState.selectionEnd);
     }
-  }
-
-  function restorePendingPrintFieldFocus(appElement) {
-    if (!pendingPrintFieldFocus) {
-      return;
-    }
-
-    var focusTarget = pendingPrintFieldFocus;
-    pendingPrintFieldFocus = null;
-    runtimeGlobal.requestAnimationFrame(function () {
-      var nextField = appElement.querySelector('[data-form="print-selections"] [name="' + focusTarget.name + '"]');
-      if (!nextField || typeof nextField.focus !== "function") {
-        return;
-      }
-      nextField.focus({ preventScroll: true });
-    });
-  }
-
-  function setPendingPrintFieldFocus(value) {
-    pendingPrintFieldFocus = value;
   }
 
   async function mount() {

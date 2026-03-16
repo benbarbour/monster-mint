@@ -215,10 +215,10 @@
   }
 
   function renderImageResizeHandles(box, component) {
-    var inset = Math.min(4, box.width / 6);
-    var visibleWidth = Math.max(8, box.width - inset * 2);
-    var handleHeight = 5;
-    var topX = box.x + (box.width - visibleWidth) / 2;
+    var handleOverhang = 6;
+    var visibleWidth = Math.max(8, box.width + handleOverhang * 2);
+    var handleHeight = 8;
+    var topX = box.x - handleOverhang;
     var topY = box.y - handleHeight / 2;
     var bottomY = box.y + box.height - handleHeight / 2;
     var cursor = getResizeCursor(component.rotationDeg || 0);
@@ -229,10 +229,11 @@
   }
 
   function renderImageResizeHandle(x, y, width, height, mode, cursor) {
+    var midY = y + height / 2;
     return [
-      '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="2" fill="rgba(255,255,255,0.001)" pointer-events="all" data-drag-mode="' + mode + '" cursor="' + cursor + '"></rect>',
-      '<line x1="' + x + '" y1="' + (y + height / 2) + '" x2="' + (x + width) + '" y2="' + (y + height / 2) + '" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" pointer-events="none"></line>',
-      '<line x1="' + x + '" y1="' + (y + height / 2) + '" x2="' + (x + width) + '" y2="' + (y + height / 2) + '" stroke="#111111" stroke-width="0.55" stroke-linecap="round" stroke-dasharray="2 2" stroke-dashoffset="2" pointer-events="none"></line>'
+      '<line x1="' + x + '" y1="' + midY + '" x2="' + (x + width) + '" y2="' + midY + '" stroke="rgba(255,255,255,0.001)" stroke-width="' + height + '" stroke-linecap="round" pointer-events="stroke" data-drag-mode="' + mode + '" cursor="' + cursor + '"></line>',
+      '<line x1="' + x + '" y1="' + midY + '" x2="' + (x + width) + '" y2="' + midY + '" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" pointer-events="none"></line>',
+      '<line x1="' + x + '" y1="' + midY + '" x2="' + (x + width) + '" y2="' + midY + '" stroke="#111111" stroke-width="0.55" stroke-linecap="round" stroke-dasharray="2 2" stroke-dashoffset="2" pointer-events="none"></line>'
     ].join("");
   }
 

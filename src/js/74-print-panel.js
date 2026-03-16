@@ -82,10 +82,22 @@
           project.printSelections = Print.normalizeSelections(project, rows);
         });
       };
-      var syncPrintSelections = function (event) {
-        if (event && event.target && event.target.name) {
-          helpers.setPendingPrintFieldFocus({ name: event.target.name });
+      var normalizeCommittedField = function (field) {
+        if (!field || !field.name) {
+          return;
         }
+        var rows = Print.getSelectionRows(store.getState().project);
+        var matched = rows.find(function (row) {
+          return field.name === "copies-" + row.tokenId || field.name === "start-" + row.tokenId;
+        });
+        if (!matched) {
+          return;
+        }
+        field.value = field.name.indexOf("copies-") === 0
+          ? String(matched.copies)
+          : String(matched.sequenceStart);
+      };
+      var syncPrintSelections = function () {
         if (printSelectionSyncTimer) {
           runtimeGlobal.clearTimeout(printSelectionSyncTimer);
         }
@@ -95,14 +107,12 @@
         }, 180);
       };
       var flushPrintSelections = function (event) {
-        if (event && event.target && event.target.name) {
-          helpers.setPendingPrintFieldFocus({ name: event.target.name });
-        }
         if (printSelectionSyncTimer) {
           runtimeGlobal.clearTimeout(printSelectionSyncTimer);
           printSelectionSyncTimer = null;
         }
         commitPrintSelections();
+        normalizeCommittedField(event && event.target);
       };
 
       printForm.addEventListener("input", syncPrintSelections);

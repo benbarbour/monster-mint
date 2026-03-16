@@ -203,18 +203,38 @@ test("token settings own appearance controls and color sequences show in preview
   await expect(page.locator('form[data-form="image-component-settings"] input[name="mirrorX"]')).toBeChecked();
   await expect(page.locator('[data-preview-stage] svg image[transform*="rotate(45"]')).toHaveCount(1);
   const edgeHandle = page.locator('[data-component-type="image"] [data-drag-mode="resize-top"]').first();
-  const edgeBox = await edgeHandle.boundingBox();
-  if (!edgeBox) {
-    throw new Error("Missing rotated image edge resize handle");
-  }
+  const edgePoint = await edgeHandle.evaluate((element, t) => {
+    const x1 = Number(element.getAttribute("x1"));
+    const y1 = Number(element.getAttribute("y1"));
+    const x2 = Number(element.getAttribute("x2"));
+    const y2 = Number(element.getAttribute("y2"));
+    const point = element.ownerSVGElement.createSVGPoint();
+    point.x = x1 + (x2 - x1) * t;
+    point.y = y1 + (y2 - y1) * t;
+    const screenPoint = point.matrixTransform(element.getScreenCTM());
+    return { x: screenPoint.x, y: screenPoint.y };
+  }, 0.5);
   const edgeHitTarget = await page.evaluate(({ x, y }) => {
     const target = document.elementFromPoint(x, y);
     return target ? target.getAttribute("data-drag-mode") : null;
-  }, {
-    x: edgeBox.x + edgeBox.width / 2,
-    y: edgeBox.y + edgeBox.height / 2
-  });
+  }, edgePoint);
   expect(edgeHitTarget).toBe("resize-top");
+  const edgeEndPoint = await edgeHandle.evaluate((element, t) => {
+    const x1 = Number(element.getAttribute("x1"));
+    const y1 = Number(element.getAttribute("y1"));
+    const x2 = Number(element.getAttribute("x2"));
+    const y2 = Number(element.getAttribute("y2"));
+    const point = element.ownerSVGElement.createSVGPoint();
+    point.x = x1 + (x2 - x1) * t;
+    point.y = y1 + (y2 - y1) * t;
+    const screenPoint = point.matrixTransform(element.getScreenCTM());
+    return { x: screenPoint.x, y: screenPoint.y };
+  }, 0.9);
+  const edgeEndHitTarget = await page.evaluate(({ x, y }) => {
+    const target = document.elementFromPoint(x, y);
+    return target ? target.getAttribute("data-drag-mode") : null;
+  }, edgeEndPoint);
+  expect(edgeEndHitTarget).toBe("resize-top");
   await expect(page.getByRole("button", { name: "Up" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Down" })).toBeVisible();
   await page.locator('select[name="selectedComponentKey"]').selectOption({ label: "token.svg" });

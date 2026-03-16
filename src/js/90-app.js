@@ -24,7 +24,6 @@
   var designerInteraction = null;
   var mountedStore = null;
   var designerWheelPersistTimer = null;
-  var pendingPrintFieldFocus = null;
   var designerLayoutObserver = null;
   var designerResizeQueued = false;
   var designerTransientPreview = null;
@@ -116,8 +115,7 @@
   };
   var PRINT_PANEL_HELPERS = {
     toNonNegativeNumberOrDefault: toNonNegativeNumberOrDefault,
-    collectPrintSelectionRows: collectPrintSelectionRows,
-    setPendingPrintFieldFocus: setPendingPrintFieldFocus
+    collectPrintSelectionRows: collectPrintSelectionRows
   };
 
   function render(appView, store) {
@@ -133,7 +131,6 @@
     renderDesignerTransientPreview(appElement);
     syncRenderedFormState(appElement, state);
     restoreFocusState(appElement, focusState);
-    restorePendingPrintFieldFocus(appElement);
   }
 
   function syncDesignerDrawerHeight(appElement) {
@@ -572,9 +569,12 @@
     setFormFieldValue(form, "height", preview.componentState.height, 2);
   }
 
-  function setFormFieldValue(form, name, value, fixedDigits) {
+  function setFormFieldValue(form, name, value, fixedDigits, skipName) {
     var field = form.querySelector('[name="' + name + '"]');
     if (!field) {
+      return;
+    }
+    if (skipName && field.name === skipName) {
       return;
     }
     field.value = typeof fixedDigits === "number" ? Number(value).toFixed(fixedDigits) : String(value);
@@ -640,10 +640,12 @@
     if (!printForm) {
       return;
     }
+    var activeElement = runtimeGlobal.document && runtimeGlobal.document.activeElement;
+    var activeName = activeElement && printForm.contains(activeElement) ? activeElement.name : null;
 
     Print.getSelectionRows(state.project).forEach(function (row) {
-      setFormFieldValue(printForm, "copies-" + row.tokenId, row.copies);
-      setFormFieldValue(printForm, "start-" + row.tokenId, row.sequenceStart);
+      setFormFieldValue(printForm, "copies-" + row.tokenId, row.copies, null, activeName);
+      setFormFieldValue(printForm, "start-" + row.tokenId, row.sequenceStart, null, activeName);
     });
   }
 
@@ -1273,26 +1275,6 @@
     if (typeof focusState.selectionStart === "number" && typeof nextField.setSelectionRange === "function") {
       nextField.setSelectionRange(focusState.selectionStart, focusState.selectionEnd == null ? focusState.selectionStart : focusState.selectionEnd);
     }
-  }
-
-  function restorePendingPrintFieldFocus(appElement) {
-    if (!pendingPrintFieldFocus) {
-      return;
-    }
-
-    var focusTarget = pendingPrintFieldFocus;
-    pendingPrintFieldFocus = null;
-    runtimeGlobal.requestAnimationFrame(function () {
-      var nextField = appElement.querySelector('[data-form="print-selections"] [name="' + focusTarget.name + '"]');
-      if (!nextField || typeof nextField.focus !== "function") {
-        return;
-      }
-      nextField.focus({ preventScroll: true });
-    });
-  }
-
-  function setPendingPrintFieldFocus(value) {
-    pendingPrintFieldFocus = value;
   }
 
   async function mount() {
