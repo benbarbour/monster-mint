@@ -60,8 +60,7 @@
         items.push({
           tokenId: token.id,
           token: token,
-          sequenceIndex: getSequenceStart(selection) - 1 + copyIndex,
-          faceCount: token.back.enabled ? 2 : 1
+          sequenceIndex: getSequenceStart(selection) - 1 + copyIndex
         });
       }
     });
@@ -75,7 +74,7 @@
 
     items.forEach(function (item) {
       var footprint = item.token.diameterIn + project.settings.bleedIn * 2;
-      var rowWidth = footprint * item.faceCount + gutterIn * Math.max(0, item.faceCount - 1);
+      var rowWidth = footprint;
       var cellSize = footprint;
 
       if (currentX + rowWidth > project.settings.pageMarginIn + availableWidth) {
@@ -92,10 +91,7 @@
         rowHeight = 0;
       }
 
-      currentPage.items.push(createCellItem(item, "front", currentX, currentY, footprint, project.settings.bleedIn));
-      if (item.faceCount === 2) {
-        currentPage.items.push(createCellItem(item, "back", currentX + footprint + gutterIn, currentY, footprint, project.settings.bleedIn));
-      }
+      currentPage.items.push(createCellItem(item, currentX, currentY, footprint, project.settings.bleedIn));
 
       currentX += rowWidth + gutterIn;
       rowHeight = Math.max(rowHeight, cellSize);
@@ -120,11 +116,10 @@
     };
   }
 
-  function createCellItem(item, faceName, cellXIn, cellYIn, footprintIn, bleedIn) {
+  function createCellItem(item, cellXIn, cellYIn, footprintIn, bleedIn) {
     return {
       tokenId: item.tokenId,
       token: item.token,
-      faceName: faceName,
       sequenceIndex: item.sequenceIndex,
       cellXIn: cellXIn,
       cellYIn: cellYIn,

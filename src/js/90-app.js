@@ -195,11 +195,9 @@
       ].join("");
     }
 
-    var face = token[selection.faceName];
+    var face = token.front;
     var selectedComponent = getSelectedComponent(face, selection.selectedComponentType, selection.selectedComponentId);
-    var componentItems = getComponentItems(face, selection.faceName);
-    var copyFaceTarget = selection.faceName === "front" ? "back" : "front";
-    var copyFaceTitle = selection.faceName === "front" ? "Copy Front to Back" : "Copy Back to Front";
+    var componentItems = getComponentItems(face);
     return [
       '<div class="designer-shell">',
       '  <section class="designer-main">',
@@ -212,17 +210,12 @@
       '            <button class="button" type="button" data-action="clone-token" data-token-id="' + token.id + '">Clone</button>',
       '            <button class="button" type="button" data-action="delete-token" data-token-id="' + token.id + '">Delete</button>',
       "          </div>",
-      '          <div class="face-toggle">',
-      '            <button type="button" class="' + (selection.faceName === "front" ? "is-active" : "") + '" data-face="front">Front</button>',
-      '            <button type="button" class="' + (selection.faceName === "back" ? "is-active" : "") + '" data-face="back">Back</button>',
-      "          </div>",
-      '          <button class="button" type="button" data-action="copy-face" data-source-face="' + selection.faceName + '" data-target-face="' + copyFaceTarget + '" aria-label="' + copyFaceTitle + '" title="' + copyFaceTitle + '">Copy</button>',
       "        </div>",
       '        <div class="designer-toolbar-row component-row">',
       '          <label class="field toolbar-field">Component<select name="selectedComponentKey">' + renderComponentOptions(componentItems, selection.selectedComponentType, selection.selectedComponentId) + '</select></label>',
       '          <div class="button-row">',
-      '            <button class="button" type="button" data-action="add-text" data-face="' + selection.faceName + '">Add Text</button>',
-      '            <button class="button" type="button" data-action="add-image" data-face="' + selection.faceName + '">Add Image</button>',
+      '            <button class="button" type="button" data-action="add-text">Add Text</button>',
+      '            <button class="button" type="button" data-action="add-image">Add Image</button>',
       '            <button class="button icon-trash" type="button" data-action="delete-component"' + (canDeleteSelectedComponent(selection) ? "" : " disabled") + ' aria-label="Delete Selected Component" title="Delete Selected Component"><span aria-hidden="true">&#128465;</span></button>',
       '            <input class="visually-hidden" type="file" accept="image/*" data-image-upload-input>',
       "          </div>",
@@ -232,9 +225,8 @@
       '    <section class="panel-card preview-shell">',
       '      <div class="preview-stage" data-preview-stage>',
       Renderer.renderTokenSvg(token, state.project, {
-        face: selection.faceName,
         sequenceIndex: 0,
-        instanceId: "designer-" + selection.faceName,
+        instanceId: "designer-front",
         interactive: true,
         selectedComponentType: selection.selectedComponentType,
         selectedComponentId: selection.selectedComponentId
@@ -253,7 +245,7 @@
       '    <div class="drawer-body">',
       '      <section class="drawer-section">',
       "        <h3>" + (selectedComponent ? "Selected Component" : "Token") + "</h3>",
-      (selectedComponent ? renderSelectedComponentForm(selectedComponent, selection, state.project) : renderTokenForm(token, state.project, selection.faceName)),
+      (selectedComponent ? renderSelectedComponentForm(selectedComponent, selection, state.project) : renderTokenForm(token, state.project)),
       "      </section>",
       "    </div>",
       "  </aside>",
@@ -314,7 +306,7 @@
     }).join("");
   }
 
-  function getComponentItems(face, faceName) {
+  function getComponentItems(face) {
     return Tokens.getSortedFaceComponents(face, "desc").map(function (entry) {
       var component = entry.component;
       return {
@@ -336,18 +328,15 @@
     return selection.selectedComponentType === "image" || selection.selectedComponentType === "text";
   }
 
-  function renderTokenForm(token, project, faceName) {
-    var face = token[faceName];
+  function renderTokenForm(token, project) {
+    var face = token.front;
     return [
       '<form class="form-grid" data-form="token-settings">',
       '  <label class="field">Name<input name="name" value="' + escapeHtml(token.name) + '" required></label>',
-      '  <div class="field-row two-up">',
-      '    <label class="field">Diameter<select name="diameterIn">' + Schema.TOKEN_SIZES.map(function (size) {
+      '  <label class="field">Diameter<select name="diameterIn">' + Schema.TOKEN_SIZES.map(function (size) {
         return '<option value="' + size + '"' + (size === token.diameterIn ? " selected" : "") + ">" + size + '&quot;</option>';
       }).join("") + "</select></label>",
-      '    <label class="field">Back face<select name="backEnabled"><option value="true"' + (token.back.enabled ? " selected" : "") + '>Enabled</option><option value="false"' + (!token.back.enabled ? " selected" : "") + '>Disabled</option></select></label>',
-      "  </div>",
-      '  <p class="field-help">Editing ' + escapeHtml(faceName === "front" ? "front" : "back") + ' face appearance.</p>',
+      '  <p class="field-help">Editing token appearance.</p>',
       renderBackgroundControls({
         modeName: "backgroundMode",
         currentMode: face.backgroundMode,
@@ -381,12 +370,9 @@
   function renderDefaultTokenSettingsForm(tokenDefaults, colorSequences) {
     return [
       '<form class="form-grid" data-form="token-defaults">',
-      '  <div class="field-row two-up">',
-      '    <label class="field">Diameter<select name="defaultDiameterIn">' + Schema.TOKEN_SIZES.map(function (size) {
+      '  <label class="field">Diameter<select name="defaultDiameterIn">' + Schema.TOKEN_SIZES.map(function (size) {
         return '<option value="' + size + '"' + (size === tokenDefaults.diameterIn ? " selected" : "") + ">" + size + '&quot;</option>';
       }).join("") + "</select></label>",
-      '    <label class="field">Back face<select name="defaultBackEnabled"><option value="true"' + (tokenDefaults.backEnabled ? " selected" : "") + '>Enabled</option><option value="false"' + (!tokenDefaults.backEnabled ? " selected" : "") + '>Disabled</option></select></label>',
-      "  </div>",
       renderBackgroundControls({
         modeName: "defaultBackgroundMode",
         currentMode: tokenDefaults.backgroundMode,
@@ -486,7 +472,7 @@
   }
 
   function renderZOrderControls(component, selection) {
-    var face = selection.token ? selection.token[selection.faceName] : null;
+    var face = selection.token ? selection.token.front : null;
     var canMoveUp = face ? Tokens.canMoveComponentZ(face, selection.selectedComponentType, component.id, "up") : false;
     var canMoveDown = face ? Tokens.canMoveComponentZ(face, selection.selectedComponentType, component.id, "down") : false;
     return [
@@ -664,7 +650,6 @@
           ui.selectedTokenId = null;
           ui.selectedComponentType = null;
           ui.selectedComponentId = null;
-          ui.selectedFace = "front";
           ui.selectedPrintPreviewPage = 0;
         });
       });
@@ -707,7 +692,6 @@
         var borderColorSelection = parseColorSourceValue(formData.get("defaultBorderColorSource"));
         store.updateProject(function (project) {
           project.settings.tokenDefaults.diameterIn = Number(formData.get("defaultDiameterIn")) || project.settings.tokenDefaults.diameterIn;
-          project.settings.tokenDefaults.backEnabled = String(formData.get("defaultBackEnabled")) === "true";
           project.settings.tokenDefaults.backgroundMode = String(formData.get("defaultBackgroundMode")) === "image" ? "image" : "color";
           project.settings.tokenDefaults.backgroundColorMode = backgroundColorSelection.mode;
           project.settings.tokenDefaults.backgroundColor = String(formData.get("defaultBackgroundColor") || project.settings.tokenDefaults.backgroundColor);
@@ -888,7 +872,6 @@
             ui.selectedTokenId = null;
             ui.selectedComponentType = null;
             ui.selectedComponentId = null;
-            ui.selectedFace = "front";
             ui.selectedPrintPreviewPage = 0;
           });
         } catch (error) {
@@ -914,7 +897,6 @@
           ui.selectedTokenId = token.id;
           ui.selectedComponentType = null;
           ui.selectedComponentId = null;
-          ui.selectedFace = "front";
         });
       });
     });
@@ -969,33 +951,6 @@
       });
     });
 
-    appElement.querySelectorAll("[data-face]").forEach(function (button) {
-      button.addEventListener("click", function () {
-        var faceName = button.getAttribute("data-face");
-        store.updateUi(function (ui) {
-          ui.selectedFace = faceName;
-          ui.selectedComponentType = null;
-          ui.selectedComponentId = null;
-        });
-      });
-    });
-
-    appElement.querySelectorAll("[data-action='copy-face']").forEach(function (button) {
-      button.addEventListener("click", function () {
-        var selection = getDesignerSelection(store.getState());
-        if (!selection.token) {
-          return;
-        }
-
-        var sourceFaceName = button.getAttribute("data-source-face") || selection.faceName;
-        var targetFaceName = button.getAttribute("data-target-face") || (sourceFaceName === "front" ? "back" : "front");
-        store.updateProject(function (project) {
-          var token = findToken(project, selection.token.id);
-          Tokens.copyFaceContent(token, sourceFaceName, targetFaceName);
-        });
-      });
-    });
-
     var tokenForm = appElement.querySelector("[data-form='token-settings']");
     if (tokenForm) {
       tokenForm.querySelectorAll('select[name="backgroundMode"], select[name="backgroundColorSource"], select[name="borderColorSource"]').forEach(function (element) {
@@ -1020,12 +975,11 @@
         var formData = new FormData(tokenForm);
         store.updateProject(function (project) {
           var token = findToken(project, selection.token.id);
-          var face = token[selection.faceName];
+          var face = token.front;
           var backgroundColorSelection = parseColorSourceValue(formData.get("backgroundColorSource"));
           var borderColorSelection = parseColorSourceValue(formData.get("borderColorSource"));
           token.name = String(formData.get("name")) || token.name;
           token.diameterIn = Number(formData.get("diameterIn")) || token.diameterIn;
-          token.back.enabled = String(formData.get("backEnabled")) === "true";
           face.backgroundMode = String(formData.get("backgroundMode")) === "image" ? "image" : "color";
           face.backgroundColorMode = backgroundColorSelection.mode;
           face.backgroundColor = String(formData.get("backgroundColor") || face.backgroundColor);
@@ -1051,8 +1005,8 @@
             if (!token) {
               return;
             }
-            token[selection.faceName].backgroundMode = "image";
-            token[selection.faceName].backgroundImageSource = imageAsset.source;
+            token.front.backgroundMode = "image";
+            token.front.backgroundImageSource = imageAsset.source;
           });
         },
         onRemove: function () {
@@ -1065,8 +1019,8 @@
             if (!token) {
               return;
             }
-            token[selection.faceName].backgroundMode = "color";
-            token[selection.faceName].backgroundImageSource = "";
+            token.front.backgroundMode = "color";
+            token.front.backgroundImageSource = "";
           });
         }
       });
@@ -1078,7 +1032,7 @@
         if (!selection.token) {
           return;
         }
-        var face = selection.token[selection.faceName];
+        var face = selection.token.front;
         var textDefaults = store.getState().project.settings.textDefaults;
         var component = Tokens.createTextComponent({
           name: "Text #" + (face.texts.length + 1),
@@ -1097,7 +1051,7 @@
         });
         store.updateProject(function (project) {
           var token = findToken(project, selection.token.id);
-          token[selection.faceName].texts.push(component);
+          token.front.texts.push(component);
         });
         store.updateUi(function (ui) {
           ui.selectedComponentType = "text";
@@ -1128,11 +1082,11 @@
             source: imageAsset.source,
             name: file.name,
             aspectRatio: imageAsset.width / imageAsset.height,
-            zIndex: Tokens.getNextComponentZ(selection.token[selection.faceName])
+            zIndex: Tokens.getNextComponentZ(selection.token.front)
           });
           store.updateProject(function (project) {
             var token = findToken(project, selection.token.id);
-            token[selection.faceName].images.push(component);
+            token.front.images.push(component);
           });
           store.updateUi(function (ui) {
             ui.selectedComponentType = "image";
@@ -1167,7 +1121,7 @@
         }
         store.updateProject(function (project) {
           var token = findToken(project, selection.token.id);
-          var face = token[selection.faceName];
+          var face = token.front;
           face.images = face.images.filter(function (component) {
             return component.id !== selection.selectedComponentId;
           });
@@ -1194,7 +1148,7 @@
           if (!token) {
             return;
           }
-          Tokens.moveComponentZ(token[selection.faceName], selection.selectedComponentType, selection.selectedComponentId, direction);
+          Tokens.moveComponentZ(token.front, selection.selectedComponentType, selection.selectedComponentId, direction);
         });
       });
     });
@@ -1320,7 +1274,7 @@
         var componentId = componentElement.getAttribute("data-component-id");
         var componentType = componentElement.getAttribute("data-component-type");
         var mode = event.target.getAttribute("data-drag-mode") || "move";
-        var component = getSelectedComponent(selection.token[selection.faceName], componentType, componentId);
+          var component = getSelectedComponent(selection.token.front, componentType, componentId);
         if (!component) {
           return;
         }
@@ -1329,7 +1283,6 @@
         var previewRect = svgElement.getBoundingClientRect();
         designerInteraction = {
           tokenId: selection.token.id,
-          faceName: selection.faceName,
           componentId: componentId,
           componentType: componentType,
           mode: mode,
@@ -1498,7 +1451,6 @@
       }
       var selection = {
         token: token,
-        faceName: designerInteraction.faceName,
         selectedComponentId: designerInteraction.componentId
       };
       var component = findComponent(project, selection, designerInteraction.componentType);
@@ -1649,11 +1601,9 @@
     var token = state.project.tokens.find(function (candidate) {
       return candidate.id === state.ui.selectedTokenId;
     }) || state.project.tokens[0] || null;
-    var faceName = state.ui.selectedFace === "back" ? "back" : "front";
 
     return {
       token: token,
-      faceName: faceName,
       selectedComponentType: state.ui.selectedComponentType,
       selectedComponentId: state.ui.selectedComponentId
     };
@@ -1688,7 +1638,7 @@
     if (!token) {
       return null;
     }
-    var face = token[selection.faceName];
+    var face = token.front;
     if (type === "background") {
       return face;
     }
@@ -1803,9 +1753,7 @@
     }
 
     token.diameterIn = tokenDefaults.diameterIn || token.diameterIn;
-    token.back.enabled = tokenDefaults.backEnabled === true;
     applyTokenDefaultsToFace(token.front, tokenDefaults);
-    applyTokenDefaultsToFace(token.back, tokenDefaults);
   }
 
   function applyTokenDefaultsToFace(face, tokenDefaults) {
@@ -2128,7 +2076,7 @@
   }
 
   function renderPageCellFill(item, project) {
-    var face = item.token[item.faceName];
+    var face = item.token.front;
     var fill = getPageCellFill(face, project.sequences.color, item.sequenceIndex);
     return '<rect x="' + (item.cellXIn * 100) + '" y="' + (item.cellYIn * 100) + '" width="' + (item.cellSizeIn * 100) + '" height="' + (item.cellSizeIn * 100) + '" fill="' + escapeHtml(fill) + '"></rect>';
   }
@@ -2137,11 +2085,10 @@
     var x = item.xIn * 100;
     var y = item.yIn * 100;
     var size = item.diameterIn * 100;
-    var cellFill = getPageCellFill(item.token[item.faceName], project.sequences.color, item.sequenceIndex);
+    var cellFill = getPageCellFill(item.token.front, project.sequences.color, item.sequenceIndex);
     return Renderer.renderTokenSvg(item.token, project, {
-        face: item.faceName,
         sequenceIndex: item.sequenceIndex,
-        instanceId: "page-" + item.faceName + "-" + item.sequenceIndex + "-" + Math.round(x) + "-" + Math.round(y),
+        instanceId: "page-front-" + item.sequenceIndex + "-" + Math.round(x) + "-" + Math.round(y),
         interactive: false,
         outerSquareFill: cellFill,
         tokenBaseFill: cellFill,

@@ -8,8 +8,7 @@
 
   function renderTokenSvg(token, project, options) {
     var opts = options || {};
-    var faceName = opts.face || "front";
-    var face = token[faceName];
+    var face = token.front;
     var sequenceIndex = opts.sequenceIndex || 0;
     var colorSequences = project.sequences.color;
     var textSequences = project.sequences.text;

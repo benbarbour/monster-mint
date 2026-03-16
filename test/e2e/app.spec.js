@@ -110,7 +110,6 @@ test("token settings own appearance controls and color sequences show in preview
   await page.getByRole("button", { name: "Settings" }).click();
   await expect(page.locator('form[data-form="token-defaults"]')).toBeVisible();
   await page.locator('form[data-form="token-defaults"] select[name="defaultDiameterIn"]').selectOption("2");
-  await page.locator('form[data-form="token-defaults"] select[name="defaultBackEnabled"]').selectOption("true");
   await page.locator('form[data-form="token-defaults"] select[name="defaultBackgroundMode"]').selectOption("image");
   await page.locator('[data-default-background-input]').setInputFiles({
     name: "default-background.svg",
@@ -132,14 +131,12 @@ test("token settings own appearance controls and color sequences show in preview
   await page.getByRole("tab", { name: "Designer" }).click();
   await page.getByRole("button", { name: "Create Token" }).click();
   await expect(page.locator('form[data-form="token-settings"] select[name="diameterIn"]')).toHaveValue("2");
-  await expect(page.locator('form[data-form="token-settings"] select[name="backEnabled"]')).toHaveValue("true");
   await expect(page.locator('form[data-form="token-settings"] select[name="backgroundMode"]')).toHaveValue("image");
   await expect(page.locator('form[data-form="token-settings"] input[name="borderWidthRatio"]')).toHaveValue("0.07");
   await expect(page.locator('[data-preview-stage] svg image[data-background-image="true"]')).toHaveCount(1);
   const componentOptions = await page.locator('select[name="selectedComponentKey"] option').allTextContents();
   expect(componentOptions).not.toContain("Background");
   expect(componentOptions).not.toContain("Border");
-  await expect(page.getByRole("button", { name: "Copy Front to Back" })).toBeVisible();
 
   await expect(page.locator('form[data-form="token-settings"] input[name="borderWidthRatio"]')).toHaveAttribute("max", "0.25");
   await expect(page.locator('[data-preview-stage] svg circle[stroke="#ff0000"]')).toHaveCount(1);
@@ -151,10 +148,6 @@ test("token settings own appearance controls and color sequences show in preview
     buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="#22aa44"/></svg>')
   });
   await expect(page.locator('[data-preview-stage] svg image[data-background-image="true"]').first()).not.toHaveAttribute("href", initialBackgroundHref);
-
-  await page.getByRole("button", { name: "Back", exact: true }).click();
-  await expect(page.locator('form[data-form="token-settings"]')).toBeVisible();
-  await expect(page.locator('form[data-form="token-settings"] input[name="borderWidthRatio"]')).toHaveValue("0.07");
 
   const oversizedSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"><desc>' +
     "A".repeat(1100000) +
@@ -183,10 +176,6 @@ test("token settings own appearance controls and color sequences show in preview
   await expect(page.locator('[data-preview-stage] svg image[transform*="rotate(45"]')).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Up" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Down" })).toBeVisible();
-  await page.getByRole("button", { name: "Copy Back to Front" }).click();
-  await page.getByRole("button", { name: "Front", exact: true }).click();
-  const copiedFrontOptions = await page.locator('select[name="selectedComponentKey"] option').allTextContents();
-  expect(copiedFrontOptions).toContain("token.svg");
   await page.locator('select[name="selectedComponentKey"]').selectOption({ label: "token.svg" });
   await expect(page.locator('form[data-form="image-component-settings"] input[name="scale"]')).toBeVisible();
 

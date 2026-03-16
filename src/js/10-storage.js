@@ -58,7 +58,6 @@
         selectedTokenId: typeof parsed.selectedTokenId === "string" ? parsed.selectedTokenId : null,
         selectedComponentType: typeof parsed.selectedComponentType === "string" ? parsed.selectedComponentType : null,
         selectedComponentId: typeof parsed.selectedComponentId === "string" ? parsed.selectedComponentId : null,
-        selectedFace: parsed.selectedFace === "back" ? "back" : "front",
         selectedPrintPreviewPage: Number.isFinite(parsed.selectedPrintPreviewPage) ? Math.max(0, parsed.selectedPrintPreviewPage) : 0,
         printPanels: normalizePrintPanels(parsed.printPanels)
       };
@@ -92,7 +91,6 @@
       selectedTokenId: null,
       selectedComponentType: null,
       selectedComponentId: null,
-      selectedFace: "front",
       selectedPrintPreviewPage: 0,
       printPanels: {
         settings: true,

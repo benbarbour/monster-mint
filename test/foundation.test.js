@@ -33,7 +33,6 @@ test("createDefaultProject returns the expected baseline structure", () => {
   assert.equal(project.meta.name, "Untitled Project");
   assert.equal(project.settings.pagePresetId, "letter");
   assert.equal(project.settings.tokenDefaults.diameterIn, 1);
-  assert.equal(project.settings.tokenDefaults.backEnabled, false);
   assert.equal(project.settings.tokenDefaults.backgroundMode, "color");
   assert.equal(project.settings.tokenDefaults.backgroundColor, "#f3e7c9");
   assert.equal(project.settings.tokenDefaults.borderWidthRatio, 0.03);
@@ -128,7 +127,6 @@ test("loadUiState provides editing slots for sequence forms", () => {
     selectedTokenId: null,
     selectedComponentType: null,
     selectedComponentId: null,
-    selectedFace: "front",
     selectedPrintPreviewPage: 0,
     printPanels: {
       settings: true,
@@ -359,23 +357,6 @@ test("token cloning creates new ids while preserving token content", () => {
   assert.equal(clone.front.backgroundImageSource, token.front.backgroundImageSource);
   assert.equal(clone.front.images[0].source, token.front.images[0].source);
   assert.equal(clone.front.texts[0].customText, token.front.texts[0].customText);
-});
-
-test("copyFaceContent preserves image backgrounds", () => {
-  const token = Tokens.createTokenTemplate({
-    front: {
-      backgroundMode: "image",
-      backgroundColor: "#112233",
-      backgroundImageSource: "data:image/png;base64,xyz"
-    }
-  });
-
-  Tokens.copyFaceContent(token, "front", "back");
-
-  assert.equal(token.back.enabled, true);
-  assert.equal(token.back.backgroundMode, "image");
-  assert.equal(token.back.backgroundColor, "#112233");
-  assert.equal(token.back.backgroundImageSource, "data:image/png;base64,xyz");
 });
 
 test("token templates cap border width ratio at twenty-five percent", () => {

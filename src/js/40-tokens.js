@@ -14,11 +14,9 @@
       diameterIn: normalizeDiameter(payload.diameterIn),
       borderUnderImages: payload.borderUnderImages === true || legacyBorderUnderContent,
       borderUnderText: payload.borderUnderText === true || legacyBorderUnderContent,
-      front: normalizeFace(payload.front),
-      back: normalizeBackFace(payload.back)
+      front: normalizeFace(payload.front)
     };
     normalizeFaceZOrder(token.front, token);
-    normalizeFaceZOrder(token.back, token);
     return token;
   }
 
@@ -70,8 +68,7 @@
     return createTokenTemplate({
       name: (token.name || "Untitled Token") + " Copy",
       diameterIn: token.diameterIn,
-      front: cloneFace(token.front),
-      back: cloneBackFace(token.back)
+      front: cloneFace(token.front)
     });
   }
 
@@ -92,32 +89,6 @@
         widthRatio: asRatio(
           payload.border && payload.border.widthRatio,
           payload.border && payload.border.enabled === false ? 0 : (Number.isFinite(legacyWidthPt) ? legacyWidthPt / 72 : 0.03)
-        ),
-        colorMode: payload.border && payload.border.colorMode === "sequence" ? "sequence" : "manual",
-        color: payload.border && payload.border.color ? payload.border.color : "#000000",
-        colorSequenceRef: payload.border && payload.border.colorSequenceRef ? payload.border.colorSequenceRef : null
-      }
-    };
-  }
-
-  function normalizeBackFace(input) {
-    var payload = input || {};
-    var legacyWidthPt = payload.border && Number(payload.border.widthPt);
-    var background = normalizeFaceBackground(payload, "#ffffff");
-    return {
-      enabled: payload.enabled === true,
-      backgroundMode: background.backgroundMode,
-      backgroundColorMode: background.backgroundColorMode,
-      backgroundColor: background.backgroundColor,
-      backgroundColorSequenceRef: background.backgroundColorSequenceRef,
-      backgroundImageSource: background.backgroundImageSource,
-      images: Array.isArray(payload.images) ? payload.images.map(createImageComponent) : [],
-      texts: Array.isArray(payload.texts) ? payload.texts.map(createTextComponent) : [],
-      border: {
-        enabled: !payload.border || payload.border.enabled !== false,
-        widthRatio: asRatio(
-          payload.border && payload.border.widthRatio,
-          payload.border && payload.border.enabled === false ? 0 : (Number.isFinite(legacyWidthPt) ? legacyWidthPt / 72 : 0)
         ),
         colorMode: payload.border && payload.border.colorMode === "sequence" ? "sequence" : "manual",
         color: payload.border && payload.border.color ? payload.border.color : "#000000",
@@ -237,7 +208,7 @@
 
   function collectBoundedSequenceLengths(token) {
     var lengths = [];
-    var faces = [token.front, token.back];
+    var faces = [token.front];
 
     faces.forEach(function (face) {
       if (!face) {
@@ -557,41 +528,9 @@
     };
   }
 
-  function cloneBackFace(face) {
-    var nextFace = cloneFace(face);
-    nextFace.enabled = face.enabled === true;
-    return nextFace;
-  }
-
-  function copyFaceContent(token, sourceFaceName, targetFaceName) {
-    if (!token || !token[sourceFaceName] || !token[targetFaceName] || sourceFaceName === targetFaceName) {
-      return token;
-    }
-
-    if (targetFaceName === "back") {
-      token.back = cloneBackFace({
-        enabled: true,
-        backgroundMode: token[sourceFaceName].backgroundMode,
-        backgroundColorMode: token[sourceFaceName].backgroundColorMode,
-        backgroundColor: token[sourceFaceName].backgroundColor,
-        backgroundColorSequenceRef: token[sourceFaceName].backgroundColorSequenceRef,
-        backgroundImageSource: token[sourceFaceName].backgroundImageSource,
-        images: token[sourceFaceName].images,
-        texts: token[sourceFaceName].texts,
-        border: token[sourceFaceName].border
-      });
-      token.back.enabled = true;
-      return token;
-    }
-
-    token.front = cloneFace(token[sourceFaceName]);
-    return token;
-  }
-
   return {
     createTokenTemplate: createTokenTemplate,
     cloneTokenTemplate: cloneTokenTemplate,
-    copyFaceContent: copyFaceContent,
     createTextComponent: createTextComponent,
     createImageComponent: createImageComponent,
     normalizeToken: normalizeToken,

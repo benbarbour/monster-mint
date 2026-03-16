@@ -61,7 +61,6 @@
   function createDefaultTokenDefaults() {
     return {
       diameterIn: 1,
-      backEnabled: false,
       backgroundMode: "color",
       backgroundColorMode: "manual",
       backgroundColor: "#f3e7c9",
@@ -187,7 +186,6 @@
     var backgroundMode = payload.backgroundMode === "image" ? "image" : "color";
     return {
       diameterIn: TOKEN_SIZES.includes(Number(payload.diameterIn)) ? Number(payload.diameterIn) : defaults.diameterIn,
-      backEnabled: payload.backEnabled === true,
       backgroundMode: backgroundMode,
       backgroundColorMode: payload.backgroundColorMode === "sequence" ? "sequence" : "manual",
       backgroundColor: typeof payload.backgroundColor === "string" && payload.backgroundColor.trim() ? payload.backgroundColor : defaults.backgroundColor,
