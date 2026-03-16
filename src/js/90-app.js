@@ -230,6 +230,7 @@
       Renderer.renderTokenSvg(token, state.project, {
         face: selection.faceName,
         sequenceIndex: 0,
+        instanceId: "designer-" + selection.faceName,
         interactive: true,
         selectedComponentType: selection.selectedComponentType,
         selectedComponentId: selection.selectedComponentId
@@ -1877,6 +1878,7 @@
     return Renderer.renderTokenSvg(item.token, project, {
         face: item.faceName,
         sequenceIndex: item.sequenceIndex,
+        instanceId: "page-" + item.faceName + "-" + item.sequenceIndex + "-" + Math.round(x) + "-" + Math.round(y),
         interactive: false,
         outerSquareFill: cellFill,
         tokenBaseFill: cellFill,

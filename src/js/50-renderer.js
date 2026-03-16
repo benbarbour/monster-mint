@@ -22,7 +22,8 @@
     var tokenBaseFill = opts.tokenBaseFill || background;
     var selectedComponentType = opts.selectedComponentType;
     var selectedComponentId = opts.selectedComponentId;
-    var tokenSlug = token.id.replace(/[^a-z0-9_-]/gi, "");
+    var instanceSuffix = opts.instanceId ? "-" + String(opts.instanceId).replace(/[^a-z0-9_-]/gi, "") : "";
+    var tokenSlug = token.id.replace(/[^a-z0-9_-]/gi, "") + instanceSuffix;
     var svgAttributes = opts.svgAttributes ? " " + opts.svgAttributes : "";
     var borderMarkup = renderBorder(face, colorSequences, sequenceIndex);
     var backgroundInsetMarkup = renderBackgroundInset(face, background, tokenBaseFill);
