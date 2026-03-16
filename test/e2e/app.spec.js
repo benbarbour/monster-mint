@@ -223,6 +223,8 @@ test("token settings own appearance controls and color sequences show in preview
   await expect(page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]')).toHaveAttribute("type", "range");
   await expect(page.locator('[data-component-type="image"] [data-drag-mode="resize-top"]').first()).toHaveAttribute("cursor", "ns-resize");
   await expect(page.locator('[data-component-type="image"] [data-drag-mode="resize-bottom"]').first()).toHaveAttribute("cursor", "ns-resize");
+  await expect(page.locator('[data-component-type="image"] [data-drag-mode="resize-left"]').first()).toHaveAttribute("cursor", "ew-resize");
+  await expect(page.locator('[data-component-type="image"] [data-drag-mode="resize-right"]').first()).toHaveAttribute("cursor", "ew-resize");
   const uploadedImage = page.locator('[data-preview-stage] svg g[data-component-type="image"] image').first();
   await expect(uploadedImage).toHaveAttribute("href", /data:image\/(jpeg|png|webp);base64,/);
   const uploadedDimensions = await uploadedImage.evaluate((node) => ({
@@ -256,7 +258,8 @@ test("token settings own appearance controls and color sequences show in preview
     return target ? target.getAttribute("data-drag-mode") : null;
   }, edgePoint);
   expect(edgeHitTarget).toBe("resize-top");
-  const edgeEndPoint = await edgeHandle.evaluate((element, t) => {
+  const sideHandle = page.locator('[data-component-type="image"] [data-drag-mode="resize-right"]').first();
+  const sidePoint = await sideHandle.evaluate((element, t) => {
     const x1 = Number(element.getAttribute("x1"));
     const y1 = Number(element.getAttribute("y1"));
     const x2 = Number(element.getAttribute("x2"));
@@ -266,12 +269,12 @@ test("token settings own appearance controls and color sequences show in preview
     point.y = y1 + (y2 - y1) * t;
     const screenPoint = point.matrixTransform(element.getScreenCTM());
     return { x: screenPoint.x, y: screenPoint.y };
-  }, 0.9);
-  const edgeEndHitTarget = await page.evaluate(({ x, y }) => {
+  }, 0.5);
+  const sideHitTarget = await page.evaluate(({ x, y }) => {
     const target = document.elementFromPoint(x, y);
     return target ? target.getAttribute("data-drag-mode") : null;
-  }, edgeEndPoint);
-  expect(edgeEndHitTarget).toBe("resize-top");
+  }, sidePoint);
+  expect(sideHitTarget).toBe("resize-right");
   await expect(page.getByRole("button", { name: "Up" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Down" })).toBeVisible();
   await page.locator('select[name="selectedComponentKey"]').selectOption({ label: "token.svg" });

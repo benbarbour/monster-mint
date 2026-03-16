@@ -376,21 +376,41 @@
       componentType: interaction.componentType
     };
 
-    if (interaction.mode === "resize" || interaction.mode === "resize-top" || interaction.mode === "resize-bottom") {
+    if (
+      interaction.mode === "resize" ||
+      interaction.mode === "resize-top" ||
+      interaction.mode === "resize-bottom" ||
+      interaction.mode === "resize-left" ||
+      interaction.mode === "resize-right"
+    ) {
       if (interaction.componentType === "image") {
         var startDimensions = Tokens.getImageDimensions(interaction.startRect);
         var rotationRadians = Number(interaction.startRect.rotationDeg || 0) * Math.PI / 180;
-        var outwardX = interaction.mode === "resize-top" ? Math.sin(rotationRadians) : -Math.sin(rotationRadians);
-        var outwardY = interaction.mode === "resize-top" ? -Math.cos(rotationRadians) : Math.cos(rotationRadians);
+        var outwardX;
+        var outwardY;
+        var baseHalfSize;
+        if (interaction.mode === "resize-top") {
+          outwardX = Math.sin(rotationRadians);
+          outwardY = -Math.cos(rotationRadians);
+          baseHalfSize = Math.max(startDimensions.height / 2, 0.001);
+        } else if (interaction.mode === "resize-bottom") {
+          outwardX = -Math.sin(rotationRadians);
+          outwardY = Math.cos(rotationRadians);
+          baseHalfSize = Math.max(startDimensions.height / 2, 0.001);
+        } else if (interaction.mode === "resize-left") {
+          outwardX = -Math.cos(rotationRadians);
+          outwardY = -Math.sin(rotationRadians);
+          baseHalfSize = Math.max(startDimensions.width / 2, 0.001);
+        } else {
+          outwardX = Math.cos(rotationRadians);
+          outwardY = Math.sin(rotationRadians);
+          baseHalfSize = Math.max(startDimensions.width / 2, 0.001);
+        }
         var outwardDelta = deltaX * outwardX + deltaY * outwardY;
-        var halfHeight = Math.max(startDimensions.height / 2, 0.001);
-        var heightRatio = interaction.mode === "resize-top" || interaction.mode === "resize-bottom"
-          ? (halfHeight + outwardDelta) / halfHeight
-          : (startDimensions.height / 2 + deltaY) / Math.max(startDimensions.height / 2, 0.001);
         state.componentState = {
           x: interaction.startRect.x,
           y: interaction.startRect.y,
-          scale: interaction.startRect.scale * Math.max(0.1, heightRatio),
+          scale: interaction.startRect.scale * Math.max(0.1, (baseHalfSize + outwardDelta) / baseHalfSize),
           rotationDeg: interaction.startRect.rotationDeg
         };
       } else {

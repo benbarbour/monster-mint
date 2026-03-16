@@ -216,24 +216,33 @@
 
   function renderImageResizeHandles(box, component) {
     var handleOverhang = 6;
-    var visibleWidth = Math.max(8, box.width + handleOverhang * 2);
-    var handleHeight = 8;
+    var edgeThickness = 8;
     var topX = box.x - handleOverhang;
-    var topY = box.y - handleHeight / 2;
-    var bottomY = box.y + box.height - handleHeight / 2;
-    var cursor = getResizeCursor(component.rotationDeg || 0);
+    var topY = box.y - edgeThickness / 2;
+    var bottomY = box.y + box.height - edgeThickness / 2;
+    var leftX = box.x - edgeThickness / 2;
+    var leftY = box.y - handleOverhang;
+    var visibleWidth = Math.max(8, box.width + handleOverhang * 2);
+    var visibleHeight = Math.max(8, box.height + handleOverhang * 2);
+    var horizontalCursor = getResizeCursor(component.rotationDeg || 0);
+    var verticalCursor = getResizeCursor(Number(component.rotationDeg || 0) + 90);
     return [
-      renderImageResizeHandle(topX, topY, visibleWidth, handleHeight, "resize-top", cursor),
-      renderImageResizeHandle(topX, bottomY, visibleWidth, handleHeight, "resize-bottom", cursor)
+      renderImageResizeHandle(topX, topY, visibleWidth, edgeThickness, "resize-top", horizontalCursor, false),
+      renderImageResizeHandle(topX, bottomY, visibleWidth, edgeThickness, "resize-bottom", horizontalCursor, false),
+      renderImageResizeHandle(leftX, leftY, visibleHeight, edgeThickness, "resize-left", verticalCursor, true),
+      renderImageResizeHandle(box.x + box.width - edgeThickness / 2, leftY, visibleHeight, edgeThickness, "resize-right", verticalCursor, true)
     ].join("");
   }
 
-  function renderImageResizeHandle(x, y, width, height, mode, cursor) {
-    var midY = y + height / 2;
+  function renderImageResizeHandle(x, y, length, thickness, mode, cursor, vertical) {
+    var x1 = vertical ? x + thickness / 2 : x;
+    var y1 = vertical ? y : y + thickness / 2;
+    var x2 = vertical ? x + thickness / 2 : x + length;
+    var y2 = vertical ? y + length : y + thickness / 2;
     return [
-      '<line x1="' + x + '" y1="' + midY + '" x2="' + (x + width) + '" y2="' + midY + '" stroke="rgba(255,255,255,0.001)" stroke-width="' + height + '" stroke-linecap="round" pointer-events="stroke" data-drag-mode="' + mode + '" cursor="' + cursor + '"></line>',
-      '<line x1="' + x + '" y1="' + midY + '" x2="' + (x + width) + '" y2="' + midY + '" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" pointer-events="none"></line>',
-      '<line x1="' + x + '" y1="' + midY + '" x2="' + (x + width) + '" y2="' + midY + '" stroke="#111111" stroke-width="0.55" stroke-linecap="round" stroke-dasharray="2 2" stroke-dashoffset="2" pointer-events="none"></line>'
+      '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="rgba(255,255,255,0.001)" stroke-width="' + thickness + '" stroke-linecap="round" pointer-events="stroke" data-drag-mode="' + mode + '" cursor="' + cursor + '"></line>',
+      '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" pointer-events="none"></line>',
+      '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#111111" stroke-width="0.55" stroke-linecap="round" stroke-dasharray="2 2" stroke-dashoffset="2" pointer-events="none"></line>'
     ].join("");
   }
 
