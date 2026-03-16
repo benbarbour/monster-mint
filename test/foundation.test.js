@@ -251,6 +251,24 @@ test("token templates cap border width ratio at twenty-five percent", () => {
   assert.equal(token.front.border.widthRatio, 0.25);
 });
 
+test("component z-order can move across the border layer without duplicates", () => {
+  const token = Tokens.createTokenTemplate({
+    front: {
+      images: [Tokens.createImageComponent({ name: "Art", zIndex: -1 })],
+      texts: [Tokens.createTextComponent({ name: "Label", zIndex: 1 })]
+    }
+  });
+
+  assert.equal(Tokens.canMoveComponentZ(token.front, "image", token.front.images[0].id, "up"), true);
+  assert.equal(Tokens.moveComponentZ(token.front, "image", token.front.images[0].id, "up"), true);
+  assert.equal(token.front.images[0].zIndex, 1);
+  assert.equal(token.front.texts[0].zIndex, 2);
+
+  assert.equal(Tokens.moveComponentZ(token.front, "text", token.front.texts[0].id, "down"), true);
+  assert.equal(token.front.images[0].zIndex, 2);
+  assert.equal(token.front.texts[0].zIndex, 1);
+});
+
 test("color sequences wrap when copies exceed sequence length", () => {
   const colorSequence = Sequences.createColorSequence({
     id: "c1",

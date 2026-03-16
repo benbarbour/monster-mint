@@ -1388,7 +1388,7 @@ button {
   function createTokenTemplate(input) {
     var payload = input || {};
     var legacyBorderUnderContent = payload.borderUnderContent === true;
-    return {
+    var token = {
       id: payload.id || Utils.uid("token"),
       name: payload.name || "Untitled Token",
       diameterIn: normalizeDiameter(payload.diameterIn),
@@ -1397,6 +1397,9 @@ button {
       front: normalizeFace(payload.front),
       back: normalizeBackFace(payload.back)
     };
+    normalizeFaceZOrder(token.front, token);
+    normalizeFaceZOrder(token.back, token);
+    return token;
   }
 
   function createTextComponent(input) {
@@ -1418,6 +1421,7 @@ button {
       colorMode: payload.colorMode === "sequence" ? "sequence" : "manual",
       color: payload.color || "#111111",
       colorSequenceRef: payload.colorSequenceRef || null,
+      zIndex: asComponentZ(payload.zIndex != null ? payload.zIndex : payload.z, 1),
       textBorder: normalizeTextBorder(payload.textBorder || payload.shadow)
     };
   }
@@ -1433,6 +1437,7 @@ button {
       rotationDeg: asRotation(payload.rotationDeg, 0),
       mirrorX: payload.mirrorX === true,
       mirrorY: payload.mirrorY === true,
+      zIndex: asComponentZ(payload.zIndex != null ? payload.zIndex : payload.z, 1),
       source: payload.source || "",
       name: payload.name || "Uploaded image"
     };
@@ -1442,8 +1447,6 @@ button {
     return createTokenTemplate({
       name: (token.name || "Untitled Token") + " Copy",
       diameterIn: token.diameterIn,
-      borderUnderImages: token.borderUnderImages === true,
-      borderUnderText: token.borderUnderText === true,
       front: cloneFace(token.front),
       back: cloneBackFace(token.back)
     });
@@ -1689,6 +1692,14 @@ button {
     return Number.isFinite(parsed) ? Math.max(0, parsed) : fallback;
   }
 
+  function asComponentZ(value, fallback) {
+    var parsed = asInteger(value, fallback);
+    if (parsed === 0) {
+      return fallback > 0 ? 1 : -1;
+    }
+    return parsed;
+  }
+
   function normalizeTextContentMode(value, legacyMode) {
     if (value === "numeric" || value === "alphabetic" || value === "custom") {
       return value;
@@ -1721,6 +1732,135 @@ button {
     return Math.min(max, Math.max(min, value));
   }
 
+  function getFaceComponents(face) {
+    return face.images.map(function (component) {
+      return { type: "image", component: component };
+    }).concat(face.texts.map(function (component) {
+      return { type: "text", component: component };
+    }));
+  }
+
+  function normalizeFaceZOrder(face, token) {
+    if (!face) {
+      return;
+    }
+
+    var legacyImagesAboveBorder = token && token.borderUnderImages === true;
+    var legacyTextAboveBorder = token && token.borderUnderText === true;
+    var negative = [];
+    var positive = [];
+
+    getFaceComponents(face).forEach(function (entry, index) {
+      var z = Number(entry.component.zIndex);
+      if (!Number.isFinite(z) || z === 0) {
+        z = entry.type === "image"
+          ? (legacyImagesAboveBorder ? index + 1 : -(index + 1))
+          : (legacyTextAboveBorder ? index + 1001 : -(index + 1001));
+      }
+
+      if (z < 0) {
+        negative.push({ type: entry.type, component: entry.component, sortKey: z });
+      } else {
+        positive.push({ type: entry.type, component: entry.component, sortKey: z });
+      }
+    });
+
+    negative.sort(compareComponentEntries);
+    positive.sort(compareComponentEntries);
+    assignZOrder(negative, positive);
+  }
+
+  function compareComponentEntries(left, right) {
+    if (left.sortKey !== right.sortKey) {
+      return left.sortKey - right.sortKey;
+    }
+    if (left.type !== right.type) {
+      return left.type === "image" ? -1 : 1;
+    }
+    return left.component.id.localeCompare(right.component.id);
+  }
+
+  function assignZOrder(negative, positive) {
+    negative.forEach(function (entry, index) {
+      entry.component.zIndex = index - negative.length;
+    });
+    positive.forEach(function (entry, index) {
+      entry.component.zIndex = index + 1;
+    });
+  }
+
+  function getSortedFaceComponents(face, direction) {
+    var multiplier = direction === "desc" ? -1 : 1;
+    return getFaceComponents(face).slice().sort(function (left, right) {
+      var delta = (Number(left.component.zIndex || 0) - Number(right.component.zIndex || 0)) * multiplier;
+      if (delta !== 0) {
+        return delta;
+      }
+      if (left.type !== right.type) {
+        return left.type === "image" ? -1 : 1;
+      }
+      return left.component.id.localeCompare(right.component.id);
+    });
+  }
+
+  function getNextComponentZ(face) {
+    var sorted = getSortedFaceComponents(face);
+    var highest = sorted.length ? Number(sorted[sorted.length - 1].component.zIndex || 0) : 0;
+    return Math.max(1, highest + 1);
+  }
+
+  function canMoveComponentZ(face, componentType, componentId, direction) {
+    var slots = buildZSlots(face);
+    var index = findSlotIndex(slots, componentType, componentId);
+    if (index < 0) {
+      return false;
+    }
+    return direction === "up" ? index < slots.length - 1 : index > 0;
+  }
+
+  function moveComponentZ(face, componentType, componentId, direction) {
+    var slots = buildZSlots(face);
+    var index = findSlotIndex(slots, componentType, componentId);
+    if (index < 0) {
+      return false;
+    }
+
+    var targetIndex = direction === "up" ? index + 1 : index - 1;
+    if (targetIndex < 0 || targetIndex >= slots.length) {
+      return false;
+    }
+
+    var moved = slots[index];
+    slots[index] = slots[targetIndex];
+    slots[targetIndex] = moved;
+    reassignZFromSlots(slots);
+    return true;
+  }
+
+  function buildZSlots(face) {
+    var sorted = getSortedFaceComponents(face);
+    var negative = sorted.filter(function (entry) {
+      return entry.component.zIndex < 0;
+    });
+    var positive = sorted.filter(function (entry) {
+      return entry.component.zIndex > 0;
+    });
+    return negative.concat([{ type: "border", component: null }], positive);
+  }
+
+  function findSlotIndex(slots, componentType, componentId) {
+    return slots.findIndex(function (entry) {
+      return entry.type === componentType && entry.component && entry.component.id === componentId;
+    });
+  }
+
+  function reassignZFromSlots(slots) {
+    var borderIndex = slots.findIndex(function (entry) {
+      return entry.type === "border";
+    });
+    assignZOrder(slots.slice(0, borderIndex), slots.slice(borderIndex + 1));
+  }
+
   function cloneFace(face) {
     return {
       backgroundColorMode: face.backgroundColorMode,
@@ -1735,6 +1875,7 @@ button {
           rotationDeg: component.rotationDeg,
           mirrorX: component.mirrorX,
           mirrorY: component.mirrorY,
+          zIndex: component.zIndex,
           source: component.source,
           name: component.name
         });
@@ -1755,6 +1896,7 @@ button {
           colorMode: component.colorMode,
           color: component.color,
           colorSequenceRef: component.colorSequenceRef,
+          zIndex: component.zIndex,
           textBorder: {
             width: component.textBorder.width,
             colorMode: component.textBorder.colorMode,
@@ -1809,6 +1951,10 @@ button {
     createTextComponent: createTextComponent,
     createImageComponent: createImageComponent,
     normalizeToken: normalizeToken,
+    getSortedFaceComponents: getSortedFaceComponents,
+    getNextComponentZ: getNextComponentZ,
+    canMoveComponentZ: canMoveComponentZ,
+    moveComponentZ: moveComponentZ,
     clampRect: clampRect,
     updateComponentRect: updateComponentRect,
     updateImageComponent: updateImageComponent,
@@ -1850,8 +1996,13 @@ button {
     var borderMarkup = renderBorder(face, colorSequences, sequenceIndex);
     var backgroundInsetMarkup = renderBackgroundInset(face, background, tokenBaseFill);
     var outerSquareFill = opts.outerSquareFill || "#f6efe2";
-    var borderUnderImages = token.borderUnderImages === true;
-    var borderUnderText = token.borderUnderText === true || borderUnderImages;
+    var orderedComponents = Tokens.getSortedFaceComponents(face);
+    var lowerComponents = orderedComponents.filter(function (entry) {
+      return entry.component.zIndex < 0;
+    });
+    var upperComponents = orderedComponents.filter(function (entry) {
+      return entry.component.zIndex > 0;
+    });
 
     return [
       '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" data-preview-svg' + svgAttributes + '>',
@@ -1862,11 +2013,9 @@ button {
       '  <rect x="0" y="0" width="100" height="100" fill="' + escapeAttr(outerSquareFill) + '"></rect>',
       '  <circle cx="50" cy="50" r="50" fill="' + escapeAttr(tokenBaseFill) + '"></circle>',
       backgroundInsetMarkup,
-      borderUnderImages ? borderMarkup : "",
-      renderImageComponents(face.images, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
-      borderUnderImages ? "" : (borderUnderText ? borderMarkup : ""),
-      renderTextComponents(face.texts, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
-      borderUnderText ? "" : borderMarkup,
+      renderOrderedComponents(lowerComponents, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
+      borderMarkup,
+      renderOrderedComponents(upperComponents, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
       opts.interactive
         ? renderInteractiveOverlays(face, selectedComponentType, selectedComponentId, tokenSlug)
         : "",
@@ -1874,8 +2023,15 @@ button {
     ].join("");
   }
 
-  function renderImageComponents(images, tokenSlug, interactive, selectedComponentType, selectedComponentId) {
-    return images.map(function (component) {
+  function renderOrderedComponents(entries, textSequences, colorSequences, sequenceIndex, tokenSlug, interactive, selectedComponentType, selectedComponentId) {
+    return entries.map(function (entry) {
+      return entry.type === "image"
+        ? renderImageComponent(entry.component, tokenSlug, interactive, selectedComponentType, selectedComponentId)
+        : renderTextComponent(entry.component, textSequences, colorSequences, sequenceIndex, tokenSlug, interactive, selectedComponentType, selectedComponentId);
+    }).join("");
+  }
+
+  function renderImageComponent(component, tokenSlug, interactive, selectedComponentType, selectedComponentId) {
       var box = toSvgRect(component, "image");
       var centerX = box.x + box.width / 2;
       var centerY = box.y + box.height / 2;
@@ -1888,8 +2044,11 @@ button {
         "translate(" + (-box.width / 2) + " " + (-box.height / 2) + ")"
       ].join(" ");
       var isSelected = interactive && selectedComponentType === "image" && selectedComponentId === component.id;
-      return '<image href="' + escapeAttr(component.source) + '" width="' + box.width + '" height="' + box.height + '" preserveAspectRatio="none" transform="' + transform + '" clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="image"' + (isSelected ? ' data-drag-mode="move"' : "") + '></image>';
-    }).join("");
+      return [
+        '<g clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="image"' + (isSelected ? ' data-drag-mode="move"' : "") + '>',
+        '  <image href="' + escapeAttr(component.source) + '" width="' + box.width + '" height="' + box.height + '" preserveAspectRatio="none" transform="' + transform + '"></image>',
+        "</g>"
+      ].join("");
   }
 
   function renderBorder(face, colorSequences, sequenceIndex) {
@@ -1919,8 +2078,7 @@ button {
     return '<circle cx="50" cy="50" r="' + radius + '" fill="' + escapeAttr(background) + '"></circle>';
   }
 
-  function renderTextComponents(components, textSequences, colorSequences, sequenceIndex, tokenSlug, previewMode, selectedComponentType, selectedComponentId) {
-    return components.map(function (component) {
+  function renderTextComponent(component, textSequences, colorSequences, sequenceIndex, tokenSlug, previewMode, selectedComponentType, selectedComponentId) {
       var value = previewMode
         ? getPreviewTextValue(component, textSequences)
         : Tokens.getTextValue(component, textSequences, sequenceIndex);
@@ -1953,7 +2111,6 @@ button {
         "  </g>",
         "</g>"
       ].join("");
-    }).join("");
   }
 
   function getPreviewTextValue(component, textSequences) {
@@ -2645,15 +2802,14 @@ button {
   }
 
   function getComponentItems(face, faceName) {
-    return face.images.map(function (component) {
-      return { type: "image", id: component.id, label: component.name || "Image" };
-    }).concat(face.texts.map(function (component) {
+    return Tokens.getSortedFaceComponents(face, "desc").map(function (entry) {
+      var component = entry.component;
       return {
-        type: "text",
+        type: entry.type,
         id: component.id,
-        label: component.name || "Text"
+        label: component.name || (entry.type === "image" ? "Image" : "Text")
       };
-    }));
+    });
   }
 
   function renderComponentOptions(items, selectedType, selectedId) {
@@ -2678,8 +2834,6 @@ button {
       }).join("") + "</select></label>",
       '    <label class="field">Back face<select name="backEnabled"><option value="true"' + (token.back.enabled ? " selected" : "") + '>Enabled</option><option value="false"' + (!token.back.enabled ? " selected" : "") + '>Disabled</option></select></label>',
       "  </div>",
-      '  <label class="field checkbox-field"><input type="checkbox" name="borderUnderImages"' + (token.borderUnderImages ? " checked" : "") + '>Render border under images</label>',
-      '  <label class="field checkbox-field"><input type="checkbox" name="borderUnderText"' + (token.borderUnderText ? " checked" : "") + '>Render border under text</label>',
       '  <p class="field-help">Editing ' + escapeHtml(faceName === "front" ? "front" : "back") + ' face appearance.</p>',
       renderColorPicker({
         label: "Background",
@@ -2711,16 +2865,17 @@ button {
     }
 
     if (selection.selectedComponentType === "text") {
-      return renderTextComponentForm(component, project);
+      return renderTextComponentForm(component, selection, project);
     }
 
-    return renderImageComponentForm(component);
+    return renderImageComponentForm(component, selection);
   }
 
-  function renderTextComponentForm(component, project) {
+  function renderTextComponentForm(component, selection, project) {
     return [
       '<form class="form-grid" data-form="text-component-settings">',
       '  <label class="field">Label<input name="name" value="' + escapeHtml(component.name || "Text") + '"></label>',
+      renderZOrderControls(component, selection),
       '  <label class="field">Content mode<select name="contentMode">' + renderTextContentModeOptions(component.contentMode) + "</select></label>",
       renderConditionalField("contentMode:custom", component.contentMode === "custom", 'Text<input name="customText" value="' + escapeHtml(component.customText) + '">'),
       renderConditionalBlock("contentMode:numeric|alphabetic", component.contentMode === "numeric" || component.contentMode === "alphabetic", [
@@ -2751,10 +2906,11 @@ button {
     ].join("");
   }
 
-  function renderImageComponentForm(component) {
+  function renderImageComponentForm(component, selection) {
     return [
       '<form class="form-grid" data-form="image-component-settings">',
       '  <label class="field">Label<input name="name" value="' + escapeHtml(component.name) + '"></label>',
+      renderZOrderControls(component, selection),
       renderPositionFields(component),
       '  <label class="field">Scale<input type="range" min="0.05" max="2" step="0.01" name="scale" value="' + component.scale.toFixed(2) + '"><span class="field-help">' + Math.round(component.scale * 100) + '% of max circle diameter</span></label>',
       '  <label class="field">Rotation<input type="range" min="0" max="360" step="1" name="rotationDeg" value="' + Math.round(Number(component.rotationDeg || 0)) + '"><span class="field-help">' + Math.round(Number(component.rotationDeg || 0)) + '&deg; clockwise</span></label>',
@@ -2768,6 +2924,22 @@ button {
       '    <span class="field-help">Changes save automatically.</span>',
       "  </div>",
       "</form>"
+    ].join("");
+  }
+
+  function renderZOrderControls(component, selection) {
+    var face = selection.token ? selection.token[selection.faceName] : null;
+    var canMoveUp = face ? Tokens.canMoveComponentZ(face, selection.selectedComponentType, component.id, "up") : false;
+    var canMoveDown = face ? Tokens.canMoveComponentZ(face, selection.selectedComponentType, component.id, "down") : false;
+    return [
+      '<div class="field">',
+      '  <span>Z-order</span>',
+      '  <div class="button-row">',
+      '    <button class="button" type="button" data-action="move-component-up"' + (canMoveUp ? "" : " disabled") + '>Up</button>',
+      '    <button class="button" type="button" data-action="move-component-down"' + (canMoveDown ? "" : " disabled") + '>Down</button>',
+      "  </div>",
+      '  <span class="field-help">Border is layer 0. Lower layers render below it, higher layers above it.</span>',
+      "</div>"
     ].join("");
   }
 
@@ -3209,8 +3381,6 @@ button {
           token.name = String(formData.get("name")) || token.name;
           token.diameterIn = Number(formData.get("diameterIn")) || token.diameterIn;
           token.back.enabled = String(formData.get("backEnabled")) === "true";
-          token.borderUnderImages = formData.get("borderUnderImages") === "on";
-          token.borderUnderText = formData.get("borderUnderText") === "on";
           face.backgroundColorMode = backgroundColorSelection.mode;
           face.backgroundColor = String(formData.get("backgroundColor") || face.backgroundColor);
           face.backgroundColorSequenceRef = backgroundColorSelection.sequenceRef;
@@ -3232,6 +3402,7 @@ button {
         var textDefaults = store.getState().project.settings.textDefaults;
         var component = Tokens.createTextComponent({
           name: "Text #" + (face.texts.length + 1),
+          zIndex: Tokens.getNextComponentZ(face),
           fontFamily: textDefaults.fontFamily,
           fontWeight: textDefaults.fontWeight,
           colorMode: textDefaults.colorMode,
@@ -3276,7 +3447,8 @@ button {
           var component = Tokens.createImageComponent({
             source: imageAsset.source,
             name: file.name,
-            aspectRatio: imageAsset.width / imageAsset.height
+            aspectRatio: imageAsset.width / imageAsset.height,
+            zIndex: Tokens.getNextComponentZ(selection.token[selection.faceName])
           });
           store.updateProject(function (project) {
             var token = findToken(project, selection.token.id);
@@ -3329,6 +3501,23 @@ button {
         });
       });
     }
+
+    appElement.querySelectorAll("[data-action='move-component-up'], [data-action='move-component-down']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var selection = getDesignerSelection(store.getState());
+        if (!selection.token || !selection.selectedComponentId || !selection.selectedComponentType) {
+          return;
+        }
+        var direction = button.getAttribute("data-action") === "move-component-up" ? "up" : "down";
+        store.updateProject(function (project) {
+          var token = findToken(project, selection.token.id);
+          if (!token) {
+            return;
+          }
+          Tokens.moveComponentZ(token[selection.faceName], selection.selectedComponentType, selection.selectedComponentId, direction);
+        });
+      });
+    });
 
     var textComponentForm = appElement.querySelector("[data-form='text-component-settings']");
     if (textComponentForm) {

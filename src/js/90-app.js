@@ -311,15 +311,14 @@
   }
 
   function getComponentItems(face, faceName) {
-    return face.images.map(function (component) {
-      return { type: "image", id: component.id, label: component.name || "Image" };
-    }).concat(face.texts.map(function (component) {
+    return Tokens.getSortedFaceComponents(face, "desc").map(function (entry) {
+      var component = entry.component;
       return {
-        type: "text",
+        type: entry.type,
         id: component.id,
-        label: component.name || "Text"
+        label: component.name || (entry.type === "image" ? "Image" : "Text")
       };
-    }));
+    });
   }
 
   function renderComponentOptions(items, selectedType, selectedId) {
@@ -344,8 +343,6 @@
       }).join("") + "</select></label>",
       '    <label class="field">Back face<select name="backEnabled"><option value="true"' + (token.back.enabled ? " selected" : "") + '>Enabled</option><option value="false"' + (!token.back.enabled ? " selected" : "") + '>Disabled</option></select></label>',
       "  </div>",
-      '  <label class="field checkbox-field"><input type="checkbox" name="borderUnderImages"' + (token.borderUnderImages ? " checked" : "") + '>Render border under images</label>',
-      '  <label class="field checkbox-field"><input type="checkbox" name="borderUnderText"' + (token.borderUnderText ? " checked" : "") + '>Render border under text</label>',
       '  <p class="field-help">Editing ' + escapeHtml(faceName === "front" ? "front" : "back") + ' face appearance.</p>',
       renderColorPicker({
         label: "Background",
@@ -377,16 +374,17 @@
     }
 
     if (selection.selectedComponentType === "text") {
-      return renderTextComponentForm(component, project);
+      return renderTextComponentForm(component, selection, project);
     }
 
-    return renderImageComponentForm(component);
+    return renderImageComponentForm(component, selection);
   }
 
-  function renderTextComponentForm(component, project) {
+  function renderTextComponentForm(component, selection, project) {
     return [
       '<form class="form-grid" data-form="text-component-settings">',
       '  <label class="field">Label<input name="name" value="' + escapeHtml(component.name || "Text") + '"></label>',
+      renderZOrderControls(component, selection),
       '  <label class="field">Content mode<select name="contentMode">' + renderTextContentModeOptions(component.contentMode) + "</select></label>",
       renderConditionalField("contentMode:custom", component.contentMode === "custom", 'Text<input name="customText" value="' + escapeHtml(component.customText) + '">'),
       renderConditionalBlock("contentMode:numeric|alphabetic", component.contentMode === "numeric" || component.contentMode === "alphabetic", [
@@ -417,10 +415,11 @@
     ].join("");
   }
 
-  function renderImageComponentForm(component) {
+  function renderImageComponentForm(component, selection) {
     return [
       '<form class="form-grid" data-form="image-component-settings">',
       '  <label class="field">Label<input name="name" value="' + escapeHtml(component.name) + '"></label>',
+      renderZOrderControls(component, selection),
       renderPositionFields(component),
       '  <label class="field">Scale<input type="range" min="0.05" max="2" step="0.01" name="scale" value="' + component.scale.toFixed(2) + '"><span class="field-help">' + Math.round(component.scale * 100) + '% of max circle diameter</span></label>',
       '  <label class="field">Rotation<input type="range" min="0" max="360" step="1" name="rotationDeg" value="' + Math.round(Number(component.rotationDeg || 0)) + '"><span class="field-help">' + Math.round(Number(component.rotationDeg || 0)) + '&deg; clockwise</span></label>',
@@ -434,6 +433,22 @@
       '    <span class="field-help">Changes save automatically.</span>',
       "  </div>",
       "</form>"
+    ].join("");
+  }
+
+  function renderZOrderControls(component, selection) {
+    var face = selection.token ? selection.token[selection.faceName] : null;
+    var canMoveUp = face ? Tokens.canMoveComponentZ(face, selection.selectedComponentType, component.id, "up") : false;
+    var canMoveDown = face ? Tokens.canMoveComponentZ(face, selection.selectedComponentType, component.id, "down") : false;
+    return [
+      '<div class="field">',
+      '  <span>Z-order</span>',
+      '  <div class="button-row">',
+      '    <button class="button" type="button" data-action="move-component-up"' + (canMoveUp ? "" : " disabled") + '>Up</button>',
+      '    <button class="button" type="button" data-action="move-component-down"' + (canMoveDown ? "" : " disabled") + '>Down</button>',
+      "  </div>",
+      '  <span class="field-help">Border is layer 0. Lower layers render below it, higher layers above it.</span>',
+      "</div>"
     ].join("");
   }
 
@@ -875,8 +890,6 @@
           token.name = String(formData.get("name")) || token.name;
           token.diameterIn = Number(formData.get("diameterIn")) || token.diameterIn;
           token.back.enabled = String(formData.get("backEnabled")) === "true";
-          token.borderUnderImages = formData.get("borderUnderImages") === "on";
-          token.borderUnderText = formData.get("borderUnderText") === "on";
           face.backgroundColorMode = backgroundColorSelection.mode;
           face.backgroundColor = String(formData.get("backgroundColor") || face.backgroundColor);
           face.backgroundColorSequenceRef = backgroundColorSelection.sequenceRef;
@@ -898,6 +911,7 @@
         var textDefaults = store.getState().project.settings.textDefaults;
         var component = Tokens.createTextComponent({
           name: "Text #" + (face.texts.length + 1),
+          zIndex: Tokens.getNextComponentZ(face),
           fontFamily: textDefaults.fontFamily,
           fontWeight: textDefaults.fontWeight,
           colorMode: textDefaults.colorMode,
@@ -942,7 +956,8 @@
           var component = Tokens.createImageComponent({
             source: imageAsset.source,
             name: file.name,
-            aspectRatio: imageAsset.width / imageAsset.height
+            aspectRatio: imageAsset.width / imageAsset.height,
+            zIndex: Tokens.getNextComponentZ(selection.token[selection.faceName])
           });
           store.updateProject(function (project) {
             var token = findToken(project, selection.token.id);
@@ -995,6 +1010,23 @@
         });
       });
     }
+
+    appElement.querySelectorAll("[data-action='move-component-up'], [data-action='move-component-down']").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var selection = getDesignerSelection(store.getState());
+        if (!selection.token || !selection.selectedComponentId || !selection.selectedComponentType) {
+          return;
+        }
+        var direction = button.getAttribute("data-action") === "move-component-up" ? "up" : "down";
+        store.updateProject(function (project) {
+          var token = findToken(project, selection.token.id);
+          if (!token) {
+            return;
+          }
+          Tokens.moveComponentZ(token[selection.faceName], selection.selectedComponentType, selection.selectedComponentId, direction);
+        });
+      });
+    });
 
     var textComponentForm = appElement.querySelector("[data-form='text-component-settings']");
     if (textComponentForm) {

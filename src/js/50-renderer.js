@@ -28,8 +28,13 @@
     var borderMarkup = renderBorder(face, colorSequences, sequenceIndex);
     var backgroundInsetMarkup = renderBackgroundInset(face, background, tokenBaseFill);
     var outerSquareFill = opts.outerSquareFill || "#f6efe2";
-    var borderUnderImages = token.borderUnderImages === true;
-    var borderUnderText = token.borderUnderText === true || borderUnderImages;
+    var orderedComponents = Tokens.getSortedFaceComponents(face);
+    var lowerComponents = orderedComponents.filter(function (entry) {
+      return entry.component.zIndex < 0;
+    });
+    var upperComponents = orderedComponents.filter(function (entry) {
+      return entry.component.zIndex > 0;
+    });
 
     return [
       '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" data-preview-svg' + svgAttributes + '>',
@@ -40,11 +45,9 @@
       '  <rect x="0" y="0" width="100" height="100" fill="' + escapeAttr(outerSquareFill) + '"></rect>',
       '  <circle cx="50" cy="50" r="50" fill="' + escapeAttr(tokenBaseFill) + '"></circle>',
       backgroundInsetMarkup,
-      borderUnderImages ? borderMarkup : "",
-      renderImageComponents(face.images, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
-      borderUnderImages ? "" : (borderUnderText ? borderMarkup : ""),
-      renderTextComponents(face.texts, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
-      borderUnderText ? "" : borderMarkup,
+      renderOrderedComponents(lowerComponents, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
+      borderMarkup,
+      renderOrderedComponents(upperComponents, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
       opts.interactive
         ? renderInteractiveOverlays(face, selectedComponentType, selectedComponentId, tokenSlug)
         : "",
@@ -52,8 +55,15 @@
     ].join("");
   }
 
-  function renderImageComponents(images, tokenSlug, interactive, selectedComponentType, selectedComponentId) {
-    return images.map(function (component) {
+  function renderOrderedComponents(entries, textSequences, colorSequences, sequenceIndex, tokenSlug, interactive, selectedComponentType, selectedComponentId) {
+    return entries.map(function (entry) {
+      return entry.type === "image"
+        ? renderImageComponent(entry.component, tokenSlug, interactive, selectedComponentType, selectedComponentId)
+        : renderTextComponent(entry.component, textSequences, colorSequences, sequenceIndex, tokenSlug, interactive, selectedComponentType, selectedComponentId);
+    }).join("");
+  }
+
+  function renderImageComponent(component, tokenSlug, interactive, selectedComponentType, selectedComponentId) {
       var box = toSvgRect(component, "image");
       var centerX = box.x + box.width / 2;
       var centerY = box.y + box.height / 2;
@@ -66,8 +76,11 @@
         "translate(" + (-box.width / 2) + " " + (-box.height / 2) + ")"
       ].join(" ");
       var isSelected = interactive && selectedComponentType === "image" && selectedComponentId === component.id;
-      return '<image href="' + escapeAttr(component.source) + '" width="' + box.width + '" height="' + box.height + '" preserveAspectRatio="none" transform="' + transform + '" clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="image"' + (isSelected ? ' data-drag-mode="move"' : "") + '></image>';
-    }).join("");
+      return [
+        '<g clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="image"' + (isSelected ? ' data-drag-mode="move"' : "") + '>',
+        '  <image href="' + escapeAttr(component.source) + '" width="' + box.width + '" height="' + box.height + '" preserveAspectRatio="none" transform="' + transform + '"></image>',
+        "</g>"
+      ].join("");
   }
 
   function renderBorder(face, colorSequences, sequenceIndex) {
@@ -97,8 +110,7 @@
     return '<circle cx="50" cy="50" r="' + radius + '" fill="' + escapeAttr(background) + '"></circle>';
   }
 
-  function renderTextComponents(components, textSequences, colorSequences, sequenceIndex, tokenSlug, previewMode, selectedComponentType, selectedComponentId) {
-    return components.map(function (component) {
+  function renderTextComponent(component, textSequences, colorSequences, sequenceIndex, tokenSlug, previewMode, selectedComponentType, selectedComponentId) {
       var value = previewMode
         ? getPreviewTextValue(component, textSequences)
         : Tokens.getTextValue(component, textSequences, sequenceIndex);
@@ -131,7 +143,6 @@
         "  </g>",
         "</g>"
       ].join("");
-    }).join("");
   }
 
   function getPreviewTextValue(component, textSequences) {

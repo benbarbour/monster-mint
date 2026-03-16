@@ -8,7 +8,7 @@
   function createTokenTemplate(input) {
     var payload = input || {};
     var legacyBorderUnderContent = payload.borderUnderContent === true;
-    return {
+    var token = {
       id: payload.id || Utils.uid("token"),
       name: payload.name || "Untitled Token",
       diameterIn: normalizeDiameter(payload.diameterIn),
@@ -17,6 +17,9 @@
       front: normalizeFace(payload.front),
       back: normalizeBackFace(payload.back)
     };
+    normalizeFaceZOrder(token.front, token);
+    normalizeFaceZOrder(token.back, token);
+    return token;
   }
 
   function createTextComponent(input) {
@@ -38,6 +41,7 @@
       colorMode: payload.colorMode === "sequence" ? "sequence" : "manual",
       color: payload.color || "#111111",
       colorSequenceRef: payload.colorSequenceRef || null,
+      zIndex: asComponentZ(payload.zIndex != null ? payload.zIndex : payload.z, 1),
       textBorder: normalizeTextBorder(payload.textBorder || payload.shadow)
     };
   }
@@ -53,6 +57,7 @@
       rotationDeg: asRotation(payload.rotationDeg, 0),
       mirrorX: payload.mirrorX === true,
       mirrorY: payload.mirrorY === true,
+      zIndex: asComponentZ(payload.zIndex != null ? payload.zIndex : payload.z, 1),
       source: payload.source || "",
       name: payload.name || "Uploaded image"
     };
@@ -62,8 +67,6 @@
     return createTokenTemplate({
       name: (token.name || "Untitled Token") + " Copy",
       diameterIn: token.diameterIn,
-      borderUnderImages: token.borderUnderImages === true,
-      borderUnderText: token.borderUnderText === true,
       front: cloneFace(token.front),
       back: cloneBackFace(token.back)
     });
@@ -309,6 +312,14 @@
     return Number.isFinite(parsed) ? Math.max(0, parsed) : fallback;
   }
 
+  function asComponentZ(value, fallback) {
+    var parsed = asInteger(value, fallback);
+    if (parsed === 0) {
+      return fallback > 0 ? 1 : -1;
+    }
+    return parsed;
+  }
+
   function normalizeTextContentMode(value, legacyMode) {
     if (value === "numeric" || value === "alphabetic" || value === "custom") {
       return value;
@@ -341,6 +352,135 @@
     return Math.min(max, Math.max(min, value));
   }
 
+  function getFaceComponents(face) {
+    return face.images.map(function (component) {
+      return { type: "image", component: component };
+    }).concat(face.texts.map(function (component) {
+      return { type: "text", component: component };
+    }));
+  }
+
+  function normalizeFaceZOrder(face, token) {
+    if (!face) {
+      return;
+    }
+
+    var legacyImagesAboveBorder = token && token.borderUnderImages === true;
+    var legacyTextAboveBorder = token && token.borderUnderText === true;
+    var negative = [];
+    var positive = [];
+
+    getFaceComponents(face).forEach(function (entry, index) {
+      var z = Number(entry.component.zIndex);
+      if (!Number.isFinite(z) || z === 0) {
+        z = entry.type === "image"
+          ? (legacyImagesAboveBorder ? index + 1 : -(index + 1))
+          : (legacyTextAboveBorder ? index + 1001 : -(index + 1001));
+      }
+
+      if (z < 0) {
+        negative.push({ type: entry.type, component: entry.component, sortKey: z });
+      } else {
+        positive.push({ type: entry.type, component: entry.component, sortKey: z });
+      }
+    });
+
+    negative.sort(compareComponentEntries);
+    positive.sort(compareComponentEntries);
+    assignZOrder(negative, positive);
+  }
+
+  function compareComponentEntries(left, right) {
+    if (left.sortKey !== right.sortKey) {
+      return left.sortKey - right.sortKey;
+    }
+    if (left.type !== right.type) {
+      return left.type === "image" ? -1 : 1;
+    }
+    return left.component.id.localeCompare(right.component.id);
+  }
+
+  function assignZOrder(negative, positive) {
+    negative.forEach(function (entry, index) {
+      entry.component.zIndex = index - negative.length;
+    });
+    positive.forEach(function (entry, index) {
+      entry.component.zIndex = index + 1;
+    });
+  }
+
+  function getSortedFaceComponents(face, direction) {
+    var multiplier = direction === "desc" ? -1 : 1;
+    return getFaceComponents(face).slice().sort(function (left, right) {
+      var delta = (Number(left.component.zIndex || 0) - Number(right.component.zIndex || 0)) * multiplier;
+      if (delta !== 0) {
+        return delta;
+      }
+      if (left.type !== right.type) {
+        return left.type === "image" ? -1 : 1;
+      }
+      return left.component.id.localeCompare(right.component.id);
+    });
+  }
+
+  function getNextComponentZ(face) {
+    var sorted = getSortedFaceComponents(face);
+    var highest = sorted.length ? Number(sorted[sorted.length - 1].component.zIndex || 0) : 0;
+    return Math.max(1, highest + 1);
+  }
+
+  function canMoveComponentZ(face, componentType, componentId, direction) {
+    var slots = buildZSlots(face);
+    var index = findSlotIndex(slots, componentType, componentId);
+    if (index < 0) {
+      return false;
+    }
+    return direction === "up" ? index < slots.length - 1 : index > 0;
+  }
+
+  function moveComponentZ(face, componentType, componentId, direction) {
+    var slots = buildZSlots(face);
+    var index = findSlotIndex(slots, componentType, componentId);
+    if (index < 0) {
+      return false;
+    }
+
+    var targetIndex = direction === "up" ? index + 1 : index - 1;
+    if (targetIndex < 0 || targetIndex >= slots.length) {
+      return false;
+    }
+
+    var moved = slots[index];
+    slots[index] = slots[targetIndex];
+    slots[targetIndex] = moved;
+    reassignZFromSlots(slots);
+    return true;
+  }
+
+  function buildZSlots(face) {
+    var sorted = getSortedFaceComponents(face);
+    var negative = sorted.filter(function (entry) {
+      return entry.component.zIndex < 0;
+    });
+    var positive = sorted.filter(function (entry) {
+      return entry.component.zIndex > 0;
+    });
+    return negative.concat([{ type: "border", component: null }], positive);
+  }
+
+  function findSlotIndex(slots, componentType, componentId) {
+    return slots.findIndex(function (entry) {
+      return entry.type === componentType && entry.component && entry.component.id === componentId;
+    });
+  }
+
+  function reassignZFromSlots(slots) {
+    var borderIndex = slots.findIndex(function (entry) {
+      return entry.type === "border";
+    });
+    assignZOrder(slots.slice(0, borderIndex), slots.slice(borderIndex + 1));
+  }
+
   function cloneFace(face) {
     return {
       backgroundColorMode: face.backgroundColorMode,
@@ -355,6 +495,7 @@
           rotationDeg: component.rotationDeg,
           mirrorX: component.mirrorX,
           mirrorY: component.mirrorY,
+          zIndex: component.zIndex,
           source: component.source,
           name: component.name
         });
@@ -375,6 +516,7 @@
           colorMode: component.colorMode,
           color: component.color,
           colorSequenceRef: component.colorSequenceRef,
+          zIndex: component.zIndex,
           textBorder: {
             width: component.textBorder.width,
             colorMode: component.textBorder.colorMode,
@@ -429,6 +571,10 @@
     createTextComponent: createTextComponent,
     createImageComponent: createImageComponent,
     normalizeToken: normalizeToken,
+    getSortedFaceComponents: getSortedFaceComponents,
+    getNextComponentZ: getNextComponentZ,
+    canMoveComponentZ: canMoveComponentZ,
+    moveComponentZ: moveComponentZ,
     clampRect: clampRect,
     updateComponentRect: updateComponentRect,
     updateImageComponent: updateImageComponent,

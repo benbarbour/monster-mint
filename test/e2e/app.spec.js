@@ -118,8 +118,6 @@ test("token settings own appearance controls and color sequences show in preview
   expect(componentOptions).not.toContain("Background");
   expect(componentOptions).not.toContain("Border");
   await expect(page.getByRole("button", { name: "Copy Front to Back" })).toBeVisible();
-  await expect(page.locator('form[data-form="token-settings"] input[name="borderUnderImages"]')).toBeVisible();
-  await expect(page.locator('form[data-form="token-settings"] input[name="borderUnderText"]')).toBeVisible();
 
   await expect(page.locator('form[data-form="token-settings"] input[name="borderWidthRatio"]')).toHaveAttribute("max", "0.25");
   const tokenBorderPicker = page.locator('.color-picker-field').filter({ hasText: "Token border" });
@@ -151,7 +149,9 @@ test("token settings own appearance controls and color sequences show in preview
   await page.locator('form[data-form="image-component-settings"] input[name="mirrorX"]').check();
   await expect(page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]')).toHaveValue("45");
   await expect(page.locator('form[data-form="image-component-settings"] input[name="mirrorX"]')).toBeChecked();
-  await expect(page.locator('[data-preview-stage] svg g[data-component-type="image"][transform*="rotate(45"]')).toHaveCount(1);
+  await expect(page.locator('[data-preview-stage] svg image[transform*="rotate(45"]')).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Up" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Down" })).toBeVisible();
   await page.getByRole("button", { name: "Copy Back to Front" }).click();
   await page.getByRole("button", { name: "Front", exact: true }).click();
   const copiedFrontOptions = await page.locator('select[name="selectedComponentKey"] option').allTextContents();
@@ -189,13 +189,13 @@ test("token settings own appearance controls and color sequences show in preview
   const printCopiesInput = page.locator('input[name^="copies-"]').first();
   await printCopiesInput.fill("2");
   await printCopiesInput.blur();
-  const previewClippedImageCount = await page.locator('.preview-page-svg image[clip-path*="token-clip-"]').count();
+  const previewClippedImageCount = await page.locator('.preview-page-svg g[data-component-type="image"][clip-path*="token-clip-"] image').count();
   expect(previewClippedImageCount).toBeGreaterThan(0);
   const previewClipIds = await page.locator('.preview-page-svg clipPath[id^="token-clip-"]').evaluateAll((nodes) => nodes.map((node) => node.id));
   expect(new Set(previewClipIds).size).toBe(previewClipIds.length);
   await page.getByRole("button", { name: "Print", exact: true }).click();
   await expect(page.locator("iframe.print-frame")).toHaveCount(1);
-  const frameClippedImageCount = await page.frameLocator("iframe.print-frame").locator('image[clip-path*="token-clip-"]').count();
+  const frameClippedImageCount = await page.frameLocator("iframe.print-frame").locator('g[data-component-type="image"][clip-path*="token-clip-"] image').count();
   expect(frameClippedImageCount).toBeGreaterThan(0);
 });
 
