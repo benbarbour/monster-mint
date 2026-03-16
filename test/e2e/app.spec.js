@@ -55,14 +55,24 @@ test("can create and manipulate a token template", async ({ page }) => {
 
   const xInput = page.locator('form[data-form="text-component-settings"] input[name="x"]');
   const yInput = page.locator('form[data-form="text-component-settings"] input[name="y"]');
+  const moveHandle = page.locator('[data-component-type="text"][data-drag-mode="move"]').first();
   await expect(xInput).toHaveValue("0.00");
+  await expect(yInput).toHaveValue("0.00");
+
+  const initialHandleY = (await moveHandle.boundingBox()).y;
+  await yInput.fill("0.10");
+  await yInput.blur();
+  await expect(yInput).toHaveValue("0.10");
+  const raisedHandleY = (await moveHandle.boundingBox()).y;
+  expect(raisedHandleY).toBeLessThan(initialHandleY);
+  await yInput.fill("0");
+  await yInput.blur();
   await expect(yInput).toHaveValue("0.00");
 
   await xInput.fill("0");
   await xInput.blur();
   await expect(xInput).toHaveValue("0.00");
 
-  const moveHandle = page.locator('[data-component-type="text"][data-drag-mode="move"]').first();
   const moveBox = await moveHandle.boundingBox();
   if (!moveBox) {
     throw new Error("Missing text drag handle");

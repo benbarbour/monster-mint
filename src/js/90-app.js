@@ -471,7 +471,7 @@
     return [
       '<div class="field-row two-up">',
       '  <label class="field">Center X<input type="number" step="0.01" name="x" value="' + component.x.toFixed(2) + '"></label>',
-      '  <label class="field">Center Y<input type="number" step="0.01" name="y" value="' + component.y.toFixed(2) + '"></label>',
+      '  <label class="field">Center Y<input type="number" step="0.01" name="y" value="' + toDisplayCenterY(component.y) + '"></label>',
       "</div>",
       '  <p class="field-help">0, 0 is the center of the token.</p>'
     ].join("");
@@ -1060,7 +1060,7 @@
           component.name = String(formData.get("name") || component.name);
           Tokens.updateImageComponent(component, {
             x: toNumberOrDefault(formData.get("x"), component.x),
-            y: toNumberOrDefault(formData.get("y"), component.y),
+            y: fromDisplayCenterY(formData.get("y"), component.y),
             scale: toNumberOrDefault(formData.get("scale"), component.scale),
             rotationDeg: toNumberOrDefault(formData.get("rotationDeg"), component.rotationDeg),
             mirrorX: formData.get("mirrorX") === "on",
@@ -1500,10 +1500,19 @@
   function applyBoundsFromForm(component, formData) {
     Tokens.updateComponentRect(component, {
       x: toNumberOrDefault(formData.get("x"), component.x),
-      y: toNumberOrDefault(formData.get("y"), component.y),
+      y: fromDisplayCenterY(formData.get("y"), component.y),
       width: toNumberOrDefault(formData.get("width"), component.width),
       height: toNumberOrDefault(formData.get("height"), component.height)
     });
+  }
+
+  function toDisplayCenterY(value) {
+    return (-Number(value || 0)).toFixed(2);
+  }
+
+  function fromDisplayCenterY(value, fallback) {
+    var parsed = Number(value);
+    return Number.isFinite(parsed) ? -parsed : fallback;
   }
 
   function toNumberOrDefault(value, fallback) {
