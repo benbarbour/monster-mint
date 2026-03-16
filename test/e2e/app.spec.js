@@ -149,9 +149,9 @@ test("token settings own appearance controls and color sequences show in preview
   });
   await expect(page.locator('[data-preview-stage] svg image[data-background-image="true"]').first()).not.toHaveAttribute("href", initialBackgroundHref);
 
-  const oversizedSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"><desc>' +
+  const oversizedSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300"><desc>' +
     "A".repeat(1100000) +
-    '</desc><rect width="200" height="100" fill="red"/></svg>';
+    '</desc><rect x="120" y="40" width="60" height="220" fill="red"/></svg>';
   await page.getByRole("button", { name: "Add Image" }).click();
   await page.locator('[data-image-upload-input]').setInputFiles({
     name: "token.svg",
@@ -164,7 +164,13 @@ test("token settings own appearance controls and color sequences show in preview
   await expect(page.locator('form[data-form="image-component-settings"] input[name="scale"]')).toHaveValue("0.5");
   await expect(page.locator('form[data-form="image-component-settings"] input[name="scale"]')).toHaveAttribute("type", "range");
   await expect(page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]')).toHaveAttribute("type", "range");
-  await expect(page.locator('[data-preview-stage] svg g[data-component-type="image"] image').first()).toHaveAttribute("href", /data:image\/(jpeg|png|webp);base64,/);
+  const uploadedImage = page.locator('[data-preview-stage] svg g[data-component-type="image"] image').first();
+  await expect(uploadedImage).toHaveAttribute("href", /data:image\/(jpeg|png|webp);base64,/);
+  const uploadedDimensions = await uploadedImage.evaluate((node) => ({
+    width: Number(node.getAttribute("width") || 0),
+    height: Number(node.getAttribute("height") || 0)
+  }));
+  expect(uploadedDimensions.width).toBeLessThan(uploadedDimensions.height);
 
   await page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]').evaluate((element) => {
     element.value = "45";

@@ -172,6 +172,97 @@ test("estimateDataUrlBytes reports base64 payload size", () => {
   assert.equal(Utils.estimateDataUrlBytes(makeDataUrl("image/png", 512)), 512);
 });
 
+test("findOpaqueBounds returns the tight alpha bounds", () => {
+  const pixels = new Uint8ClampedArray(4 * 4 * 4);
+  pixels[(1 * 4 + 1) * 4 + 3] = 255;
+  pixels[(2 * 4 + 2) * 4 + 3] = 255;
+
+  assert.deepEqual(Utils.findOpaqueBounds(pixels, 4, 4), {
+    x: 1,
+    y: 1,
+    width: 2,
+    height: 2
+  });
+  assert.equal(Utils.findOpaqueBounds(new Uint8ClampedArray(4 * 4 * 4), 4, 4), null);
+});
+
+test("trimTransparentImageAssetSource crops transparent borders before optimization", async () => {
+  const source = makeDataUrl("image/png", 1024);
+  const draws = [];
+
+  function makeContext(canvas) {
+    return {
+      clearRect() {},
+      drawImage() {
+        draws.push({
+          canvasWidth: canvas.width,
+          canvasHeight: canvas.height,
+          args: Array.from(arguments).slice(1)
+        });
+      },
+      getImageData() {
+        const pixels = new Uint8ClampedArray(4 * 4 * 4);
+        pixels[(1 * 4 + 1) * 4 + 3] = 255;
+        pixels[(1 * 4 + 2) * 4 + 3] = 255;
+        pixels[(2 * 4 + 1) * 4 + 3] = 255;
+        pixels[(2 * 4 + 2) * 4 + 3] = 255;
+        return { data: pixels };
+      }
+    };
+  }
+
+  const result = await Utils.trimTransparentImageAssetSource(source, {
+    dimensions: { width: 4, height: 4 },
+    loadImage: async () => ({ src: source }),
+    createCanvas: (width, height) => ({
+      width,
+      height,
+      getContext() {
+        return makeContext({ width, height });
+      }
+    }),
+    encodeCanvas: (canvas, mimeType) => makeDataUrl(mimeType, canvas.width * canvas.height * 16)
+  });
+
+  assert.equal(result.width, 2);
+  assert.equal(result.height, 2);
+  assert.equal(result.source.startsWith("data:image/webp;base64,"), true);
+  assert.deepEqual(draws[1], {
+    canvasWidth: 2,
+    canvasHeight: 2,
+    args: [1, 1, 2, 2, 0, 0, 2, 2]
+  });
+});
+
+test("trimTransparentImageAssetSource falls back when trimming cannot encode", async () => {
+  const source = makeDataUrl("image/png", 1024);
+
+  const result = await Utils.trimTransparentImageAssetSource(source, {
+    dimensions: { width: 4, height: 4 },
+    loadImage: async () => ({ src: source }),
+    createCanvas: (width, height) => ({
+      width,
+      height,
+      getContext() {
+        return {
+          clearRect() {},
+          drawImage() {},
+          getImageData() {
+            const pixels = new Uint8ClampedArray(4 * 4 * 4);
+            pixels[(1 * 4 + 1) * 4 + 3] = 255;
+            return { data: pixels };
+          }
+        };
+      }
+    }),
+    encodeCanvas: () => ""
+  });
+
+  assert.equal(result.source, source);
+  assert.equal(result.width, 4);
+  assert.equal(result.height, 4);
+});
+
 test("optimizeImageAssetSource leaves small images unchanged", async () => {
   const source = makeDataUrl("image/png", 768);
   let loadCount = 0;

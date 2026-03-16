@@ -1057,8 +1057,14 @@ button {
   async function readImageAssetFile(file) {
     var source = await readDataUrlFile(file);
     var dimensions = await loadImageDimensions(source);
-    var optimized = await optimizeImageAssetSource(source, {
+    var trimmed = await trimTransparentImageAssetSource(source, {
       dimensions: dimensions
+    });
+    var optimized = await optimizeImageAssetSource(trimmed.source, {
+      dimensions: {
+        width: trimmed.width,
+        height: trimmed.height
+      }
     });
     return {
       source: optimized.source,
@@ -1143,6 +1149,93 @@ button {
     }
   }
 
+  async function trimTransparentImageAssetSource(source, options) {
+    var settings = normalizeImageTrimOptions(options);
+    var originalDimensions = settings.dimensions || await settings.loadImageDimensions(source);
+    var originalAsset = {
+      source: source,
+      width: originalDimensions.width,
+      height: originalDimensions.height,
+      bytes: estimateDataUrlBytes(source)
+    };
+    var mimeType = getDataUrlMimeType(source);
+
+    if (mimeType === "image/jpeg" || mimeType === "image/jpg") {
+      return originalAsset;
+    }
+
+    try {
+      var image = await settings.loadImage(source);
+      var canvas = settings.createCanvas(originalDimensions.width, originalDimensions.height);
+      var context = canvas && typeof canvas.getContext === "function" ? canvas.getContext("2d") : null;
+      if (
+        !context ||
+        typeof context.clearRect !== "function" ||
+        typeof context.drawImage !== "function" ||
+        typeof context.getImageData !== "function"
+      ) {
+        return originalAsset;
+      }
+
+      context.clearRect(0, 0, originalDimensions.width, originalDimensions.height);
+      context.drawImage(image, 0, 0, originalDimensions.width, originalDimensions.height);
+      var imageData = context.getImageData(0, 0, originalDimensions.width, originalDimensions.height);
+      var bounds = settings.findOpaqueBounds(imageData.data, originalDimensions.width, originalDimensions.height);
+      if (!bounds) {
+        return originalAsset;
+      }
+
+      if (
+        bounds.x === 0 &&
+        bounds.y === 0 &&
+        bounds.width === originalDimensions.width &&
+        bounds.height === originalDimensions.height
+      ) {
+        return originalAsset;
+      }
+
+      var trimmedCanvas = settings.createCanvas(bounds.width, bounds.height);
+      var trimmedContext = trimmedCanvas && typeof trimmedCanvas.getContext === "function" ? trimmedCanvas.getContext("2d") : null;
+      if (
+        !trimmedContext ||
+        typeof trimmedContext.clearRect !== "function" ||
+        typeof trimmedContext.drawImage !== "function"
+      ) {
+        return originalAsset;
+      }
+
+      trimmedContext.clearRect(0, 0, bounds.width, bounds.height);
+      trimmedContext.drawImage(
+        image,
+        bounds.x,
+        bounds.y,
+        bounds.width,
+        bounds.height,
+        0,
+        0,
+        bounds.width,
+        bounds.height
+      );
+
+      var trimmedSource = settings.encodeCanvas(trimmedCanvas, "image/webp", 0.92);
+      if (!isDataUrl(trimmedSource)) {
+        trimmedSource = settings.encodeCanvas(trimmedCanvas, "image/png");
+      }
+      if (!isDataUrl(trimmedSource)) {
+        return originalAsset;
+      }
+
+      return {
+        source: trimmedSource,
+        width: bounds.width,
+        height: bounds.height,
+        bytes: estimateDataUrlBytes(trimmedSource)
+      };
+    } catch (error) {
+      return originalAsset;
+    }
+  }
+
   function normalizeImageOptimizationOptions(options) {
     var settings = options && typeof options === "object" ? options : {};
     return {
@@ -1159,6 +1252,18 @@ button {
       detectTransparency: typeof settings.detectTransparency === "function" ? settings.detectTransparency : detectTransparency,
       createCanvas: typeof settings.createCanvas === "function" ? settings.createCanvas : createCanvas,
       encodeCanvas: typeof settings.encodeCanvas === "function" ? settings.encodeCanvas : encodeCanvas
+    };
+  }
+
+  function normalizeImageTrimOptions(options) {
+    var settings = options && typeof options === "object" ? options : {};
+    return {
+      dimensions: settings.dimensions || null,
+      loadImageDimensions: typeof settings.loadImageDimensions === "function" ? settings.loadImageDimensions : loadImageDimensions,
+      loadImage: typeof settings.loadImage === "function" ? settings.loadImage : loadImage,
+      createCanvas: typeof settings.createCanvas === "function" ? settings.createCanvas : createCanvas,
+      encodeCanvas: typeof settings.encodeCanvas === "function" ? settings.encodeCanvas : encodeCanvas,
+      findOpaqueBounds: typeof settings.findOpaqueBounds === "function" ? settings.findOpaqueBounds : findOpaqueBounds
     };
   }
 
@@ -1229,6 +1334,48 @@ button {
     };
   }
 
+  function findOpaqueBounds(pixels, width, height) {
+    if (!pixels || !pixels.length || width <= 0 || height <= 0) {
+      return null;
+    }
+
+    var minX = width;
+    var minY = height;
+    var maxX = -1;
+    var maxY = -1;
+
+    for (var y = 0; y < height; y += 1) {
+      for (var x = 0; x < width; x += 1) {
+        var alpha = pixels[(y * width + x) * 4 + 3];
+        if (alpha > 0) {
+          if (x < minX) {
+            minX = x;
+          }
+          if (y < minY) {
+            minY = y;
+          }
+          if (x > maxX) {
+            maxX = x;
+          }
+          if (y > maxY) {
+            maxY = y;
+          }
+        }
+      }
+    }
+
+    if (maxX < minX || maxY < minY) {
+      return null;
+    }
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX + 1,
+      height: maxY - minY + 1
+    };
+  }
+
   function estimateDataUrlBytes(source) {
     if (!isDataUrl(source)) {
       return String(source || "").length;
@@ -1285,7 +1432,9 @@ button {
     readDataUrlFile: readDataUrlFile,
     loadImage: loadImage,
     loadImageDimensions: loadImageDimensions,
+    findOpaqueBounds: findOpaqueBounds,
     estimateDataUrlBytes: estimateDataUrlBytes,
+    trimTransparentImageAssetSource: trimTransparentImageAssetSource,
     optimizeImageAssetSource: optimizeImageAssetSource,
     readImageAssetFile: readImageAssetFile
   };
