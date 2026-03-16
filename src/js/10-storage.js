@@ -51,9 +51,7 @@
       var parsed = JSON.parse(raw);
       return {
         activeTab: typeof parsed.activeTab === "string" ? parsed.activeTab : "designer",
-        editingTextSequenceId: typeof parsed.editingTextSequenceId === "string" ? parsed.editingTextSequenceId : null,
         editingColorSequenceId: typeof parsed.editingColorSequenceId === "string" ? parsed.editingColorSequenceId : null,
-        selectedTextSequenceId: typeof parsed.selectedTextSequenceId === "string" ? parsed.selectedTextSequenceId : null,
         selectedColorSequenceId: typeof parsed.selectedColorSequenceId === "string" ? parsed.selectedColorSequenceId : null,
         selectedTokenId: typeof parsed.selectedTokenId === "string" ? parsed.selectedTokenId : null,
         selectedComponentType: typeof parsed.selectedComponentType === "string" ? parsed.selectedComponentType : null,
@@ -84,9 +82,7 @@
   function defaultUiState() {
     return {
       activeTab: "designer",
-      editingTextSequenceId: null,
       editingColorSequenceId: null,
-      selectedTextSequenceId: null,
       selectedColorSequenceId: null,
       selectedTokenId: null,
       selectedComponentType: null,

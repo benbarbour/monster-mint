@@ -116,15 +116,13 @@ test("state store can update without persisting until requested", () => {
   assert.equal(savedProject.meta.name, "Draft");
 });
 
-test("loadUiState provides editing slots for sequence forms", () => {
+test("loadUiState provides the active UI defaults", () => {
   const storage = createMemoryStorage();
   const uiState = Storage.loadUiState(storage);
 
   assert.deepEqual(uiState, {
     activeTab: "designer",
-    editingTextSequenceId: null,
     editingColorSequenceId: null,
-    selectedTextSequenceId: null,
     selectedColorSequenceId: null,
     selectedTokenId: null,
     selectedComponentType: null,

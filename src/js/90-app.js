@@ -6,10 +6,11 @@
     global.MonsterMintUtils,
     global.MonsterMintTokens,
     global.MonsterMintRenderer,
-    global.MonsterMintPrint
+    global.MonsterMintPrint,
+    global.MonsterMintUi
   );
   global.MonsterMintApp = api;
-})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, State, Sequences, Utils, Tokens, Renderer, Print) {
+})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, State, Sequences, Utils, Tokens, Renderer, Print, Ui) {
   var runtimeGlobal = typeof globalThis !== "undefined" ? globalThis : window;
   var TAB_CONFIG = [
     { id: "designer", label: "Designer" },
@@ -35,14 +36,27 @@
   var designerResizeQueued = false;
   var designerTransientPreview = null;
   var designerPreviewRenderQueued = false;
-
-  function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll("\"", "&quot;");
-  }
+  var CONDITIONAL_FIELD_PRESERVE = [
+    "contentMode",
+    "colorSource",
+    "textBorderColorSource",
+    "backgroundColorSource",
+    "borderColorSource",
+    "defaultBackgroundColorSource",
+    "defaultBorderColorSource",
+    "defaultBackgroundMode"
+  ];
+  var escapeHtml = Ui.escapeHtml;
+  var renderConditionalField = Ui.renderConditionalField;
+  var renderConditionalBlock = Ui.renderConditionalBlock;
+  var syncConditionalFields = Ui.syncConditionalFields;
+  var parseColorSourceValue = Ui.parseColorSourceValue;
+  var normalizeColorInput = Ui.normalizeColorInput;
+  var toNumberOrDefault = Ui.toNumberOrDefault;
+  var toIntegerOrDefault = Ui.toIntegerOrDefault;
+  var toNonNegativeNumberOrDefault = Ui.toNonNegativeNumberOrDefault;
+  var toAlphaThresholdOrDefault = Ui.toAlphaThresholdOrDefault;
+  var toNonNegativeInteger = Ui.toNonNegativeInteger;
 
   function render(appElement, store) {
     var focusState = captureFocusState(appElement);
@@ -69,9 +83,9 @@
         return '<button class="tab-button' + (tab.id === activeTab ? " is-active" : "") + '" type="button" role="tab" aria-selected="' + (tab.id === activeTab ? "true" : "false") + '" data-tab="' + tab.id + '">' + tab.label + "</button>";
       }).join(""),
       "  </nav>",
-      renderPanel("settings", activeTab, renderSettingsPanel(state)),
-      renderPanel("designer", activeTab, renderDesignerPanel(state)),
-      renderPanel("print", activeTab, renderPrintPanel(state)),
+      renderPanel("settings", activeTab, activeTab === "settings" ? renderSettingsPanel(state) : ""),
+      renderPanel("designer", activeTab, activeTab === "designer" ? renderDesignerPanel(state) : ""),
+      renderPanel("print", activeTab, activeTab === "print" ? renderPrintPanel(state) : ""),
       "</main>"
     ].join("");
 
@@ -659,9 +673,7 @@
 
         store.replaceProject(Schema.createDefaultProject());
         store.updateUi(function (ui) {
-          ui.editingTextSequenceId = null;
           ui.editingColorSequenceId = null;
-          ui.selectedTextSequenceId = null;
           ui.selectedColorSequenceId = null;
           ui.selectedTokenId = null;
           ui.selectedComponentType = null;
@@ -695,7 +707,7 @@
           defaultBackgroundMode: tokenDefaultsForm.querySelector('[name="defaultBackgroundMode"]').value,
           defaultBackgroundColorSource: tokenDefaultsForm.querySelector('[name="defaultBackgroundColorSource"]').value,
           defaultBorderColorSource: tokenDefaultsForm.querySelector('[name="defaultBorderColorSource"]').value
-        });
+        }, CONDITIONAL_FIELD_PRESERVE);
       };
       tokenDefaultsForm.querySelectorAll('select[name="defaultBackgroundMode"], select[name="defaultBackgroundColorSource"], select[name="defaultBorderColorSource"]').forEach(function (element) {
         element.addEventListener("change", syncTokenDefaultVisibility);
@@ -745,7 +757,7 @@
         syncConditionalFields(textDefaultsForm, {
           defaultTextColorSource: textDefaultsForm.querySelector('[name="defaultTextColorSource"]').value,
           defaultTextBorderColorSource: textDefaultsForm.querySelector('[name="defaultTextBorderColorSource"]').value
-        });
+        }, CONDITIONAL_FIELD_PRESERVE);
       };
       textDefaultsForm.querySelectorAll('select[name="defaultTextColorSource"], select[name="defaultTextBorderColorSource"]').forEach(function (element) {
         element.addEventListener("change", syncTextDefaultVisibility);
@@ -809,7 +821,6 @@
         store.updateUi(function (ui) {
           ui.selectedColorSequenceId = selectedColorSequenceField.value || null;
           ui.editingColorSequenceId = selectedColorSequenceField.value || null;
-          ui.editingTextSequenceId = null;
         });
       });
     }
@@ -827,7 +838,6 @@
         store.updateUi(function (ui) {
           ui.selectedColorSequenceId = sequence.id;
           ui.editingColorSequenceId = sequence.id;
-          ui.editingTextSequenceId = null;
         });
       });
     }
@@ -846,7 +856,6 @@
         });
         store.updateUi(function (ui) {
           ui.editingColorSequenceId = null;
-          ui.editingTextSequenceId = null;
           if (ui.selectedColorSequenceId === sequenceId) {
             ui.selectedColorSequenceId = null;
           }
@@ -858,7 +867,6 @@
     if (closeDrawerButton) {
       closeDrawerButton.addEventListener("click", function () {
         store.updateUi(function (ui) {
-          ui.editingTextSequenceId = null;
           ui.editingColorSequenceId = null;
         });
       });
@@ -897,9 +905,7 @@
           var normalizedProject = await Utils.normalizeProjectImageAssets(projectWithDefaults, getImageImportOptions(projectWithDefaults));
           store.replaceProject(normalizedProject);
           store.updateUi(function (ui) {
-            ui.editingTextSequenceId = null;
             ui.editingColorSequenceId = null;
-            ui.selectedTextSequenceId = null;
             ui.selectedColorSequenceId = null;
             ui.selectedTokenId = null;
             ui.selectedComponentType = null;
@@ -991,14 +997,14 @@
             backgroundMode: tokenForm.querySelector('[name="backgroundMode"]').value,
             backgroundColorSource: tokenForm.querySelector('[name="backgroundColorSource"]').value,
             borderColorSource: tokenForm.querySelector('[name="borderColorSource"]').value
-          });
+          }, CONDITIONAL_FIELD_PRESERVE);
         });
       });
       syncConditionalFields(tokenForm, {
         backgroundMode: tokenForm.querySelector('[name="backgroundMode"]').value,
         backgroundColorSource: tokenForm.querySelector('[name="backgroundColorSource"]').value,
         borderColorSource: tokenForm.querySelector('[name="borderColorSource"]').value
-      });
+      }, CONDITIONAL_FIELD_PRESERVE);
       tokenForm.addEventListener("change", function () {
         var selection = getDesignerSelection(store.getState());
         if (!selection.token) {
@@ -1196,7 +1202,7 @@
           contentMode: contentModeField ? contentModeField.value : null,
           colorSource: colorSourceField ? colorSourceField.value : null,
           textBorderColorSource: textBorderColorSourceField ? textBorderColorSourceField.value : null
-        });
+        }, CONDITIONAL_FIELD_PRESERVE);
       };
       textComponentForm.querySelectorAll('select[name="contentMode"], select[name="colorSource"], select[name="textBorderColorSource"]').forEach(function (element) {
         element.addEventListener("change", syncTextComponentVisibility);
@@ -1833,31 +1839,6 @@
     return Number.isFinite(parsed) ? -parsed : fallback;
   }
 
-  function toNumberOrDefault(value, fallback) {
-    var parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  }
-
-  function toIntegerOrDefault(value, fallback) {
-    var parsed = Number.parseInt(value, 10);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  }
-
-  function toNonNegativeNumberOrDefault(value, fallback) {
-    var parsed = Number(value);
-    return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
-  }
-
-  function toAlphaThresholdOrDefault(value, fallback) {
-    var parsed = Number.parseInt(value, 10);
-    return Number.isFinite(parsed) ? Math.min(255, Math.max(1, parsed)) : fallback;
-  }
-
-  function toNonNegativeInteger(value, fallback) {
-    var parsed = Number.parseInt(value, 10);
-    return Number.isFinite(parsed) ? Math.max(0, parsed) : fallback;
-  }
-
   function getImageImportOptions(project) {
     return {
       trimAlphaThreshold: project && project.settings ? project.settings.imageTrimAlphaThreshold : 1
@@ -1884,42 +1865,6 @@
     } else {
       collection.push(value);
     }
-  }
-
-  function nullableValue(value) {
-    return value ? String(value) : null;
-  }
-
-  function syncConditionalFields(form, values) {
-    form.querySelectorAll("[data-visible-when]").forEach(function (element) {
-      var parts = element.getAttribute("data-visible-when").split(":");
-      var fieldName = parts[0];
-      var expectedValues = parts[1].split("|");
-      var isVisible = expectedValues.indexOf(values[fieldName]) !== -1;
-      element.hidden = !isVisible;
-      element.style.display = isVisible ? "" : "none";
-      element.querySelectorAll("input, select, textarea, button").forEach(function (control) {
-        if (control.name === "contentMode" || control.name === "colorSource" || control.name === "textBorderColorSource" || control.name === "backgroundColorSource" || control.name === "borderColorSource" || control.name === "defaultBackgroundColorSource" || control.name === "defaultBorderColorSource" || control.name === "defaultBackgroundMode") {
-          return;
-        }
-        control.disabled = !isVisible;
-      });
-    });
-  }
-
-  function renderConditionalField(visibleWhen, isVisible, innerHtml) {
-    return '<label class="field" data-visible-when="' + visibleWhen + '"' + (isVisible ? "" : ' hidden style="display:none"') + ">" + innerHtml + "</label>";
-  }
-
-  function renderConditionalBlock(visibleWhen, isVisible, innerHtml) {
-    return '<div data-visible-when="' + visibleWhen + '"' + (isVisible ? "" : ' hidden style="display:none"') + ">" + innerHtml + "</div>";
-  }
-
-  function parseColorSourceValue(value) {
-    var source = value ? String(value) : "manual";
-    return source === "manual"
-      ? { mode: "manual", sequenceRef: null }
-      : { mode: "sequence", sequenceRef: source };
   }
 
   function applyTokenDefaults(token, tokenDefaults) {
@@ -1980,20 +1925,6 @@
     }
   }
 
-  function renderTextSequenceManager(sequences, selectedSequence, editingSequence) {
-    return renderSequenceManager({
-      selectedName: "selectedTextSequenceId",
-      selectedSequence: selectedSequence,
-      sequences: sequences,
-      summary: selectedSequence
-        ? Sequences.summarizeTextSequence(selectedSequence)
-        : (sequences.length ? "Select a custom sequence to edit it in the drawer." : "No custom text sequences yet."),
-      helperText: "Built-in text sequences stay available in token settings and are not edited here.",
-      newAction: "new-text-sequence",
-      isEditing: !!editingSequence
-    });
-  }
-
   function renderColorSequenceManager(sequences, selectedSequence, editingSequence) {
     return renderSequenceManager({
       selectedName: "selectedColorSequenceId",
@@ -2023,28 +1954,6 @@
     ].join("");
   }
 
-  function renderTextSequenceForm(sequence) {
-    var type = sequence ? sequence.type : "numeric";
-    return [
-      '<form class="form-grid" data-form="text-sequence">',
-      '  <input type="hidden" name="id" value="' + escapeHtml(sequence ? sequence.id : "") + '">',
-      '  <label class="field">Name<input name="name" value="' + escapeHtml(sequence ? sequence.name : "") + '" required></label>',
-      '  <div class="field-row two-up">',
-      '    <label class="field">Type<select name="type">' + renderTextTypeOptions(type) + "</select></label>",
-      '    <label class="field">Pad digits<input type="number" min="0" step="1" name="padTo" value="' + escapeHtml(sequence && sequence.type === "numeric" ? sequence.padTo : 0) + '"></label>',
-      "  </div>",
-      '  <div class="field-row three-up" data-type-only="numeric"' + (type === "numeric" ? "" : " hidden") + '>',
-      '    <label class="field">Start<input type="number" step="1" name="start" value="' + escapeHtml(sequence && sequence.type === "numeric" ? sequence.start : 1) + '"></label>',
-      '    <label class="field">Step<input type="number" step="1" name="step" value="' + escapeHtml(sequence && sequence.type === "numeric" ? sequence.step : 1) + '"></label>',
-      '    <label class="field">Prefix<input name="prefix" value="' + escapeHtml(sequence ? sequence.prefix : "") + '"></label>',
-      "  </div>",
-      '  <div class="field-row two-up"><label class="field">Suffix<input name="suffix" value="' + escapeHtml(sequence ? sequence.suffix : "") + '"></label></div>',
-      '  <label class="field" data-type-only="custom"' + (type === "custom" ? "" : " hidden") + '>Custom values<textarea name="customValuesText">' + escapeHtml(sequence && sequence.type === "custom" ? sequence.customValues.join("\n") : "") + '</textarea><span class="field-help">One value per line.</span></label>',
-      '  <p class="field-help">Changes save automatically when you leave a field.</p>',
-      "</form>"
-    ].join("");
-  }
-
   function renderColorSequenceForm(sequence) {
     return [
       '<form class="form-grid" data-form="color-sequence">',
@@ -2056,30 +1965,11 @@
     ].join("");
   }
 
-  function renderTextTypeOptions(currentValue) {
-    return [
-      { id: "numeric", label: "Numeric" },
-      { id: "alphabetic", label: "Alphabetic" },
-      { id: "custom", label: "Custom" }
-    ].map(function (option) {
-      return '<option value="' + option.id + '"' + (currentValue === option.id ? " selected" : "") + ">" + option.label + "</option>";
-    }).join("");
-  }
-
   function renderTextContentModeOptions(currentValue) {
     return [
       { id: "numeric", label: "Number Sequence" },
       { id: "alphabetic", label: "Alphabet Sequence" },
       { id: "custom", label: "Custom Text" }
-    ].map(function (option) {
-      return '<option value="' + option.id + '"' + (currentValue === option.id ? " selected" : "") + ">" + option.label + "</option>";
-    }).join("");
-  }
-
-  function renderColorModeOptions(currentValue) {
-    return [
-      { id: "manual", label: "Manual" },
-      { id: "sequence", label: "Sequence" }
     ].map(function (option) {
       return '<option value="' + option.id + '"' + (currentValue === option.id ? " selected" : "") + ">" + option.label + "</option>";
     }).join("");
@@ -2146,14 +2036,6 @@
       return candidate.id === selectedId;
     });
     return sequence ? sequence.name : "No sequence";
-  }
-
-  function normalizeColorInput(value) {
-    if (typeof value === "string" && value.startsWith("#")) {
-      return value;
-    }
-
-    return "#000000";
   }
 
   function renderPageSettingsForm(settings) {
