@@ -33,6 +33,8 @@
   var printSelectionSyncTimer = null;
   var designerLayoutObserver = null;
   var designerResizeQueued = false;
+  var designerTransientPreview = null;
+  var designerPreviewRenderQueued = false;
 
   function escapeHtml(value) {
     return String(value)
@@ -75,6 +77,7 @@
 
     attachEvents(appElement, store);
     syncDesignerDrawerHeight(appElement);
+    renderDesignerTransientPreview(appElement);
     restoreFocusState(appElement, focusState);
     restorePendingPrintFieldFocus(appElement);
   }
@@ -1353,30 +1356,7 @@
 
         event.preventDefault();
         var factor = Math.pow(1.0015, -event.deltaY);
-        store.updateProject(function (project) {
-          var nextComponent = findComponent(project, selection, selection.selectedComponentType);
-          if (!nextComponent) {
-            return;
-          }
-
-          if (selection.selectedComponentType === "image") {
-            Tokens.updateImageComponent(nextComponent, {
-              x: nextComponent.x,
-              y: nextComponent.y,
-              scale: nextComponent.scale * factor,
-              rotationDeg: nextComponent.rotationDeg,
-              mirrorX: nextComponent.mirrorX,
-              mirrorY: nextComponent.mirrorY
-            });
-          } else {
-            Tokens.updateComponentRect(nextComponent, {
-              x: nextComponent.x,
-              y: nextComponent.y,
-              width: nextComponent.width * factor,
-              height: nextComponent.height * factor
-            });
-          }
-        }, { persist: false });
+        setDesignerTransientPreview(scaleDesignerComponentState(selection, component, factor));
         scheduleDesignerPersist();
       }, { passive: false });
 
@@ -1472,82 +1452,7 @@
       return;
     }
 
-    var deltaX = (event.clientX - designerInteraction.startClientX) / designerInteraction.previewRect.width;
-    var deltaY = (event.clientY - designerInteraction.startClientY) / designerInteraction.previewRect.height;
-    mountedStore.updateProject(function (project) {
-      var token = findToken(project, designerInteraction.tokenId);
-      if (!token) {
-        return;
-      }
-      var selection = {
-        token: token,
-        selectedComponentId: designerInteraction.componentId
-      };
-      var component = findComponent(project, selection, designerInteraction.componentType);
-      if (!component) {
-        return;
-      }
-
-      if (designerInteraction.mode === "resize") {
-        if (designerInteraction.componentType === "image") {
-          var startDimensions = Tokens.getImageDimensions(designerInteraction.startRect);
-          var widthRatio = (startDimensions.width / 2 + deltaX) / Math.max(startDimensions.width / 2, 0.001);
-          var heightRatio = (startDimensions.height / 2 + deltaY) / Math.max(startDimensions.height / 2, 0.001);
-          var nextScale = designerInteraction.startRect.scale * Math.max(0.1, widthRatio, heightRatio);
-          Tokens.updateImageComponent(component, {
-            x: designerInteraction.startRect.x,
-            y: designerInteraction.startRect.y,
-            scale: nextScale,
-            rotationDeg: component.rotationDeg,
-            mirrorX: component.mirrorX,
-            mirrorY: component.mirrorY
-          });
-        } else {
-          Tokens.updateComponentRect(component, {
-            x: designerInteraction.startRect.x,
-            y: designerInteraction.startRect.y,
-            width: designerInteraction.startRect.width + deltaX * 2,
-            height: designerInteraction.startRect.height + deltaY * 2
-          });
-        }
-      } else if (designerInteraction.mode === "rotate" && designerInteraction.componentType === "image") {
-        var startAngle = Math.atan2(
-          designerInteraction.startClientY - designerInteraction.centerClientY,
-          designerInteraction.startClientX - designerInteraction.centerClientX
-        );
-        var nextAngle = Math.atan2(
-          event.clientY - designerInteraction.centerClientY,
-          event.clientX - designerInteraction.centerClientX
-        );
-        var deltaDeg = (nextAngle - startAngle) * 180 / Math.PI;
-        Tokens.updateImageComponent(component, {
-          x: designerInteraction.startRect.x,
-          y: designerInteraction.startRect.y,
-          scale: designerInteraction.startRect.scale,
-          rotationDeg: designerInteraction.startRect.rotationDeg + deltaDeg,
-          mirrorX: component.mirrorX,
-          mirrorY: component.mirrorY
-        });
-      } else {
-        if (designerInteraction.componentType === "image") {
-          Tokens.updateImageComponent(component, {
-            x: designerInteraction.startRect.x + deltaX,
-            y: designerInteraction.startRect.y + deltaY,
-            scale: designerInteraction.startRect.scale,
-            rotationDeg: component.rotationDeg,
-            mirrorX: component.mirrorX,
-            mirrorY: component.mirrorY
-          });
-        } else {
-          Tokens.updateComponentRect(component, {
-            x: designerInteraction.startRect.x + deltaX,
-            y: designerInteraction.startRect.y + deltaY,
-            width: designerInteraction.startRect.width,
-            height: designerInteraction.startRect.height
-          });
-        }
-      }
-    }, { persist: false });
+    setDesignerTransientPreview(buildDesignerInteractionState(designerInteraction, event));
   }
 
   function handleGlobalPointerUp() {
@@ -1560,7 +1465,7 @@
       runtimeGlobal.clearTimeout(designerWheelPersistTimer);
       designerWheelPersistTimer = null;
     }
-    mountedStore.persistProject();
+    commitDesignerTransientPreview();
   }
 
   function scheduleDesignerPersist() {
@@ -1569,10 +1474,239 @@
     }
     designerWheelPersistTimer = runtimeGlobal.setTimeout(function () {
       designerWheelPersistTimer = null;
-      if (mountedStore) {
-        mountedStore.persistProject();
-      }
+      commitDesignerTransientPreview();
     }, 180);
+  }
+
+  function buildDesignerInteractionState(interaction, event) {
+    var deltaX = (event.clientX - interaction.startClientX) / interaction.previewRect.width;
+    var deltaY = (event.clientY - interaction.startClientY) / interaction.previewRect.height;
+    var state = {
+      tokenId: interaction.tokenId,
+      componentId: interaction.componentId,
+      componentType: interaction.componentType
+    };
+
+    if (interaction.mode === "resize") {
+      if (interaction.componentType === "image") {
+        var startDimensions = Tokens.getImageDimensions(interaction.startRect);
+        var widthRatio = (startDimensions.width / 2 + deltaX) / Math.max(startDimensions.width / 2, 0.001);
+        var heightRatio = (startDimensions.height / 2 + deltaY) / Math.max(startDimensions.height / 2, 0.001);
+        state.componentState = {
+          x: interaction.startRect.x,
+          y: interaction.startRect.y,
+          scale: interaction.startRect.scale * Math.max(0.1, widthRatio, heightRatio),
+          rotationDeg: interaction.startRect.rotationDeg
+        };
+      } else {
+        state.componentState = {
+          x: interaction.startRect.x,
+          y: interaction.startRect.y,
+          width: interaction.startRect.width + deltaX * 2,
+          height: interaction.startRect.height + deltaY * 2
+        };
+      }
+      return state;
+    }
+
+    if (interaction.mode === "rotate" && interaction.componentType === "image") {
+      var startAngle = Math.atan2(
+        interaction.startClientY - interaction.centerClientY,
+        interaction.startClientX - interaction.centerClientX
+      );
+      var nextAngle = Math.atan2(
+        event.clientY - interaction.centerClientY,
+        event.clientX - interaction.centerClientX
+      );
+      state.componentState = {
+        x: interaction.startRect.x,
+        y: interaction.startRect.y,
+        scale: interaction.startRect.scale,
+        rotationDeg: interaction.startRect.rotationDeg + (nextAngle - startAngle) * 180 / Math.PI
+      };
+      return state;
+    }
+
+    if (interaction.componentType === "image") {
+      state.componentState = {
+        x: interaction.startRect.x + deltaX,
+        y: interaction.startRect.y + deltaY,
+        scale: interaction.startRect.scale,
+        rotationDeg: interaction.startRect.rotationDeg
+      };
+      return state;
+    }
+
+    state.componentState = {
+      x: interaction.startRect.x + deltaX,
+      y: interaction.startRect.y + deltaY,
+      width: interaction.startRect.width,
+      height: interaction.startRect.height
+    };
+    return state;
+  }
+
+  function scaleDesignerComponentState(selection, component, factor) {
+    var state = {
+      tokenId: selection.token.id,
+      componentId: component.id,
+      componentType: selection.selectedComponentType
+    };
+
+    if (selection.selectedComponentType === "image") {
+      state.componentState = {
+        x: component.x,
+        y: component.y,
+        scale: component.scale * factor,
+        rotationDeg: component.rotationDeg
+      };
+      return state;
+    }
+
+    state.componentState = {
+      x: component.x,
+      y: component.y,
+      width: component.width * factor,
+      height: component.height * factor
+    };
+    return state;
+  }
+
+  function setDesignerTransientPreview(preview) {
+    designerTransientPreview = preview;
+    scheduleDesignerTransientRender();
+  }
+
+  function scheduleDesignerTransientRender() {
+    if (designerPreviewRenderQueued) {
+      return;
+    }
+    designerPreviewRenderQueued = true;
+    runtimeGlobal.requestAnimationFrame(function () {
+      designerPreviewRenderQueued = false;
+      renderDesignerTransientPreview();
+    });
+  }
+
+  function renderDesignerTransientPreview(appElement) {
+    if (!designerTransientPreview || !mountedStore) {
+      return;
+    }
+
+    var root = appElement || runtimeGlobal.document.getElementById("app");
+    if (!root) {
+      return;
+    }
+
+    var state = mountedStore.getState();
+    var selection = getDesignerSelection(state);
+    if (!selection.token || selection.token.id !== designerTransientPreview.tokenId) {
+      return;
+    }
+
+    var token = Schema.clone(selection.token);
+    if (!applyDesignerTransientState(token, designerTransientPreview)) {
+      return;
+    }
+
+    var previewStage = root.querySelector("[data-preview-stage]");
+    if (!previewStage) {
+      return;
+    }
+
+    previewStage.innerHTML = Renderer.renderTokenSvg(token, state.project, {
+      sequenceIndex: 0,
+      instanceId: "designer-front",
+      interactive: true,
+      selectedComponentType: state.ui.selectedComponentType,
+      selectedComponentId: state.ui.selectedComponentId
+    });
+    syncDesignerTransientForm(root, designerTransientPreview);
+  }
+
+  function applyDesignerTransientState(token, preview) {
+    if (!token || !token.front || !preview) {
+      return false;
+    }
+
+    var component = getSelectedComponent(token.front, preview.componentType, preview.componentId);
+    if (!component) {
+      return false;
+    }
+
+    if (preview.componentType === "image") {
+      Tokens.updateImageComponent(component, {
+        x: preview.componentState.x,
+        y: preview.componentState.y,
+        scale: preview.componentState.scale,
+        rotationDeg: preview.componentState.rotationDeg,
+        mirrorX: component.mirrorX,
+        mirrorY: component.mirrorY
+      });
+      return true;
+    }
+
+    Tokens.updateComponentRect(component, preview.componentState);
+    return true;
+  }
+
+  function syncDesignerTransientForm(appElement, preview) {
+    var form = appElement.querySelector(
+      preview.componentType === "image"
+        ? '[data-form="image-component-settings"]'
+        : '[data-form="text-component-settings"]'
+    );
+    if (!form) {
+      return;
+    }
+
+    setFormFieldValue(form, "x", preview.componentState.x, 2);
+    setFormFieldValue(form, "y", toDisplayCenterY(preview.componentState.y), 2);
+    if (preview.componentType === "image") {
+      setFormFieldValue(form, "scale", preview.componentState.scale, 2);
+      setFormFieldValue(form, "rotationDeg", Math.round(Number(preview.componentState.rotationDeg || 0)));
+      setRangeHelpText(form, "scale", Math.round(preview.componentState.scale * 100) + "% of max circle diameter");
+      setRangeHelpText(form, "rotationDeg", Math.round(Number(preview.componentState.rotationDeg || 0)) + "° clockwise");
+      return;
+    }
+
+    setFormFieldValue(form, "width", preview.componentState.width, 2);
+    setFormFieldValue(form, "height", preview.componentState.height, 2);
+  }
+
+  function setFormFieldValue(form, name, value, fixedDigits) {
+    var field = form.querySelector('[name="' + name + '"]');
+    if (!field) {
+      return;
+    }
+    field.value = typeof fixedDigits === "number" ? Number(value).toFixed(fixedDigits) : String(value);
+  }
+
+  function setRangeHelpText(form, name, text) {
+    var field = form.querySelector('[name="' + name + '"]');
+    if (!field) {
+      return;
+    }
+    var help = field.parentElement ? field.parentElement.querySelector(".field-help") : null;
+    if (help) {
+      help.textContent = text;
+    }
+  }
+
+  function commitDesignerTransientPreview() {
+    if (!mountedStore || !designerTransientPreview) {
+      return;
+    }
+
+    var preview = designerTransientPreview;
+    designerTransientPreview = null;
+    mountedStore.updateProject(function (project) {
+      var token = findToken(project, preview.tokenId);
+      if (!token) {
+        return;
+      }
+      applyDesignerTransientState(token, preview);
+    });
   }
 
   function captureFocusState(appElement) {
