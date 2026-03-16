@@ -29,6 +29,7 @@
   var designerTransientPreview = null;
   var designerPreviewRenderQueued = false;
   var appDelegatedHandlersBound = false;
+  var mountedAppView = null;
   var CONDITIONAL_FIELD_PRESERVE = [
     "contentMode",
     "colorSource",
@@ -74,41 +75,65 @@
   var renderFontFamilyOptions = AppHelpers.renderFontFamilyOptions;
   var getSelectedSequence = AppHelpers.getSelectedSequence;
   var getSequenceName = AppHelpers.getSequenceName;
+  var SETTINGS_PANEL_HELPERS = {
+    conditionalFieldPreserve: CONDITIONAL_FIELD_PRESERVE,
+    getSelectedSequence: getSelectedSequence,
+    renderDefaultTokenSettingsForm: renderDefaultTokenSettingsForm,
+    renderDefaultTextSettingsForm: renderDefaultTextSettingsForm,
+    renderImageImportSettingsForm: renderImageImportSettingsForm,
+    renderColorSequenceManager: renderColorSequenceManager,
+    renderColorSequenceForm: renderColorSequenceForm,
+    syncConditionalFields: syncConditionalFields,
+    parseColorSourceValue: parseColorSourceValue,
+    toNumberOrDefault: toNumberOrDefault,
+    toNonNegativeNumberOrDefault: toNonNegativeNumberOrDefault,
+    toAlphaThresholdOrDefault: toAlphaThresholdOrDefault,
+    upsertById: upsertById,
+    bindBackgroundUploadControls: bindBackgroundUploadControls,
+    getImageImportOptions: getImageImportOptions
+  };
+  var DESIGNER_PANEL_HELPERS = {
+    conditionalFieldPreserve: CONDITIONAL_FIELD_PRESERVE,
+    getDesignerSelection: getDesignerSelection,
+    getSelectedComponent: getSelectedComponent,
+    renderBackgroundControls: renderBackgroundControls,
+    renderColorPicker: renderColorPicker,
+    renderConditionalField: renderConditionalField,
+    renderConditionalBlock: renderConditionalBlock,
+    renderTextContentModeOptions: renderTextContentModeOptions,
+    renderFontWeightOptions: renderFontWeightOptions,
+    renderFontFamilyOptions: renderFontFamilyOptions,
+    syncConditionalFields: syncConditionalFields,
+    parseColorSourceValue: parseColorSourceValue,
+    toNumberOrDefault: toNumberOrDefault,
+    toIntegerOrDefault: toIntegerOrDefault,
+    toNonNegativeInteger: toNonNegativeInteger,
+    findToken: findToken,
+    findComponent: findComponent,
+    applyBoundsFromForm: applyBoundsFromForm,
+    fromDisplayCenterY: fromDisplayCenterY,
+    bindBackgroundUploadControls: bindBackgroundUploadControls,
+    getImageImportOptions: getImageImportOptions,
+    readImageAssetFile: Utils.readImageAssetFile
+  };
+  var PRINT_PANEL_HELPERS = {
+    toNonNegativeNumberOrDefault: toNonNegativeNumberOrDefault,
+    collectPrintSelectionRows: collectPrintSelectionRows,
+    setPendingPrintFieldFocus: setPendingPrintFieldFocus
+  };
 
-  function render(appElement, store) {
+  function render(appView, store) {
+    var appElement = appView.appElement;
     var focusState = captureFocusState(appElement);
     var state = store.getState();
     var activeTab = state.ui.activeTab;
-
-    appElement.innerHTML = [
-      '<main class="app-shell">',
-      '  <header class="app-header">',
-      '    <div class="app-brand">',
-      '      <h1 class="app-title">Monster Mint</h1>',
-      '      <p class="app-subtitle">Design printable tabletop token sheets in one self-contained browser app.</p>',
-      "    </div>",
-      '    <div class="app-menu" role="toolbar" aria-label="Project actions">',
-      '      <button class="menu-button" type="button" data-action="export-project" aria-label="Export JSON" title="Export JSON"><span aria-hidden="true">&#8595;</span></button>',
-      '      <button class="menu-button" type="button" data-action="import-project" aria-label="Import JSON" title="Import JSON"><span aria-hidden="true">&#8593;</span></button>',
-      '      <button class="menu-button" type="button" data-action="reset-project" aria-label="Reset Project" title="Reset Project"><span aria-hidden="true">&#8635;</span></button>',
-      '      <button class="menu-button' + (activeTab === "settings" ? " is-active" : "") + '" type="button" data-action="open-settings" aria-label="Settings" title="Settings"><span aria-hidden="true">&#9881;</span></button>',
-      '      <input class="visually-hidden" type="file" accept="application/json,.json" data-import-input>',
-      "    </div>",
-      "  </header>",
-      '  <nav class="tabs" aria-label="Main tabs" role="tablist">',
-      TAB_CONFIG.map(function (tab) {
-        return '<button class="tab-button' + (tab.id === activeTab ? " is-active" : "") + '" type="button" role="tab" aria-selected="' + (tab.id === activeTab ? "true" : "false") + '" data-tab="' + tab.id + '">' + tab.label + "</button>";
-      }).join(""),
-      "  </nav>",
-      renderPanel("settings", activeTab, activeTab === "settings" ? SettingsPanel.renderPanel(state, getSettingsPanelHelpers()) : ""),
-      renderPanel("designer", activeTab, activeTab === "designer" ? DesignerPanel.renderPanel(state, getDesignerPanelHelpers()) : ""),
-      renderPanel("print", activeTab, activeTab === "print" ? PrintPanel.renderPanel(state) : ""),
-      "</main>"
-    ].join("");
-
-    attachEvents(appElement, store);
+    updateShellState(appView, activeTab);
+    updatePanelContent(appView, "settings", activeTab === "settings" ? SettingsPanel.renderPanel(state, SETTINGS_PANEL_HELPERS) : "", store);
+    updatePanelContent(appView, "designer", activeTab === "designer" ? DesignerPanel.renderPanel(state, DESIGNER_PANEL_HELPERS) : "", store);
+    updatePanelContent(appView, "print", activeTab === "print" ? PrintPanel.renderPanel(state) : "", store);
     syncDesignerDrawerHeight(appElement);
     renderDesignerTransientPreview(appElement);
+    syncRenderedFormState(appElement, state);
     restoreFocusState(appElement, focusState);
     restorePendingPrintFieldFocus(appElement);
   }
@@ -145,70 +170,101 @@
     }
   }
 
-  function renderPanel(tabId, activeTab, content) {
-    return '<section class="tab-panel' + (tabId === activeTab ? " is-active" : "") + '" data-panel="' + tabId + '">' + content + "</section>";
-  }
+  function createAppView(appElement) {
+    appElement.innerHTML = [
+      '<main class="app-shell">',
+      '  <header class="app-header">',
+      '    <div class="app-brand">',
+      '      <h1 class="app-title">Monster Mint</h1>',
+      '      <p class="app-subtitle">Design printable tabletop token sheets in one self-contained browser app.</p>',
+      "    </div>",
+      '    <div class="app-menu" role="toolbar" aria-label="Project actions">',
+      '      <button class="menu-button" type="button" data-action="export-project" aria-label="Export JSON" title="Export JSON"><span aria-hidden="true">&#8595;</span></button>',
+      '      <button class="menu-button" type="button" data-action="import-project" aria-label="Import JSON" title="Import JSON"><span aria-hidden="true">&#8593;</span></button>',
+      '      <button class="menu-button" type="button" data-action="reset-project" aria-label="Reset Project" title="Reset Project"><span aria-hidden="true">&#8635;</span></button>',
+      '      <button class="menu-button" type="button" data-action="open-settings" aria-label="Settings" title="Settings"><span aria-hidden="true">&#9881;</span></button>',
+      '      <input class="visually-hidden" type="file" accept="application/json,.json" data-import-input>',
+      "    </div>",
+      "  </header>",
+      '  <nav class="tabs" aria-label="Main tabs" role="tablist">',
+      TAB_CONFIG.map(function (tab) {
+        return '<button class="tab-button" type="button" role="tab" aria-selected="false" data-tab="' + tab.id + '">' + tab.label + "</button>";
+      }).join(""),
+      "  </nav>",
+      '<section class="tab-panel" data-panel="settings"></section>',
+      '<section class="tab-panel" data-panel="designer"></section>',
+      '<section class="tab-panel" data-panel="print"></section>',
+      "</main>"
+    ].join("");
 
-  function getSettingsPanelHelpers() {
     return {
-      conditionalFieldPreserve: CONDITIONAL_FIELD_PRESERVE,
-      getSelectedSequence: getSelectedSequence,
-      renderDefaultTokenSettingsForm: renderDefaultTokenSettingsForm,
-      renderDefaultTextSettingsForm: renderDefaultTextSettingsForm,
-      renderImageImportSettingsForm: renderImageImportSettingsForm,
-      renderColorSequenceManager: renderColorSequenceManager,
-      renderColorSequenceForm: renderColorSequenceForm,
-      syncConditionalFields: syncConditionalFields,
-      parseColorSourceValue: parseColorSourceValue,
-      toNumberOrDefault: toNumberOrDefault,
-      toNonNegativeNumberOrDefault: toNonNegativeNumberOrDefault,
-      toAlphaThresholdOrDefault: toAlphaThresholdOrDefault,
-      upsertById: upsertById,
-      bindBackgroundUploadControls: bindBackgroundUploadControls,
-      getImageImportOptions: getImageImportOptions
+      appElement: appElement,
+      settingsButton: appElement.querySelector('[data-action="open-settings"]'),
+      panels: {
+        settings: appElement.querySelector('[data-panel="settings"]'),
+        designer: appElement.querySelector('[data-panel="designer"]'),
+        print: appElement.querySelector('[data-panel="print"]')
+      },
+      tabButtons: TAB_CONFIG.reduce(function (result, tab) {
+        result[tab.id] = appElement.querySelector('[data-tab="' + tab.id + '"]');
+        return result;
+      }, {}),
+      panelHtml: {
+        settings: null,
+        designer: null,
+        print: null
+      }
     };
   }
 
-  function getDesignerPanelHelpers() {
-    return {
-      conditionalFieldPreserve: CONDITIONAL_FIELD_PRESERVE,
-      getDesignerSelection: getDesignerSelection,
-      getSelectedComponent: getSelectedComponent,
-      renderBackgroundControls: renderBackgroundControls,
-      renderColorPicker: renderColorPicker,
-      renderConditionalField: renderConditionalField,
-      renderConditionalBlock: renderConditionalBlock,
-      renderTextContentModeOptions: renderTextContentModeOptions,
-      renderFontWeightOptions: renderFontWeightOptions,
-      renderFontFamilyOptions: renderFontFamilyOptions,
-      syncConditionalFields: syncConditionalFields,
-      parseColorSourceValue: parseColorSourceValue,
-      toNumberOrDefault: toNumberOrDefault,
-      toIntegerOrDefault: toIntegerOrDefault,
-      toNonNegativeInteger: toNonNegativeInteger,
-      findToken: findToken,
-      findComponent: findComponent,
-      applyBoundsFromForm: applyBoundsFromForm,
-      fromDisplayCenterY: fromDisplayCenterY,
-      bindBackgroundUploadControls: bindBackgroundUploadControls,
-      getImageImportOptions: getImageImportOptions,
-      readImageAssetFile: Utils.readImageAssetFile
-    };
+  function updateShellState(appView, activeTab) {
+    if (appView.settingsButton) {
+      appView.settingsButton.classList.toggle("is-active", activeTab === "settings");
+    }
+
+    Object.keys(appView.panels).forEach(function (tabId) {
+      var panel = appView.panels[tabId];
+      if (panel) {
+        panel.classList.toggle("is-active", tabId === activeTab);
+      }
+    });
+
+    TAB_CONFIG.forEach(function (tab) {
+      var button = appView.tabButtons[tab.id];
+      if (!button) {
+        return;
+      }
+      var isActive = tab.id === activeTab;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
   }
 
-  function getPrintPanelHelpers() {
-    return {
-      toNonNegativeNumberOrDefault: toNonNegativeNumberOrDefault,
-      collectPrintSelectionRows: collectPrintSelectionRows,
-      setPendingPrintFieldFocus: setPendingPrintFieldFocus
-    };
+  function updatePanelContent(appView, tabId, nextHtml, store) {
+    var panel = appView.panels[tabId];
+    if (!panel || appView.panelHtml[tabId] === nextHtml) {
+      return;
+    }
+
+    panel.innerHTML = nextHtml;
+    appView.panelHtml[tabId] = nextHtml;
+    bindPanelForms(tabId, appView.appElement, store);
   }
 
-  function attachEvents(appElement, store) {
-    SettingsPanel.bindForms(appElement, store, getSettingsPanelHelpers());
-    SettingsPanel.bindTransferActions(appElement, store, getSettingsPanelHelpers());
-    DesignerPanel.bindForms(appElement, store, getDesignerPanelHelpers());
-    PrintPanel.bindForms(appElement, store, getPrintPanelHelpers());
+  function bindPanelForms(tabId, appElement, store) {
+    if (tabId === "settings") {
+      SettingsPanel.bindForms(appElement, store, SETTINGS_PANEL_HELPERS);
+      return;
+    }
+
+    if (tabId === "designer") {
+      DesignerPanel.bindForms(appElement, store, DESIGNER_PANEL_HELPERS);
+      return;
+    }
+
+    if (tabId === "print") {
+      PrintPanel.bindForms(appElement, store, PRINT_PANEL_HELPERS);
+    }
   }
 
 
@@ -456,6 +512,62 @@
     if (help) {
       help.textContent = text;
     }
+  }
+
+  function syncRenderedFormState(appElement, state) {
+    syncDesignerFormState(appElement, state);
+    syncPrintSelectionFormState(appElement, state);
+  }
+
+  function syncDesignerFormState(appElement, state) {
+    var selection = getDesignerSelection(state);
+    if (!selection.token || !selection.selectedComponentType) {
+      return;
+    }
+
+    var component = getSelectedComponent(selection.token.front, selection.selectedComponentType, selection.selectedComponentId);
+    if (!component) {
+      return;
+    }
+
+    if (selection.selectedComponentType === "image") {
+      var imageForm = appElement.querySelector('[data-form="image-component-settings"]');
+      if (!imageForm) {
+        return;
+      }
+      setFormFieldValue(imageForm, "x", component.x, 2);
+      setFormFieldValue(imageForm, "y", toDisplayCenterY(component.y), 2);
+      setFormFieldValue(imageForm, "scale", component.scale, 2);
+      setFormFieldValue(imageForm, "rotationDeg", Math.round(Number(component.rotationDeg || 0)));
+      setRangeHelpText(imageForm, "scale", Math.round(component.scale * 100) + "% of max circle diameter");
+      setRangeHelpText(imageForm, "rotationDeg", Math.round(Number(component.rotationDeg || 0)) + "° clockwise");
+      return;
+    }
+
+    var textForm = appElement.querySelector('[data-form="text-component-settings"]');
+    if (!textForm) {
+      return;
+    }
+    setFormFieldValue(textForm, "x", component.x, 2);
+    setFormFieldValue(textForm, "y", toDisplayCenterY(component.y), 2);
+    setFormFieldValue(textForm, "width", component.width, 2);
+    setFormFieldValue(textForm, "height", component.height, 2);
+    setFormFieldValue(textForm, "sequenceStart", component.sequenceStart);
+    if (textForm.querySelector('[name="sequencePad"]')) {
+      setFormFieldValue(textForm, "sequencePad", component.sequencePad);
+    }
+  }
+
+  function syncPrintSelectionFormState(appElement, state) {
+    var printForm = appElement.querySelector('[data-form="print-selections"]');
+    if (!printForm) {
+      return;
+    }
+
+    Print.getSelectionRows(state.project).forEach(function (row) {
+      setFormFieldValue(printForm, "copies-" + row.tokenId, row.copies);
+      setFormFieldValue(printForm, "start-" + row.tokenId, row.sequenceStart);
+    });
   }
 
   function bindDelegatedAppHandlers(appElement) {
@@ -994,13 +1106,15 @@
     var appElement = document.getElementById("app");
     var store = State.createStore({ storage: runtimeGlobal.localStorage });
     mountedStore = store;
+    mountedAppView = createAppView(appElement);
     bindDelegatedAppHandlers(appElement);
+    SettingsPanel.bindTransferActions(appElement, store, SETTINGS_PANEL_HELPERS);
     store.subscribe(function () {
-      render(appElement, store);
+      render(mountedAppView, store);
     });
     bindGlobalPointerHandlers();
     bindGlobalResizeHandlers(appElement);
-    render(appElement, store);
+    render(mountedAppView, store);
   }
 
   function bindGlobalPointerHandlers() {
