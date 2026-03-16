@@ -28,9 +28,10 @@ test("can create and manipulate a token template", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Selected Component" })).toBeVisible();
   await expect(page.locator(".designer-drawer .drawer-body")).toHaveCSS("overflow-y", "auto");
   await expect(page.locator('form[data-form="text-component-settings"] input[name="name"]')).toHaveValue("Text #1");
-  await expect(page.locator('form[data-form="text-component-settings"] select[name="contentMode"]')).toHaveValue("custom");
-  await expect(page.locator('form[data-form="text-component-settings"] input[name="customText"]')).toBeVisible();
-  await expect(page.locator('form[data-form="text-component-settings"] input[name="sequenceStart"]')).toBeHidden();
+  await expect(page.locator('form[data-form="text-component-settings"] select[name="contentMode"]')).toHaveValue("numeric");
+  await expect(page.locator('form[data-form="text-component-settings"] input[name="customText"]')).toBeHidden();
+  await expect(page.locator('form[data-form="text-component-settings"] input[name="sequenceStart"]')).toBeVisible();
+  await expect(page.locator('form[data-form="text-component-settings"] input[name="sequencePad"]')).toBeVisible();
   const textNode = page.locator('[data-preview-stage] svg text').first();
   const initialFontSize = Number(await textNode.getAttribute("font-size"));
   await page.locator('form[data-form="text-component-settings"] input[name="textBorderWidth"]').fill("6");

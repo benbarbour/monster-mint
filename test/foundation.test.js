@@ -312,6 +312,7 @@ test("text components preserve zero-centered coordinates", () => {
   assert.equal(component.y, 0);
   assert.equal(component.width, 0.5);
   assert.equal(component.height, 0.2);
+  assert.equal(component.contentMode, "numeric");
 });
 
 test("image components use centered defaults and aspect-based scaling", () => {

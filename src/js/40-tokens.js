@@ -32,7 +32,10 @@
       y: asCoordinate(payload.y, 0),
       width: asSize(payload.width, 0.5),
       height: asSize(payload.height, 0.2),
-      contentMode: normalizeTextContentMode(payload.contentMode, legacyMode),
+      contentMode: normalizeTextContentMode(
+        payload.contentMode != null ? payload.contentMode : (legacyMode || "numeric"),
+        legacyMode
+      ),
       customText: payload.customText || "Token",
       sequenceStart: asInteger(payload.sequenceStart, legacyMode === "alphabetic" ? 1 : (payload.start || 1)),
       sequencePad: asNonNegativeInteger(payload.sequencePad, payload.padTo || 0),
