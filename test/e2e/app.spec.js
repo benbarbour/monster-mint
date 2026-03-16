@@ -108,13 +108,22 @@ test("can create and manipulate a token template", async ({ page }) => {
 
 test("token settings own appearance controls and color sequences show in preview", async ({ page }) => {
   await page.getByRole("button", { name: "Settings" }).click();
-  await expect(page.locator('form[data-form="background-defaults"]')).toBeVisible();
-  await page.locator('form[data-form="background-defaults"] select[name="defaultBackgroundMode"]').selectOption("image");
+  await expect(page.locator('form[data-form="token-defaults"]')).toBeVisible();
+  await page.locator('form[data-form="token-defaults"] select[name="defaultDiameterIn"]').selectOption("2");
+  await page.locator('form[data-form="token-defaults"] select[name="defaultBackEnabled"]').selectOption("true");
+  await page.locator('form[data-form="token-defaults"] select[name="defaultBackgroundMode"]').selectOption("image");
   await page.locator('[data-default-background-input]').setInputFiles({
     name: "default-background.svg",
     mimeType: "image/svg+xml",
     buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="#2244ff"/></svg>')
   });
+  await page.locator('form[data-form="token-defaults"] input[name="defaultBorderWidthRatio"]').evaluate((element) => {
+    element.value = "0.07";
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  const defaultBorderPicker = page.locator('form[data-form="token-defaults"] .color-picker-field').filter({ hasText: "Default token border" });
+  await defaultBorderPicker.locator("summary").click();
+  await page.locator('select[name="defaultBorderColorSource"]').selectOption({ label: "Rainbow" });
   await expect(page.locator('form[data-form="text-defaults"] select[name="fontFamily"]')).toBeVisible();
   await page.locator('form[data-form="text-defaults"] select[name="fontFamily"]').selectOption("Arial");
   await page.locator('form[data-form="text-defaults"] select[name="fontWeight"]').selectOption("500");
@@ -122,7 +131,10 @@ test("token settings own appearance controls and color sequences show in preview
   await page.locator('form[data-form="text-defaults"] input[name="defaultTextBorderWidth"]').blur();
   await page.getByRole("tab", { name: "Designer" }).click();
   await page.getByRole("button", { name: "Create Token" }).click();
+  await expect(page.locator('form[data-form="token-settings"] select[name="diameterIn"]')).toHaveValue("2");
+  await expect(page.locator('form[data-form="token-settings"] select[name="backEnabled"]')).toHaveValue("true");
   await expect(page.locator('form[data-form="token-settings"] select[name="backgroundMode"]')).toHaveValue("image");
+  await expect(page.locator('form[data-form="token-settings"] input[name="borderWidthRatio"]')).toHaveValue("0.07");
   await expect(page.locator('[data-preview-stage] svg image[data-background-image="true"]')).toHaveCount(1);
   const componentOptions = await page.locator('select[name="selectedComponentKey"] option').allTextContents();
   expect(componentOptions).not.toContain("Background");
@@ -130,9 +142,7 @@ test("token settings own appearance controls and color sequences show in preview
   await expect(page.getByRole("button", { name: "Copy Front to Back" })).toBeVisible();
 
   await expect(page.locator('form[data-form="token-settings"] input[name="borderWidthRatio"]')).toHaveAttribute("max", "0.25");
-  const tokenBorderPicker = page.locator('.color-picker-field').filter({ hasText: "Token border" });
-  await tokenBorderPicker.locator("summary").click();
-  await page.locator('select[name="borderColorSource"]').selectOption({ label: "Rainbow" });
+  await expect(page.locator('[data-preview-stage] svg circle[stroke="#ff0000"]')).toHaveCount(1);
   const initialBackgroundHref = await page.locator('[data-preview-stage] svg image[data-background-image="true"]').first().getAttribute("href");
   await page.locator('form[data-form="token-settings"] select[name="backgroundMode"]').selectOption("image");
   await page.locator('[data-token-background-input]').setInputFiles({
@@ -142,10 +152,9 @@ test("token settings own appearance controls and color sequences show in preview
   });
   await expect(page.locator('[data-preview-stage] svg image[data-background-image="true"]').first()).not.toHaveAttribute("href", initialBackgroundHref);
 
-  await expect(page.locator('[data-preview-stage] svg circle[stroke="#ff0000"]')).toHaveCount(1);
-
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.locator('form[data-form="token-settings"]')).toBeVisible();
+  await expect(page.locator('form[data-form="token-settings"] input[name="borderWidthRatio"]')).toHaveValue("0.07");
 
   const oversizedSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"><desc>' +
     "A".repeat(1100000) +

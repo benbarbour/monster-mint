@@ -58,13 +58,19 @@
     };
   }
 
-  function createDefaultBackgroundDefaults() {
+  function createDefaultTokenDefaults() {
     return {
+      diameterIn: 1,
+      backEnabled: false,
       backgroundMode: "color",
       backgroundColorMode: "manual",
       backgroundColor: "#f3e7c9",
       backgroundColorSequenceRef: null,
-      backgroundImageSource: ""
+      backgroundImageSource: "",
+      borderWidthRatio: 0.03,
+      borderColorMode: "manual",
+      borderColor: "#000000",
+      borderColorSequenceRef: null
     };
   }
 
@@ -84,7 +90,7 @@
         pageOrientation: "portrait",
         pageMarginIn: 0.25,
         bleedIn: 0.0625,
-        backgroundDefaults: createDefaultBackgroundDefaults(),
+        tokenDefaults: createDefaultTokenDefaults(),
         textDefaults: createDefaultTextDefaults()
       },
       sequences: {
@@ -113,7 +119,10 @@
         pageOrientation: project.settings && project.settings.pageOrientation === "landscape" ? "landscape" : "portrait",
         pageMarginIn: asPositiveNumber(project.settings && project.settings.pageMarginIn, defaults.settings.pageMarginIn),
         bleedIn: asNonNegativeNumber(project.settings && project.settings.bleedIn, defaults.settings.bleedIn),
-        backgroundDefaults: normalizeBackgroundDefaults(project.settings && project.settings.backgroundDefaults, defaults.settings.backgroundDefaults),
+        tokenDefaults: normalizeTokenDefaults(
+          project.settings && (project.settings.tokenDefaults || project.settings.backgroundDefaults),
+          defaults.settings.tokenDefaults
+        ),
         textDefaults: normalizeTextDefaults(project.settings && project.settings.textDefaults, defaults.settings.textDefaults)
       },
       sequences: {
@@ -171,17 +180,25 @@
     };
   }
 
-  function normalizeBackgroundDefaults(input, fallback) {
+  function normalizeTokenDefaults(input, fallback) {
     var payload = input && typeof input === "object" ? input : {};
-    var defaults = fallback || createDefaultBackgroundDefaults();
+    var defaults = fallback || createDefaultTokenDefaults();
     var imageSource = typeof payload.backgroundImageSource === "string" ? payload.backgroundImageSource : defaults.backgroundImageSource;
     var backgroundMode = payload.backgroundMode === "image" ? "image" : "color";
     return {
+      diameterIn: TOKEN_SIZES.includes(Number(payload.diameterIn)) ? Number(payload.diameterIn) : defaults.diameterIn,
+      backEnabled: payload.backEnabled === true,
       backgroundMode: backgroundMode,
       backgroundColorMode: payload.backgroundColorMode === "sequence" ? "sequence" : "manual",
       backgroundColor: typeof payload.backgroundColor === "string" && payload.backgroundColor.trim() ? payload.backgroundColor : defaults.backgroundColor,
       backgroundColorSequenceRef: typeof payload.backgroundColorSequenceRef === "string" && payload.backgroundColorSequenceRef ? payload.backgroundColorSequenceRef : null,
-      backgroundImageSource: imageSource
+      backgroundImageSource: imageSource,
+      borderWidthRatio: typeof payload.borderWidthRatio === "number" && Number.isFinite(payload.borderWidthRatio)
+        ? Math.min(0.25, Math.max(0, payload.borderWidthRatio))
+        : defaults.borderWidthRatio,
+      borderColorMode: payload.borderColorMode === "sequence" ? "sequence" : "manual",
+      borderColor: typeof payload.borderColor === "string" && payload.borderColor.trim() ? payload.borderColor : defaults.borderColor,
+      borderColorSequenceRef: typeof payload.borderColorSequenceRef === "string" && payload.borderColorSequenceRef ? payload.borderColorSequenceRef : null
     };
   }
 
@@ -193,7 +210,7 @@
     TOKEN_SIZES: TOKEN_SIZES,
     BUILT_IN_TEXT_SEQUENCES: BUILT_IN_TEXT_SEQUENCES,
     BUILT_IN_COLOR_SEQUENCES: BUILT_IN_COLOR_SEQUENCES,
-    createDefaultBackgroundDefaults: createDefaultBackgroundDefaults,
+    createDefaultTokenDefaults: createDefaultTokenDefaults,
     createDefaultTextDefaults: createDefaultTextDefaults,
     clone: clone,
     createDefaultProject: createDefaultProject,

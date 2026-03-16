@@ -129,8 +129,8 @@
       '  <div class="settings-main">',
       '    <div class="panel-grid settings-grid">',
       '      <section class="panel-card">',
-      "    <h2>Default Background</h2>",
-      renderDefaultBackgroundSettingsForm(state.project.settings.backgroundDefaults, state.project.sequences.color),
+      "    <h2>Default Token</h2>",
+      renderDefaultTokenSettingsForm(state.project.settings.tokenDefaults, state.project.sequences.color),
       "      </section>",
       '      <section class="panel-card">',
       "    <h2>Default Text</h2>",
@@ -378,25 +378,41 @@
     ].join("");
   }
 
-  function renderDefaultBackgroundSettingsForm(backgroundDefaults, colorSequences) {
+  function renderDefaultTokenSettingsForm(tokenDefaults, colorSequences) {
     return [
-      '<form class="form-grid" data-form="background-defaults">',
+      '<form class="form-grid" data-form="token-defaults">',
+      '  <div class="field-row two-up">',
+      '    <label class="field">Diameter<select name="defaultDiameterIn">' + Schema.TOKEN_SIZES.map(function (size) {
+        return '<option value="' + size + '"' + (size === tokenDefaults.diameterIn ? " selected" : "") + ">" + size + '&quot;</option>';
+      }).join("") + "</select></label>",
+      '    <label class="field">Back face<select name="defaultBackEnabled"><option value="true"' + (tokenDefaults.backEnabled ? " selected" : "") + '>Enabled</option><option value="false"' + (!tokenDefaults.backEnabled ? " selected" : "") + '>Disabled</option></select></label>',
+      "  </div>",
       renderBackgroundControls({
         modeName: "defaultBackgroundMode",
-        currentMode: backgroundDefaults.backgroundMode,
+        currentMode: tokenDefaults.backgroundMode,
         colorLabel: "Default background",
         sourceName: "defaultBackgroundColorSource",
         colorName: "defaultBackgroundColor",
-        currentColorMode: backgroundDefaults.backgroundColorMode,
-        currentColor: backgroundDefaults.backgroundColor,
-        currentSequenceRef: backgroundDefaults.backgroundColorSequenceRef,
+        currentColorMode: tokenDefaults.backgroundColorMode,
+        currentColor: tokenDefaults.backgroundColor,
+        currentSequenceRef: tokenDefaults.backgroundColorSequenceRef,
         sequences: colorSequences,
-        imageSource: backgroundDefaults.backgroundImageSource,
+        imageSource: tokenDefaults.backgroundImageSource,
         uploadAction: "upload-default-background",
         removeAction: "remove-default-background",
         inputAttributes: 'data-default-background-input'
       }),
-      '  <p class="field-help">New tokens copy this background onto both faces.</p>',
+      '  <label class="field">Default border width<input type="range" min="0" max="0.25" step="0.01" name="defaultBorderWidthRatio" value="' + tokenDefaults.borderWidthRatio.toFixed(2) + '"><span class="field-help">' + Math.round(tokenDefaults.borderWidthRatio * 100) + '% of token width</span></label>',
+      renderColorPicker({
+        label: "Default token border",
+        sourceName: "defaultBorderColorSource",
+        colorName: "defaultBorderColor",
+        currentMode: tokenDefaults.borderColorMode,
+        currentColor: tokenDefaults.borderColor,
+        currentSequenceRef: tokenDefaults.borderColorSequenceRef,
+        sequences: colorSequences
+      }),
+      '  <p class="field-help">New tokens copy these defaults onto both faces.</p>',
       "</form>"
     ].join("");
   }
@@ -671,44 +687,52 @@
   }
 
   function bindSettingsForms(appElement, store) {
-    var backgroundDefaultsForm = appElement.querySelector("[data-form='background-defaults']");
-    if (backgroundDefaultsForm) {
-      var syncBackgroundDefaultVisibility = function () {
-        syncConditionalFields(backgroundDefaultsForm, {
-          defaultBackgroundMode: backgroundDefaultsForm.querySelector('[name="defaultBackgroundMode"]').value,
-          defaultBackgroundColorSource: backgroundDefaultsForm.querySelector('[name="defaultBackgroundColorSource"]').value
+    var tokenDefaultsForm = appElement.querySelector("[data-form='token-defaults']");
+    if (tokenDefaultsForm) {
+      var syncTokenDefaultVisibility = function () {
+        syncConditionalFields(tokenDefaultsForm, {
+          defaultBackgroundMode: tokenDefaultsForm.querySelector('[name="defaultBackgroundMode"]').value,
+          defaultBackgroundColorSource: tokenDefaultsForm.querySelector('[name="defaultBackgroundColorSource"]').value,
+          defaultBorderColorSource: tokenDefaultsForm.querySelector('[name="defaultBorderColorSource"]').value
         });
       };
-      backgroundDefaultsForm.querySelectorAll('select[name="defaultBackgroundMode"], select[name="defaultBackgroundColorSource"]').forEach(function (element) {
-        element.addEventListener("change", syncBackgroundDefaultVisibility);
+      tokenDefaultsForm.querySelectorAll('select[name="defaultBackgroundMode"], select[name="defaultBackgroundColorSource"], select[name="defaultBorderColorSource"]').forEach(function (element) {
+        element.addEventListener("change", syncTokenDefaultVisibility);
       });
-      syncBackgroundDefaultVisibility();
+      syncTokenDefaultVisibility();
 
-      backgroundDefaultsForm.addEventListener("change", function () {
-        var formData = new FormData(backgroundDefaultsForm);
+      tokenDefaultsForm.addEventListener("change", function () {
+        var formData = new FormData(tokenDefaultsForm);
         var backgroundColorSelection = parseColorSourceValue(formData.get("defaultBackgroundColorSource"));
+        var borderColorSelection = parseColorSourceValue(formData.get("defaultBorderColorSource"));
         store.updateProject(function (project) {
-          project.settings.backgroundDefaults.backgroundMode = String(formData.get("defaultBackgroundMode")) === "image" ? "image" : "color";
-          project.settings.backgroundDefaults.backgroundColorMode = backgroundColorSelection.mode;
-          project.settings.backgroundDefaults.backgroundColor = String(formData.get("defaultBackgroundColor") || project.settings.backgroundDefaults.backgroundColor);
-          project.settings.backgroundDefaults.backgroundColorSequenceRef = backgroundColorSelection.sequenceRef;
+          project.settings.tokenDefaults.diameterIn = Number(formData.get("defaultDiameterIn")) || project.settings.tokenDefaults.diameterIn;
+          project.settings.tokenDefaults.backEnabled = String(formData.get("defaultBackEnabled")) === "true";
+          project.settings.tokenDefaults.backgroundMode = String(formData.get("defaultBackgroundMode")) === "image" ? "image" : "color";
+          project.settings.tokenDefaults.backgroundColorMode = backgroundColorSelection.mode;
+          project.settings.tokenDefaults.backgroundColor = String(formData.get("defaultBackgroundColor") || project.settings.tokenDefaults.backgroundColor);
+          project.settings.tokenDefaults.backgroundColorSequenceRef = backgroundColorSelection.sequenceRef;
+          project.settings.tokenDefaults.borderWidthRatio = toNumberOrDefault(formData.get("defaultBorderWidthRatio"), project.settings.tokenDefaults.borderWidthRatio);
+          project.settings.tokenDefaults.borderColorMode = borderColorSelection.mode;
+          project.settings.tokenDefaults.borderColor = String(formData.get("defaultBorderColor") || project.settings.tokenDefaults.borderColor);
+          project.settings.tokenDefaults.borderColorSequenceRef = borderColorSelection.sequenceRef;
         });
       });
 
-      bindBackgroundUploadControls(backgroundDefaultsForm, {
+      bindBackgroundUploadControls(tokenDefaultsForm, {
         uploadAction: "upload-default-background",
         removeAction: "remove-default-background",
         inputSelector: "[data-default-background-input]",
         onUpload: function (imageAsset) {
           store.updateProject(function (project) {
-            project.settings.backgroundDefaults.backgroundMode = "image";
-            project.settings.backgroundDefaults.backgroundImageSource = imageAsset.source;
+            project.settings.tokenDefaults.backgroundMode = "image";
+            project.settings.tokenDefaults.backgroundImageSource = imageAsset.source;
           });
         },
         onRemove: function () {
           store.updateProject(function (project) {
-            project.settings.backgroundDefaults.backgroundMode = "color";
-            project.settings.backgroundDefaults.backgroundImageSource = "";
+            project.settings.tokenDefaults.backgroundMode = "color";
+            project.settings.tokenDefaults.backgroundImageSource = "";
           });
         }
       });
@@ -881,8 +905,7 @@
     appElement.querySelectorAll("[data-action='add-token']").forEach(function (button) {
       button.addEventListener("click", function () {
         var token = Tokens.createTokenTemplate({});
-        applyBackgroundDefaultsToFace(token.front, store.getState().project.settings.backgroundDefaults);
-        applyBackgroundDefaultsToFace(token.back, store.getState().project.settings.backgroundDefaults);
+        applyTokenDefaults(token, store.getState().project.settings.tokenDefaults);
         store.updateProject(function (project) {
           project.tokens.push(token);
         });
@@ -1751,7 +1774,7 @@
       element.hidden = !isVisible;
       element.style.display = isVisible ? "" : "none";
       element.querySelectorAll("input, select, textarea, button").forEach(function (control) {
-        if (control.name === "contentMode" || control.name === "colorSource" || control.name === "textBorderColorSource" || control.name === "backgroundColorSource" || control.name === "borderColorSource") {
+        if (control.name === "contentMode" || control.name === "colorSource" || control.name === "textBorderColorSource" || control.name === "backgroundColorSource" || control.name === "borderColorSource" || control.name === "defaultBackgroundColorSource" || control.name === "defaultBorderColorSource" || control.name === "defaultBackgroundMode") {
           return;
         }
         control.disabled = !isVisible;
@@ -1774,16 +1797,31 @@
       : { mode: "sequence", sequenceRef: source };
   }
 
-  function applyBackgroundDefaultsToFace(face, backgroundDefaults) {
-    if (!face || !backgroundDefaults) {
+  function applyTokenDefaults(token, tokenDefaults) {
+    if (!token || !tokenDefaults) {
       return;
     }
 
-    face.backgroundMode = backgroundDefaults.backgroundMode === "image" ? "image" : "color";
-    face.backgroundColorMode = backgroundDefaults.backgroundColorMode === "sequence" ? "sequence" : "manual";
-    face.backgroundColor = backgroundDefaults.backgroundColor || face.backgroundColor;
-    face.backgroundColorSequenceRef = backgroundDefaults.backgroundColorSequenceRef || null;
-    face.backgroundImageSource = backgroundDefaults.backgroundImageSource || "";
+    token.diameterIn = tokenDefaults.diameterIn || token.diameterIn;
+    token.back.enabled = tokenDefaults.backEnabled === true;
+    applyTokenDefaultsToFace(token.front, tokenDefaults);
+    applyTokenDefaultsToFace(token.back, tokenDefaults);
+  }
+
+  function applyTokenDefaultsToFace(face, tokenDefaults) {
+    if (!face || !tokenDefaults) {
+      return;
+    }
+
+    face.backgroundMode = tokenDefaults.backgroundMode === "image" ? "image" : "color";
+    face.backgroundColorMode = tokenDefaults.backgroundColorMode === "sequence" ? "sequence" : "manual";
+    face.backgroundColor = tokenDefaults.backgroundColor || face.backgroundColor;
+    face.backgroundColorSequenceRef = tokenDefaults.backgroundColorSequenceRef || null;
+    face.backgroundImageSource = tokenDefaults.backgroundImageSource || "";
+    face.border.widthRatio = Number.isFinite(tokenDefaults.borderWidthRatio) ? tokenDefaults.borderWidthRatio : face.border.widthRatio;
+    face.border.colorMode = tokenDefaults.borderColorMode === "sequence" ? "sequence" : "manual";
+    face.border.color = tokenDefaults.borderColor || face.border.color;
+    face.border.colorSequenceRef = tokenDefaults.borderColorSequenceRef || null;
   }
 
   function bindBackgroundUploadControls(container, config) {
