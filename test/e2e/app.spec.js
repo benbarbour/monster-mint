@@ -193,10 +193,12 @@ test("token settings own appearance controls and color sequences show in preview
   expect(previewClippedImageCount).toBeGreaterThan(0);
   const previewClipIds = await page.locator('.preview-page-svg clipPath[id^="token-clip-"]').evaluateAll((nodes) => nodes.map((node) => node.id));
   expect(new Set(previewClipIds).size).toBe(previewClipIds.length);
+  await expect(page.locator('.preview-page-svg clipPath[id^="token-clip-"] circle').first()).toHaveAttribute("r", "49.75");
   await page.getByRole("button", { name: "Print", exact: true }).click();
   await expect(page.locator("iframe.print-frame")).toHaveCount(1);
   const frameClippedImageCount = await page.frameLocator("iframe.print-frame").locator('g[data-component-type="image"][clip-path*="token-clip-"] image').count();
   expect(frameClippedImageCount).toBeGreaterThan(0);
+  await expect(page.frameLocator("iframe.print-frame").locator('clipPath[id^="token-clip-"] circle').first()).toHaveAttribute("r", "49.75");
 });
 
 test("built-in text modes and color sequences drive live print preview", async ({ page }) => {
