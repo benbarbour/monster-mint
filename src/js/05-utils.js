@@ -73,11 +73,12 @@
     });
   }
 
-  async function readImageAssetFile(file) {
+  async function readImageAssetFile(file, options) {
     var source = await readDataUrlFile(file);
     var dimensions = await loadImageDimensions(source);
     var optimized = await normalizeEmbeddedImageAssetSource(source, {
-      dimensions: dimensions
+      dimensions: dimensions,
+      trimAlphaThreshold: options && options.trimAlphaThreshold
     });
     return {
       source: optimized.source,
@@ -100,6 +101,7 @@
     var dimensions = settings.dimensions || await loadImageDimensions(source);
     var trimmed = await trimTransparentImageAssetSource(source, {
       dimensions: dimensions,
+      trimAlphaThreshold: settings.trimAlphaThreshold,
       loadImageDimensions: settings.loadImageDimensions,
       loadImage: settings.loadImage,
       createCanvas: settings.createCanvas,
@@ -111,6 +113,7 @@
         width: trimmed.width,
         height: trimmed.height
       },
+      trimAlphaThreshold: settings.trimAlphaThreshold,
       maxBytes: settings.maxBytes,
       maxLongestEdge: settings.maxLongestEdge,
       minLongestEdge: settings.minLongestEdge,
@@ -231,7 +234,12 @@
       context.clearRect(0, 0, originalDimensions.width, originalDimensions.height);
       context.drawImage(image, 0, 0, originalDimensions.width, originalDimensions.height);
       var imageData = context.getImageData(0, 0, originalDimensions.width, originalDimensions.height);
-      var bounds = settings.findOpaqueBounds(imageData.data, originalDimensions.width, originalDimensions.height);
+      var bounds = settings.findOpaqueBounds(
+        imageData.data,
+        originalDimensions.width,
+        originalDimensions.height,
+        settings.trimAlphaThreshold
+      );
       if (!bounds) {
         return originalAsset;
       }
@@ -371,6 +379,7 @@
     var settings = options && typeof options === "object" ? options : {};
     return {
       dimensions: settings.dimensions || null,
+      trimAlphaThreshold: asAlphaThreshold(settings.trimAlphaThreshold, 1),
       loadImageDimensions: typeof settings.loadImageDimensions === "function" ? settings.loadImageDimensions : loadImageDimensions,
       loadImage: typeof settings.loadImage === "function" ? settings.loadImage : loadImage,
       createCanvas: typeof settings.createCanvas === "function" ? settings.createCanvas : createCanvas,
@@ -446,10 +455,12 @@
     };
   }
 
-  function findOpaqueBounds(pixels, width, height) {
+  function findOpaqueBounds(pixels, width, height, alphaThreshold) {
     if (!pixels || !pixels.length || width <= 0 || height <= 0) {
       return null;
     }
+
+    var minAlpha = asAlphaThreshold(alphaThreshold, 1);
 
     var minX = width;
     var minY = height;
@@ -459,7 +470,7 @@
     for (var y = 0; y < height; y += 1) {
       for (var x = 0; x < width; x += 1) {
         var alpha = pixels[(y * width + x) * 4 + 3];
-        if (alpha > 0) {
+        if (alpha >= minAlpha) {
           if (x < minX) {
             minX = x;
           }
@@ -528,6 +539,11 @@
   function asPositiveInteger(value, fallback) {
     var parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback;
+  }
+
+  function asAlphaThreshold(value, fallback) {
+    var parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.min(255, Math.max(1, Math.round(parsed))) : fallback;
   }
 
   function asPositiveNumber(value, fallback) {

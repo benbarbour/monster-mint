@@ -109,6 +109,10 @@ test("can create and manipulate a token template", async ({ page }) => {
 test("token settings own appearance controls and color sequences show in preview", async ({ page }) => {
   await page.getByRole("button", { name: "Settings" }).click();
   await expect(page.locator('form[data-form="token-defaults"]')).toBeVisible();
+  await expect(page.locator('form[data-form="image-import-settings"] input[name="imageTrimAlphaThreshold"]')).toHaveValue("1");
+  await page.locator('form[data-form="image-import-settings"] input[name="imageTrimAlphaThreshold"]').fill("2");
+  await page.locator('form[data-form="image-import-settings"] input[name="imageTrimAlphaThreshold"]').blur();
+  await expect(page.locator('form[data-form="image-import-settings"] input[name="imageTrimAlphaThreshold"]')).toHaveValue("2");
   await page.locator('form[data-form="token-defaults"] select[name="defaultDiameterIn"]').selectOption("2");
   await page.locator('form[data-form="token-defaults"] select[name="defaultBackgroundMode"]').selectOption("image");
   await page.locator('[data-default-background-input]').setInputFiles({

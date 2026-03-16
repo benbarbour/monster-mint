@@ -137,6 +137,10 @@
       renderDefaultTextSettingsForm(state.project.settings.textDefaults, state.project.sequences.color),
       "      </section>",
       '      <section class="panel-card">',
+      "    <h2>Image Import</h2>",
+      renderImageImportSettingsForm(state.project.settings),
+      "      </section>",
+      '      <section class="panel-card">',
       "    <h2>Color Sequences</h2>",
       renderColorSequenceManager(customColorSequences, selectedColorSequence, editingColorSequence),
       "      </section>",
@@ -518,6 +522,15 @@
     ].join("");
   }
 
+  function renderImageImportSettingsForm(settings) {
+    return [
+      '<form class="form-grid" data-form="image-import-settings">',
+      '  <label class="field">Trim alpha threshold<input type="number" min="1" max="255" step="1" name="imageTrimAlphaThreshold" value="' + settings.imageTrimAlphaThreshold + '"><span class="field-help">1 keeps any non-transparent pixel. Higher values ignore faint halos and shadows when trimming imports.</span></label>',
+      '  <p class="field-help">Applies to new image uploads, replacements, background image uploads, and imported JSON image assets.</p>',
+      "</form>"
+    ].join("");
+  }
+
   function renderPositionFields(component) {
     return [
       '<div class="field-row two-up">',
@@ -707,6 +720,7 @@
         uploadAction: "upload-default-background",
         removeAction: "remove-default-background",
         inputSelector: "[data-default-background-input]",
+        importOptions: getImageImportOptions(store.getState().project),
         onUpload: function (imageAsset) {
           store.updateProject(function (project) {
             project.settings.tokenDefaults.backgroundMode = "image";
@@ -749,6 +763,19 @@
           project.settings.textDefaults.textBorder.colorMode = textBorderColorSelection.mode;
           project.settings.textDefaults.textBorder.color = String(formData.get("defaultTextBorderColor") || project.settings.textDefaults.textBorder.color);
           project.settings.textDefaults.textBorder.colorSequenceRef = textBorderColorSelection.sequenceRef;
+        });
+      });
+    }
+
+    var imageImportSettingsForm = appElement.querySelector("[data-form='image-import-settings']");
+    if (imageImportSettingsForm) {
+      imageImportSettingsForm.addEventListener("change", function () {
+        var formData = new FormData(imageImportSettingsForm);
+        store.updateProject(function (project) {
+          project.settings.imageTrimAlphaThreshold = toAlphaThresholdOrDefault(
+            formData.get("imageTrimAlphaThreshold"),
+            project.settings.imageTrimAlphaThreshold
+          );
         });
       });
     }
@@ -863,7 +890,8 @@
         try {
           var contents = await Utils.readTextFile(file);
           var parsed = JSON.parse(contents);
-          var normalizedProject = await Utils.normalizeProjectImageAssets(parsed);
+          var projectWithDefaults = Schema.normalizeProject(parsed);
+          var normalizedProject = await Utils.normalizeProjectImageAssets(projectWithDefaults, getImageImportOptions(projectWithDefaults));
           store.replaceProject(normalizedProject);
           store.updateUi(function (ui) {
             ui.editingTextSequenceId = null;
@@ -996,6 +1024,7 @@
         uploadAction: "upload-token-background",
         removeAction: "remove-token-background",
         inputSelector: "[data-token-background-input]",
+        importOptions: getImageImportOptions(store.getState().project),
         onUpload: function (imageAsset) {
           var selection = getDesignerSelection(store.getState());
           if (!selection.token) {
@@ -1078,7 +1107,7 @@
           return;
         }
         try {
-          var imageAsset = await Utils.readImageAssetFile(file);
+          var imageAsset = await Utils.readImageAssetFile(file, getImageImportOptions(store.getState().project));
           var component = Tokens.createImageComponent({
             source: imageAsset.source,
             name: file.name,
@@ -1241,7 +1270,7 @@
             return;
           }
           try {
-            var imageAsset = await Utils.readImageAssetFile(file);
+            var imageAsset = await Utils.readImageAssetFile(file, getImageImportOptions(store.getState().project));
             store.updateProject(function (project) {
               var component = findComponent(project, selection, "image");
               if (component) {
@@ -1685,9 +1714,20 @@
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
   }
 
+  function toAlphaThresholdOrDefault(value, fallback) {
+    var parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? Math.min(255, Math.max(1, parsed)) : fallback;
+  }
+
   function toNonNegativeInteger(value, fallback) {
     var parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) ? Math.max(0, parsed) : fallback;
+  }
+
+  function getImageImportOptions(project) {
+    return {
+      trimAlphaThreshold: project && project.settings ? project.settings.imageTrimAlphaThreshold : 1
+    };
   }
 
   function collectPrintSelectionRows(printForm, project) {
@@ -1788,7 +1828,7 @@
           return;
         }
         try {
-          var imageAsset = await Utils.readImageAssetFile(file);
+          var imageAsset = await Utils.readImageAssetFile(file, config.importOptions || {});
           config.onUpload(imageAsset);
         } catch (error) {
           runtimeGlobal.alert("Image import failed.");

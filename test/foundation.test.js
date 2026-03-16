@@ -33,6 +33,7 @@ test("createDefaultProject returns the expected baseline structure", () => {
   assert.equal(project.meta.name, "Untitled Project");
   assert.equal(project.settings.pagePresetId, "letter");
   assert.equal(project.settings.tokenDefaults.diameterIn, 1);
+  assert.equal(project.settings.imageTrimAlphaThreshold, 1);
   assert.equal(project.settings.tokenDefaults.backgroundMode, "color");
   assert.equal(project.settings.tokenDefaults.backgroundColor, "#f3e7c9");
   assert.equal(project.settings.tokenDefaults.borderWidthRatio, 0.03);
@@ -67,6 +68,7 @@ test("normalizeProject fills missing values and rejects unknown page presets", (
   assert.equal(normalized.settings.pagePresetId, "letter");
   assert.equal(normalized.settings.pageOrientation, "landscape");
   assert.equal(normalized.settings.pageMarginIn, 0.5);
+  assert.equal(normalized.settings.imageTrimAlphaThreshold, 1);
   assert.equal(normalized.settings.tokenDefaults.backgroundMode, "color");
   assert.equal(normalized.settings.textDefaults.fontFamily, "Times New Roman");
   assert.equal(normalized.sequences.text[0].id, "builtin_text_numeric");
@@ -186,6 +188,25 @@ test("findOpaqueBounds returns the tight alpha bounds", () => {
   assert.equal(Utils.findOpaqueBounds(new Uint8ClampedArray(4 * 4 * 4), 4, 4), null);
 });
 
+test("findOpaqueBounds respects the alpha threshold", () => {
+  const pixels = new Uint8ClampedArray(4 * 4 * 4);
+  pixels[(1 * 4 + 0) * 4 + 3] = 1;
+  pixels[(1 * 4 + 1) * 4 + 3] = 255;
+
+  assert.deepEqual(Utils.findOpaqueBounds(pixels, 4, 4, 1), {
+    x: 0,
+    y: 1,
+    width: 2,
+    height: 1
+  });
+  assert.deepEqual(Utils.findOpaqueBounds(pixels, 4, 4, 2), {
+    x: 1,
+    y: 1,
+    width: 1,
+    height: 1
+  });
+});
+
 test("trimTransparentImageAssetSource crops transparent borders before optimization", async () => {
   const source = makeDataUrl("image/png", 1024);
   const draws = [];
@@ -261,6 +282,36 @@ test("trimTransparentImageAssetSource falls back when trimming cannot encode", a
   assert.equal(result.source, source);
   assert.equal(result.width, 4);
   assert.equal(result.height, 4);
+});
+
+test("trimTransparentImageAssetSource ignores faint halo pixels below the configured threshold", async () => {
+  const source = makeDataUrl("image/png", 1024);
+
+  const result = await Utils.trimTransparentImageAssetSource(source, {
+    dimensions: { width: 4, height: 4 },
+    trimAlphaThreshold: 2,
+    loadImage: async () => ({ src: source }),
+    createCanvas: (width, height) => ({
+      width,
+      height,
+      getContext() {
+        return {
+          clearRect() {},
+          drawImage() {},
+          getImageData() {
+            const pixels = new Uint8ClampedArray(4 * 4 * 4);
+            pixels[(1 * 4 + 0) * 4 + 3] = 1;
+            pixels[(1 * 4 + 1) * 4 + 3] = 255;
+            return { data: pixels };
+          }
+        };
+      }
+    }),
+    encodeCanvas: (canvas, mimeType) => makeDataUrl(mimeType, canvas.width * canvas.height * 16)
+  });
+
+  assert.equal(result.width, 1);
+  assert.equal(result.height, 1);
 });
 
 test("normalizeProjectImageAssets updates imported token images and backgrounds", async () => {

@@ -89,6 +89,7 @@
         pageOrientation: "portrait",
         pageMarginIn: 0.25,
         bleedIn: 0.0625,
+        imageTrimAlphaThreshold: 1,
         tokenDefaults: createDefaultTokenDefaults(),
         textDefaults: createDefaultTextDefaults()
       },
@@ -118,6 +119,7 @@
         pageOrientation: project.settings && project.settings.pageOrientation === "landscape" ? "landscape" : "portrait",
         pageMarginIn: asPositiveNumber(project.settings && project.settings.pageMarginIn, defaults.settings.pageMarginIn),
         bleedIn: asNonNegativeNumber(project.settings && project.settings.bleedIn, defaults.settings.bleedIn),
+        imageTrimAlphaThreshold: asAlphaThreshold(project.settings && project.settings.imageTrimAlphaThreshold, defaults.settings.imageTrimAlphaThreshold),
         tokenDefaults: normalizeTokenDefaults(
           project.settings && (project.settings.tokenDefaults || project.settings.backgroundDefaults),
           defaults.settings.tokenDefaults
@@ -149,6 +151,11 @@
 
   function asNonNegativeNumber(value, fallback) {
     return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : fallback;
+  }
+
+  function asAlphaThreshold(value, fallback) {
+    var parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.min(255, Math.max(1, Math.round(parsed))) : fallback;
   }
 
   function mergeBuiltInSequences(sequences, builtIns) {

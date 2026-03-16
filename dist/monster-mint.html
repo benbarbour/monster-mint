@@ -850,6 +850,7 @@ button {
         pageOrientation: "portrait",
         pageMarginIn: 0.25,
         bleedIn: 0.0625,
+        imageTrimAlphaThreshold: 1,
         tokenDefaults: createDefaultTokenDefaults(),
         textDefaults: createDefaultTextDefaults()
       },
@@ -879,6 +880,7 @@ button {
         pageOrientation: project.settings && project.settings.pageOrientation === "landscape" ? "landscape" : "portrait",
         pageMarginIn: asPositiveNumber(project.settings && project.settings.pageMarginIn, defaults.settings.pageMarginIn),
         bleedIn: asNonNegativeNumber(project.settings && project.settings.bleedIn, defaults.settings.bleedIn),
+        imageTrimAlphaThreshold: asAlphaThreshold(project.settings && project.settings.imageTrimAlphaThreshold, defaults.settings.imageTrimAlphaThreshold),
         tokenDefaults: normalizeTokenDefaults(
           project.settings && (project.settings.tokenDefaults || project.settings.backgroundDefaults),
           defaults.settings.tokenDefaults
@@ -910,6 +912,11 @@ button {
 
   function asNonNegativeNumber(value, fallback) {
     return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : fallback;
+  }
+
+  function asAlphaThreshold(value, fallback) {
+    var parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.min(255, Math.max(1, Math.round(parsed))) : fallback;
   }
 
   function mergeBuiltInSequences(sequences, builtIns) {
@@ -1054,11 +1061,12 @@ button {
     });
   }
 
-  async function readImageAssetFile(file) {
+  async function readImageAssetFile(file, options) {
     var source = await readDataUrlFile(file);
     var dimensions = await loadImageDimensions(source);
     var optimized = await normalizeEmbeddedImageAssetSource(source, {
-      dimensions: dimensions
+      dimensions: dimensions,
+      trimAlphaThreshold: options && options.trimAlphaThreshold
     });
     return {
       source: optimized.source,
@@ -1081,6 +1089,7 @@ button {
     var dimensions = settings.dimensions || await loadImageDimensions(source);
     var trimmed = await trimTransparentImageAssetSource(source, {
       dimensions: dimensions,
+      trimAlphaThreshold: settings.trimAlphaThreshold,
       loadImageDimensions: settings.loadImageDimensions,
       loadImage: settings.loadImage,
       createCanvas: settings.createCanvas,
@@ -1092,6 +1101,7 @@ button {
         width: trimmed.width,
         height: trimmed.height
       },
+      trimAlphaThreshold: settings.trimAlphaThreshold,
       maxBytes: settings.maxBytes,
       maxLongestEdge: settings.maxLongestEdge,
       minLongestEdge: settings.minLongestEdge,
@@ -1212,7 +1222,12 @@ button {
       context.clearRect(0, 0, originalDimensions.width, originalDimensions.height);
       context.drawImage(image, 0, 0, originalDimensions.width, originalDimensions.height);
       var imageData = context.getImageData(0, 0, originalDimensions.width, originalDimensions.height);
-      var bounds = settings.findOpaqueBounds(imageData.data, originalDimensions.width, originalDimensions.height);
+      var bounds = settings.findOpaqueBounds(
+        imageData.data,
+        originalDimensions.width,
+        originalDimensions.height,
+        settings.trimAlphaThreshold
+      );
       if (!bounds) {
         return originalAsset;
       }
@@ -1352,6 +1367,7 @@ button {
     var settings = options && typeof options === "object" ? options : {};
     return {
       dimensions: settings.dimensions || null,
+      trimAlphaThreshold: asAlphaThreshold(settings.trimAlphaThreshold, 1),
       loadImageDimensions: typeof settings.loadImageDimensions === "function" ? settings.loadImageDimensions : loadImageDimensions,
       loadImage: typeof settings.loadImage === "function" ? settings.loadImage : loadImage,
       createCanvas: typeof settings.createCanvas === "function" ? settings.createCanvas : createCanvas,
@@ -1427,10 +1443,12 @@ button {
     };
   }
 
-  function findOpaqueBounds(pixels, width, height) {
+  function findOpaqueBounds(pixels, width, height, alphaThreshold) {
     if (!pixels || !pixels.length || width <= 0 || height <= 0) {
       return null;
     }
+
+    var minAlpha = asAlphaThreshold(alphaThreshold, 1);
 
     var minX = width;
     var minY = height;
@@ -1440,7 +1458,7 @@ button {
     for (var y = 0; y < height; y += 1) {
       for (var x = 0; x < width; x += 1) {
         var alpha = pixels[(y * width + x) * 4 + 3];
-        if (alpha > 0) {
+        if (alpha >= minAlpha) {
           if (x < minX) {
             minX = x;
           }
@@ -1509,6 +1527,11 @@ button {
   function asPositiveInteger(value, fallback) {
     var parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback;
+  }
+
+  function asAlphaThreshold(value, fallback) {
+    var parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.min(255, Math.max(1, Math.round(parsed))) : fallback;
   }
 
   function asPositiveNumber(value, fallback) {
@@ -3116,6 +3139,10 @@ button {
       renderDefaultTextSettingsForm(state.project.settings.textDefaults, state.project.sequences.color),
       "      </section>",
       '      <section class="panel-card">',
+      "    <h2>Image Import</h2>",
+      renderImageImportSettingsForm(state.project.settings),
+      "      </section>",
+      '      <section class="panel-card">',
       "    <h2>Color Sequences</h2>",
       renderColorSequenceManager(customColorSequences, selectedColorSequence, editingColorSequence),
       "      </section>",
@@ -3497,6 +3524,15 @@ button {
     ].join("");
   }
 
+  function renderImageImportSettingsForm(settings) {
+    return [
+      '<form class="form-grid" data-form="image-import-settings">',
+      '  <label class="field">Trim alpha threshold<input type="number" min="1" max="255" step="1" name="imageTrimAlphaThreshold" value="' + settings.imageTrimAlphaThreshold + '"><span class="field-help">1 keeps any non-transparent pixel. Higher values ignore faint halos and shadows when trimming imports.</span></label>',
+      '  <p class="field-help">Applies to new image uploads, replacements, background image uploads, and imported JSON image assets.</p>',
+      "</form>"
+    ].join("");
+  }
+
   function renderPositionFields(component) {
     return [
       '<div class="field-row two-up">',
@@ -3686,6 +3722,7 @@ button {
         uploadAction: "upload-default-background",
         removeAction: "remove-default-background",
         inputSelector: "[data-default-background-input]",
+        importOptions: getImageImportOptions(store.getState().project),
         onUpload: function (imageAsset) {
           store.updateProject(function (project) {
             project.settings.tokenDefaults.backgroundMode = "image";
@@ -3728,6 +3765,19 @@ button {
           project.settings.textDefaults.textBorder.colorMode = textBorderColorSelection.mode;
           project.settings.textDefaults.textBorder.color = String(formData.get("defaultTextBorderColor") || project.settings.textDefaults.textBorder.color);
           project.settings.textDefaults.textBorder.colorSequenceRef = textBorderColorSelection.sequenceRef;
+        });
+      });
+    }
+
+    var imageImportSettingsForm = appElement.querySelector("[data-form='image-import-settings']");
+    if (imageImportSettingsForm) {
+      imageImportSettingsForm.addEventListener("change", function () {
+        var formData = new FormData(imageImportSettingsForm);
+        store.updateProject(function (project) {
+          project.settings.imageTrimAlphaThreshold = toAlphaThresholdOrDefault(
+            formData.get("imageTrimAlphaThreshold"),
+            project.settings.imageTrimAlphaThreshold
+          );
         });
       });
     }
@@ -3842,7 +3892,8 @@ button {
         try {
           var contents = await Utils.readTextFile(file);
           var parsed = JSON.parse(contents);
-          var normalizedProject = await Utils.normalizeProjectImageAssets(parsed);
+          var projectWithDefaults = Schema.normalizeProject(parsed);
+          var normalizedProject = await Utils.normalizeProjectImageAssets(projectWithDefaults, getImageImportOptions(projectWithDefaults));
           store.replaceProject(normalizedProject);
           store.updateUi(function (ui) {
             ui.editingTextSequenceId = null;
@@ -3975,6 +4026,7 @@ button {
         uploadAction: "upload-token-background",
         removeAction: "remove-token-background",
         inputSelector: "[data-token-background-input]",
+        importOptions: getImageImportOptions(store.getState().project),
         onUpload: function (imageAsset) {
           var selection = getDesignerSelection(store.getState());
           if (!selection.token) {
@@ -4057,7 +4109,7 @@ button {
           return;
         }
         try {
-          var imageAsset = await Utils.readImageAssetFile(file);
+          var imageAsset = await Utils.readImageAssetFile(file, getImageImportOptions(store.getState().project));
           var component = Tokens.createImageComponent({
             source: imageAsset.source,
             name: file.name,
@@ -4220,7 +4272,7 @@ button {
             return;
           }
           try {
-            var imageAsset = await Utils.readImageAssetFile(file);
+            var imageAsset = await Utils.readImageAssetFile(file, getImageImportOptions(store.getState().project));
             store.updateProject(function (project) {
               var component = findComponent(project, selection, "image");
               if (component) {
@@ -4664,9 +4716,20 @@ button {
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
   }
 
+  function toAlphaThresholdOrDefault(value, fallback) {
+    var parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? Math.min(255, Math.max(1, parsed)) : fallback;
+  }
+
   function toNonNegativeInteger(value, fallback) {
     var parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) ? Math.max(0, parsed) : fallback;
+  }
+
+  function getImageImportOptions(project) {
+    return {
+      trimAlphaThreshold: project && project.settings ? project.settings.imageTrimAlphaThreshold : 1
+    };
   }
 
   function collectPrintSelectionRows(printForm, project) {
@@ -4767,7 +4830,7 @@ button {
           return;
         }
         try {
-          var imageAsset = await Utils.readImageAssetFile(file);
+          var imageAsset = await Utils.readImageAssetFile(file, config.importOptions || {});
           config.onUpload(imageAsset);
         } catch (error) {
           runtimeGlobal.alert("Image import failed.");
