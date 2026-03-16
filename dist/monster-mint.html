@@ -3156,7 +3156,7 @@ button {
         currentSequenceRef: tokenDefaults.borderColorSequenceRef,
         sequences: colorSequences
       }),
-      '  <p class="field-help">New tokens copy these defaults onto both faces.</p>',
+      '  <p class="field-help">New tokens start with these defaults.</p>',
       "</form>"
     ].join("");
   }
@@ -3802,6 +3802,7 @@ button {
   );
   global.MonsterMintAppDesignerPanel = api;
 })(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, Tokens, Renderer, Ui) {
+  var runtimeGlobal = typeof globalThis !== "undefined" ? globalThis : window;
   var escapeHtml = Ui.escapeHtml;
 
   function renderPanel(state, helpers) {
@@ -4161,7 +4162,7 @@ button {
             ui.selectedComponentId = component.id;
           });
         } catch (error) {
-          window.alert("Image import failed.");
+          runtimeGlobal.alert("Image import failed.");
           console.error(error);
         } finally {
           addImageInput.value = "";
@@ -4273,7 +4274,7 @@ button {
               }
             });
           } catch (error) {
-            window.alert("Image import failed.");
+            runtimeGlobal.alert("Image import failed.");
             console.error(error);
           } finally {
             replaceImageInput.value = "";
