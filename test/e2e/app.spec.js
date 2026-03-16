@@ -107,6 +107,13 @@ test("can create and manipulate a token template", async ({ page }) => {
 
 test("token settings own appearance controls and color sequences show in preview", async ({ page }) => {
   await page.getByRole("button", { name: "Settings" }).click();
+  await expect(page.locator('form[data-form="background-defaults"]')).toBeVisible();
+  await page.locator('form[data-form="background-defaults"] select[name="defaultBackgroundMode"]').selectOption("image");
+  await page.locator('[data-default-background-input]').setInputFiles({
+    name: "default-background.svg",
+    mimeType: "image/svg+xml",
+    buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="#2244ff"/></svg>')
+  });
   await expect(page.locator('form[data-form="text-defaults"] select[name="fontFamily"]')).toBeVisible();
   await page.locator('form[data-form="text-defaults"] select[name="fontFamily"]').selectOption("Arial");
   await page.locator('form[data-form="text-defaults"] select[name="fontWeight"]').selectOption("500");
@@ -114,6 +121,8 @@ test("token settings own appearance controls and color sequences show in preview
   await page.locator('form[data-form="text-defaults"] input[name="defaultTextBorderWidth"]').blur();
   await page.getByRole("tab", { name: "Designer" }).click();
   await page.getByRole("button", { name: "Create Token" }).click();
+  await expect(page.locator('form[data-form="token-settings"] select[name="backgroundMode"]')).toHaveValue("image");
+  await expect(page.locator('[data-preview-stage] svg image[data-background-image="true"]')).toHaveCount(1);
   const componentOptions = await page.locator('select[name="selectedComponentKey"] option').allTextContents();
   expect(componentOptions).not.toContain("Background");
   expect(componentOptions).not.toContain("Border");
@@ -123,6 +132,14 @@ test("token settings own appearance controls and color sequences show in preview
   const tokenBorderPicker = page.locator('.color-picker-field').filter({ hasText: "Token border" });
   await tokenBorderPicker.locator("summary").click();
   await page.locator('select[name="borderColorSource"]').selectOption({ label: "Rainbow" });
+  const initialBackgroundHref = await page.locator('[data-preview-stage] svg image[data-background-image="true"]').first().getAttribute("href");
+  await page.locator('form[data-form="token-settings"] select[name="backgroundMode"]').selectOption("image");
+  await page.locator('[data-token-background-input]').setInputFiles({
+    name: "token-background.svg",
+    mimeType: "image/svg+xml",
+    buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="#22aa44"/></svg>')
+  });
+  await expect(page.locator('[data-preview-stage] svg image[data-background-image="true"]').first()).not.toHaveAttribute("href", initialBackgroundHref);
 
   await expect(page.locator('[data-preview-stage] svg circle[stroke="#ff0000"]')).toHaveCount(1);
 
@@ -144,7 +161,7 @@ test("token settings own appearance controls and color sequences show in preview
   await expect(page.locator('form[data-form="image-component-settings"] input[name="scale"]')).toHaveValue("0.5");
   await expect(page.locator('form[data-form="image-component-settings"] input[name="scale"]')).toHaveAttribute("type", "range");
   await expect(page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]')).toHaveAttribute("type", "range");
-  await expect(page.locator('[data-preview-stage] svg image').first()).toHaveAttribute("href", /data:image\/(jpeg|png|webp);base64,/);
+  await expect(page.locator('[data-preview-stage] svg g[data-component-type="image"] image').first()).toHaveAttribute("href", /data:image\/(jpeg|png|webp);base64,/);
 
   await page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]').evaluate((element) => {
     element.value = "45";

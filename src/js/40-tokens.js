@@ -75,10 +75,13 @@
   function normalizeFace(input) {
     var payload = input || {};
     var legacyWidthPt = payload.border && Number(payload.border.widthPt);
+    var background = normalizeFaceBackground(payload, "#f3e7c9");
     return {
-      backgroundColorMode: payload.backgroundColorMode === "sequence" ? "sequence" : "manual",
-      backgroundColor: payload.backgroundColor || "#f3e7c9",
-      backgroundColorSequenceRef: payload.backgroundColorSequenceRef || null,
+      backgroundMode: background.backgroundMode,
+      backgroundColorMode: background.backgroundColorMode,
+      backgroundColor: background.backgroundColor,
+      backgroundColorSequenceRef: background.backgroundColorSequenceRef,
+      backgroundImageSource: background.backgroundImageSource,
       images: Array.isArray(payload.images) ? payload.images.map(createImageComponent) : [],
       texts: Array.isArray(payload.texts) ? payload.texts.map(createTextComponent) : [],
       border: {
@@ -97,11 +100,14 @@
   function normalizeBackFace(input) {
     var payload = input || {};
     var legacyWidthPt = payload.border && Number(payload.border.widthPt);
+    var background = normalizeFaceBackground(payload, "#ffffff");
     return {
       enabled: payload.enabled === true,
-      backgroundColorMode: payload.backgroundColorMode === "sequence" ? "sequence" : "manual",
-      backgroundColor: payload.backgroundColor || "#ffffff",
-      backgroundColorSequenceRef: payload.backgroundColorSequenceRef || null,
+      backgroundMode: background.backgroundMode,
+      backgroundColorMode: background.backgroundColorMode,
+      backgroundColor: background.backgroundColor,
+      backgroundColorSequenceRef: background.backgroundColorSequenceRef,
+      backgroundImageSource: background.backgroundImageSource,
       images: Array.isArray(payload.images) ? payload.images.map(createImageComponent) : [],
       texts: Array.isArray(payload.texts) ? payload.texts.map(createTextComponent) : [],
       border: {
@@ -119,6 +125,17 @@
 
   function normalizeToken(input) {
     return createTokenTemplate(input);
+  }
+
+  function normalizeFaceBackground(input, fallbackColor) {
+    var payload = input || {};
+    return {
+      backgroundMode: payload.backgroundMode === "image" ? "image" : "color",
+      backgroundColorMode: payload.backgroundColorMode === "sequence" ? "sequence" : "manual",
+      backgroundColor: payload.backgroundColor || fallbackColor,
+      backgroundColorSequenceRef: payload.backgroundColorSequenceRef || null,
+      backgroundImageSource: typeof payload.backgroundImageSource === "string" ? payload.backgroundImageSource : ""
+    };
   }
 
   function normalizeDiameter(value) {
@@ -483,9 +500,11 @@
 
   function cloneFace(face) {
     return {
+      backgroundMode: face.backgroundMode,
       backgroundColorMode: face.backgroundColorMode,
       backgroundColor: face.backgroundColor,
       backgroundColorSequenceRef: face.backgroundColorSequenceRef,
+      backgroundImageSource: face.backgroundImageSource,
       images: face.images.map(function (component) {
         return createImageComponent({
           x: component.x,
@@ -549,9 +568,11 @@
     if (targetFaceName === "back") {
       token.back = cloneBackFace({
         enabled: true,
+        backgroundMode: token[sourceFaceName].backgroundMode,
         backgroundColorMode: token[sourceFaceName].backgroundColorMode,
         backgroundColor: token[sourceFaceName].backgroundColor,
         backgroundColorSequenceRef: token[sourceFaceName].backgroundColorSequenceRef,
+        backgroundImageSource: token[sourceFaceName].backgroundImageSource,
         images: token[sourceFaceName].images,
         texts: token[sourceFaceName].texts,
         border: token[sourceFaceName].border
@@ -581,6 +602,7 @@
     getImageDimensions: getImageDimensions,
     getTextValue: getTextValue,
     getColorValue: getColorValue,
+    normalizeFaceBackground: normalizeFaceBackground,
     collectBoundedSequenceLengths: collectBoundedSequenceLengths
   };
 });

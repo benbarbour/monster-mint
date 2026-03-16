@@ -58,6 +58,16 @@
     };
   }
 
+  function createDefaultBackgroundDefaults() {
+    return {
+      backgroundMode: "color",
+      backgroundColorMode: "manual",
+      backgroundColor: "#f3e7c9",
+      backgroundColorSequenceRef: null,
+      backgroundImageSource: ""
+    };
+  }
+
   function timestamp() {
     return new Date().toISOString();
   }
@@ -74,6 +84,7 @@
         pageOrientation: "portrait",
         pageMarginIn: 0.25,
         bleedIn: 0.0625,
+        backgroundDefaults: createDefaultBackgroundDefaults(),
         textDefaults: createDefaultTextDefaults()
       },
       sequences: {
@@ -102,6 +113,7 @@
         pageOrientation: project.settings && project.settings.pageOrientation === "landscape" ? "landscape" : "portrait",
         pageMarginIn: asPositiveNumber(project.settings && project.settings.pageMarginIn, defaults.settings.pageMarginIn),
         bleedIn: asNonNegativeNumber(project.settings && project.settings.bleedIn, defaults.settings.bleedIn),
+        backgroundDefaults: normalizeBackgroundDefaults(project.settings && project.settings.backgroundDefaults, defaults.settings.backgroundDefaults),
         textDefaults: normalizeTextDefaults(project.settings && project.settings.textDefaults, defaults.settings.textDefaults)
       },
       sequences: {
@@ -159,6 +171,20 @@
     };
   }
 
+  function normalizeBackgroundDefaults(input, fallback) {
+    var payload = input && typeof input === "object" ? input : {};
+    var defaults = fallback || createDefaultBackgroundDefaults();
+    var imageSource = typeof payload.backgroundImageSource === "string" ? payload.backgroundImageSource : defaults.backgroundImageSource;
+    var backgroundMode = payload.backgroundMode === "image" ? "image" : "color";
+    return {
+      backgroundMode: backgroundMode,
+      backgroundColorMode: payload.backgroundColorMode === "sequence" ? "sequence" : "manual",
+      backgroundColor: typeof payload.backgroundColor === "string" && payload.backgroundColor.trim() ? payload.backgroundColor : defaults.backgroundColor,
+      backgroundColorSequenceRef: typeof payload.backgroundColorSequenceRef === "string" && payload.backgroundColorSequenceRef ? payload.backgroundColorSequenceRef : null,
+      backgroundImageSource: imageSource
+    };
+  }
+
   return {
     STORAGE_KEY: STORAGE_KEY,
     UI_STORAGE_KEY: UI_STORAGE_KEY,
@@ -167,6 +193,7 @@
     TOKEN_SIZES: TOKEN_SIZES,
     BUILT_IN_TEXT_SEQUENCES: BUILT_IN_TEXT_SEQUENCES,
     BUILT_IN_COLOR_SEQUENCES: BUILT_IN_COLOR_SEQUENCES,
+    createDefaultBackgroundDefaults: createDefaultBackgroundDefaults,
     createDefaultTextDefaults: createDefaultTextDefaults,
     clone: clone,
     createDefaultProject: createDefaultProject,

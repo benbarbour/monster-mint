@@ -13,21 +13,22 @@
     var sequenceIndex = opts.sequenceIndex || 0;
     var colorSequences = project.sequences.color;
     var textSequences = project.sequences.text;
-    var background = Tokens.getColorValue(
+    var backgroundColor = Tokens.getColorValue(
       face.backgroundColorMode,
       face.backgroundColor,
       face.backgroundColorSequenceRef,
       colorSequences,
       sequenceIndex
     );
-    var tokenBaseFill = opts.tokenBaseFill || background;
+    var tokenBaseFill = opts.tokenBaseFill || backgroundColor;
     var selectedComponentType = opts.selectedComponentType;
     var selectedComponentId = opts.selectedComponentId;
     var instanceSuffix = opts.instanceId ? "-" + String(opts.instanceId).replace(/[^a-z0-9_-]/gi, "") : "";
     var tokenSlug = token.id.replace(/[^a-z0-9_-]/gi, "") + instanceSuffix;
     var svgAttributes = opts.svgAttributes ? " " + opts.svgAttributes : "";
     var borderMarkup = renderBorder(face, colorSequences, sequenceIndex);
-    var backgroundInsetMarkup = renderBackgroundInset(face, background, tokenBaseFill);
+    var backgroundInsetMarkup = renderBackgroundInset(face, backgroundColor, tokenBaseFill);
+    var backgroundImageMarkup = renderBackgroundImage(face, tokenSlug);
     var outerSquareFill = opts.outerSquareFill || "#f6efe2";
     var orderedComponents = Tokens.getSortedFaceComponents(face);
     var lowerComponents = orderedComponents.filter(function (entry) {
@@ -46,6 +47,7 @@
       '  <rect x="0" y="0" width="100" height="100" fill="' + escapeAttr(outerSquareFill) + '"></rect>',
       '  <circle cx="50" cy="50" r="50" fill="' + escapeAttr(tokenBaseFill) + '"></circle>',
       backgroundInsetMarkup,
+      backgroundImageMarkup,
       renderOrderedComponents(lowerComponents, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
       borderMarkup,
       renderOrderedComponents(upperComponents, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
@@ -99,6 +101,18 @@
     var width = face.border.widthRatio * 100;
     var radius = 50 - width / 2;
     return '<circle cx="50" cy="50" r="' + radius + '" fill="none" stroke="' + escapeAttr(color) + '" stroke-width="' + width + '"></circle>';
+  }
+
+  function renderBackgroundImage(face, tokenSlug) {
+    if (face.backgroundMode !== "image" || !face.backgroundImageSource) {
+      return "";
+    }
+
+    return [
+      '<g clip-path="url(#token-clip-' + tokenSlug + ')">',
+      '  <image href="' + escapeAttr(face.backgroundImageSource) + '" x="0" y="0" width="100" height="100" preserveAspectRatio="xMidYMid slice" data-background-image="true"></image>',
+      "</g>"
+    ].join("");
   }
 
   function renderBackgroundInset(face, background, tokenBaseFill) {

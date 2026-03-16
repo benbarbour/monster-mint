@@ -32,6 +32,8 @@ test("createDefaultProject returns the expected baseline structure", () => {
   assert.equal(project.version, 1);
   assert.equal(project.meta.name, "Untitled Project");
   assert.equal(project.settings.pagePresetId, "letter");
+  assert.equal(project.settings.backgroundDefaults.backgroundMode, "color");
+  assert.equal(project.settings.backgroundDefaults.backgroundColor, "#f3e7c9");
   assert.equal(project.settings.textDefaults.fontFamily, "Georgia");
   assert.equal(project.settings.textDefaults.textBorder.width, 0);
   assert.deepEqual(project.sequences.text.map((sequence) => sequence.id), [
@@ -60,6 +62,7 @@ test("normalizeProject fills missing values and rejects unknown page presets", (
   assert.equal(normalized.settings.pagePresetId, "letter");
   assert.equal(normalized.settings.pageOrientation, "landscape");
   assert.equal(normalized.settings.pageMarginIn, 0.5);
+  assert.equal(normalized.settings.backgroundDefaults.backgroundMode, "color");
   assert.equal(normalized.settings.textDefaults.fontFamily, "Georgia");
   assert.equal(normalized.sequences.text[0].id, "builtin_text_numeric");
   assert.equal(normalized.sequences.color[0].id, "builtin_color_rainbow");
@@ -332,6 +335,8 @@ test("token cloning creates new ids while preserving token content", () => {
   const token = Tokens.createTokenTemplate({
     name: "Goblin",
     front: {
+      backgroundMode: "image",
+      backgroundImageSource: "data:image/png;base64,bg",
       images: [Tokens.createImageComponent({ name: "Goblin Art", source: "data:image/png;base64,abc" })],
       texts: [Tokens.createTextComponent({ name: "Label", customText: "Goblin" })]
     }
@@ -343,8 +348,27 @@ test("token cloning creates new ids while preserving token content", () => {
   assert.notEqual(clone.id, token.id);
   assert.notEqual(clone.front.images[0].id, token.front.images[0].id);
   assert.notEqual(clone.front.texts[0].id, token.front.texts[0].id);
+  assert.equal(clone.front.backgroundMode, "image");
+  assert.equal(clone.front.backgroundImageSource, token.front.backgroundImageSource);
   assert.equal(clone.front.images[0].source, token.front.images[0].source);
   assert.equal(clone.front.texts[0].customText, token.front.texts[0].customText);
+});
+
+test("copyFaceContent preserves image backgrounds", () => {
+  const token = Tokens.createTokenTemplate({
+    front: {
+      backgroundMode: "image",
+      backgroundColor: "#112233",
+      backgroundImageSource: "data:image/png;base64,xyz"
+    }
+  });
+
+  Tokens.copyFaceContent(token, "front", "back");
+
+  assert.equal(token.back.enabled, true);
+  assert.equal(token.back.backgroundMode, "image");
+  assert.equal(token.back.backgroundColor, "#112233");
+  assert.equal(token.back.backgroundImageSource, "data:image/png;base64,xyz");
 });
 
 test("token templates cap border width ratio at twenty-five percent", () => {
