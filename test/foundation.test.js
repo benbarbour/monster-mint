@@ -21,6 +21,11 @@ function createMemoryStorage() {
   };
 }
 
+function makeDataUrl(mimeType, byteLength) {
+  const payload = Buffer.alloc(byteLength, 97).toString("base64");
+  return `data:${mimeType};base64,${payload}`;
+}
+
 test("createDefaultProject returns the expected baseline structure", () => {
   const project = Schema.createDefaultProject();
 
@@ -154,6 +159,112 @@ test("createColorSequence filters invalid colors and reports finite lengths", ()
 
 test("parseLineList trims and removes blank lines", () => {
   assert.deepEqual(Utils.parseLineList("one\n\n two \n"), ["one", "two"]);
+});
+
+test("estimateDataUrlBytes reports base64 payload size", () => {
+  assert.equal(Utils.estimateDataUrlBytes(makeDataUrl("image/png", 512)), 512);
+});
+
+test("optimizeImageAssetSource leaves small images unchanged", async () => {
+  const source = makeDataUrl("image/png", 768);
+  let loadCount = 0;
+
+  const result = await Utils.optimizeImageAssetSource(source, {
+    maxBytes: 1024,
+    dimensions: { width: 400, height: 200 },
+    loadImage: async () => {
+      loadCount += 1;
+      return {};
+    }
+  });
+
+  assert.equal(result.source, source);
+  assert.equal(result.width, 400);
+  assert.equal(result.height, 200);
+  assert.equal(loadCount, 0);
+});
+
+test("optimizeImageAssetSource uses jpeg for opaque oversized images", async () => {
+  const source = makeDataUrl("image/png", 2048);
+  const encodedCalls = [];
+
+  const result = await Utils.optimizeImageAssetSource(source, {
+    maxBytes: 1024,
+    dimensions: { width: 3000, height: 1500 },
+    loadImage: async () => ({ src: source }),
+    detectTransparency: async () => false,
+    createCanvas: (width, height) => ({
+      width,
+      height,
+      getContext() {
+        return {
+          clearRect() {},
+          drawImage() {}
+        };
+      }
+    }),
+    encodeCanvas: (canvas, mimeType, quality) => {
+      encodedCalls.push({ width: canvas.width, height: canvas.height, mimeType, quality });
+      return makeDataUrl(mimeType, 900);
+    }
+  });
+
+  assert.equal(result.source.startsWith("data:image/jpeg;base64,"), true);
+  assert.equal(result.width, 2048);
+  assert.equal(result.height, 1024);
+  assert.deepEqual(encodedCalls[0], {
+    width: 2048,
+    height: 1024,
+    mimeType: "image/jpeg",
+    quality: 0.9
+  });
+});
+
+test("optimizeImageAssetSource falls back to png when transparent webp encoding is unavailable", async () => {
+  const source = makeDataUrl("image/png", 4096);
+
+  const result = await Utils.optimizeImageAssetSource(source, {
+    maxBytes: 1024,
+    dimensions: { width: 1200, height: 1200 },
+    loadImage: async () => ({ src: source }),
+    detectTransparency: async () => true,
+    createCanvas: (width, height) => ({
+      width,
+      height,
+      getContext() {
+        return {
+          clearRect() {},
+          drawImage() {}
+        };
+      }
+    }),
+    encodeCanvas: (canvas, mimeType) => {
+      if (mimeType === "image/webp") {
+        return "";
+      }
+      return makeDataUrl("image/png", 900);
+    }
+  });
+
+  assert.equal(result.source.startsWith("data:image/png;base64,"), true);
+  assert.equal(result.width, 1200);
+  assert.equal(result.height, 1200);
+});
+
+test("optimizeImageAssetSource falls back to the original image when optimization fails", async () => {
+  const source = makeDataUrl("image/png", 2048);
+
+  const result = await Utils.optimizeImageAssetSource(source, {
+    maxBytes: 1024,
+    dimensions: { width: 800, height: 600 },
+    loadImage: async () => {
+      throw new Error("boom");
+    }
+  });
+
+  assert.equal(result.source, source);
+  assert.equal(result.width, 800);
+  assert.equal(result.height, 600);
 });
 
 test("resolveTextValue handles numeric and alphabetic sequences", () => {

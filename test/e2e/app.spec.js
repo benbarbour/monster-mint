@@ -129,11 +129,14 @@ test("token settings own appearance controls and color sequences show in preview
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.locator('form[data-form="token-settings"]')).toBeVisible();
 
+  const oversizedSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"><desc>' +
+    "A".repeat(1100000) +
+    '</desc><rect width="200" height="100" fill="red"/></svg>';
   await page.getByRole("button", { name: "Add Image" }).click();
   await page.locator('[data-image-upload-input]').setInputFiles({
     name: "token.svg",
     mimeType: "image/svg+xml",
-    buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"><rect width="200" height="100" fill="red"/></svg>')
+    buffer: Buffer.from(oversizedSvg)
   });
 
   await expect(page.locator('form[data-form="image-component-settings"] input[name="x"]')).toHaveValue("0.00");
@@ -141,6 +144,7 @@ test("token settings own appearance controls and color sequences show in preview
   await expect(page.locator('form[data-form="image-component-settings"] input[name="scale"]')).toHaveValue("0.5");
   await expect(page.locator('form[data-form="image-component-settings"] input[name="scale"]')).toHaveAttribute("type", "range");
   await expect(page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]')).toHaveAttribute("type", "range");
+  await expect(page.locator('[data-preview-stage] svg image').first()).toHaveAttribute("href", /data:image\/(jpeg|png|webp);base64,/);
 
   await page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]').evaluate((element) => {
     element.value = "45";
