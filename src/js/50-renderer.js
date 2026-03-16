@@ -200,7 +200,7 @@
     return [
       '<g data-component-id="' + component.id + '" data-component-type="' + type + '"' + transform + '>',
       renderSelectionBox(box),
-      type === "image" ? renderImageResizeHandles(box) : renderTextResizeHandle(box),
+      type === "image" ? renderImageResizeHandles(box, component) : renderTextResizeHandle(box),
       type === "image"
         ? '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#ffffff" stroke-width="0.9"></line>' +
           '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#111111" stroke-width="0.45" stroke-dasharray="2 2" stroke-dashoffset="2"></line>' +
@@ -214,25 +214,40 @@
     return '<rect x="' + (box.x + box.width - 2) + '" y="' + (box.y + box.height - 2) + '" width="4" height="4" rx="1" fill="#ffffff" stroke="#111111" stroke-width="0.6" data-drag-mode="resize" cursor="nwse-resize"></rect>';
   }
 
-  function renderImageResizeHandles(box) {
+  function renderImageResizeHandles(box, component) {
     var inset = Math.min(4, box.width / 6);
     var visibleWidth = Math.max(8, box.width - inset * 2);
     var handleHeight = 5;
     var topX = box.x + (box.width - visibleWidth) / 2;
     var topY = box.y - handleHeight / 2;
     var bottomY = box.y + box.height - handleHeight / 2;
+    var cursor = getResizeCursor(component.rotationDeg || 0);
     return [
-      renderImageResizeHandle(topX, topY, visibleWidth, handleHeight, "resize-top"),
-      renderImageResizeHandle(topX, bottomY, visibleWidth, handleHeight, "resize-bottom")
+      renderImageResizeHandle(topX, topY, visibleWidth, handleHeight, "resize-top", cursor),
+      renderImageResizeHandle(topX, bottomY, visibleWidth, handleHeight, "resize-bottom", cursor)
     ].join("");
   }
 
-  function renderImageResizeHandle(x, y, width, height, mode) {
+  function renderImageResizeHandle(x, y, width, height, mode, cursor) {
     return [
-      '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="2" fill="transparent" data-drag-mode="' + mode + '" cursor="ns-resize"></rect>',
+      '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="2" fill="transparent" data-drag-mode="' + mode + '" cursor="' + cursor + '"></rect>',
       '<line x1="' + x + '" y1="' + (y + height / 2) + '" x2="' + (x + width) + '" y2="' + (y + height / 2) + '" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" pointer-events="none"></line>',
       '<line x1="' + x + '" y1="' + (y + height / 2) + '" x2="' + (x + width) + '" y2="' + (y + height / 2) + '" stroke="#111111" stroke-width="0.55" stroke-linecap="round" stroke-dasharray="2 2" stroke-dashoffset="2" pointer-events="none"></line>'
     ].join("");
+  }
+
+  function getResizeCursor(rotationDeg) {
+    var normalized = ((Number(rotationDeg || 0) % 180) + 180) % 180;
+    if (normalized < 22.5 || normalized >= 157.5) {
+      return "ns-resize";
+    }
+    if (normalized < 67.5) {
+      return "nesw-resize";
+    }
+    if (normalized < 112.5) {
+      return "ew-resize";
+    }
+    return "nwse-resize";
   }
 
   function renderSelectionBox(box) {
