@@ -76,6 +76,7 @@ module.exports = [
         Buffer: "readonly",
         console: "readonly",
         document: "readonly",
+        IDBObjectStore: "readonly",
         localStorage: "readonly",
         process: "readonly"
       }

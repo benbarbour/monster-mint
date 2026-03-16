@@ -5,12 +5,14 @@
     module.exports = api;
   }
 })(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, Storage) {
-  function createStore(options) {
-    var storage = options && options.storage ? options.storage : null;
+  async function createStore(options) {
+    var persistence = resolvePersistence(options);
     var listeners = [];
+    var saveQueue = Promise.resolve();
+    var saveRevision = 0;
     var state = {
-      project: Storage.loadProject(storage),
-      ui: Storage.loadUiState(storage),
+      project: await persistence.loadProject(),
+      ui: await persistence.loadUiState(),
       autosaveStatus: "Loaded",
       lastSavedAt: null,
       autosaveErrorMessage: null
@@ -22,33 +24,61 @@
       });
     }
 
-    function save() {
-      state.project.meta.updatedAt = new Date().toISOString();
-      var projectSaved = Storage.saveProject(storage, state.project);
-      var uiSaved = Storage.saveUiState(storage, state.ui);
-      if (projectSaved && uiSaved) {
-        state.autosaveStatus = "Saved";
-        state.lastSavedAt = state.project.meta.updatedAt;
-        state.autosaveErrorMessage = null;
-        return true;
-      }
-
+    function setSaveError() {
       state.autosaveStatus = "Error";
       state.autosaveErrorMessage = "Changes could not be saved to browser storage. Export your project to avoid losing work.";
-      return false;
+    }
+
+    function enqueuePersistence(task) {
+      saveQueue = saveQueue.then(task, task);
+      return saveQueue;
+    }
+
+    function save() {
+      state.project.meta.updatedAt = new Date().toISOString();
+      var revision = ++saveRevision;
+      var updatedAt = state.project.meta.updatedAt;
+      var projectSnapshot = Schema.clone(state.project);
+      var uiSnapshot = Schema.clone(state.ui);
+
+      state.autosaveStatus = "Saving";
+      state.autosaveErrorMessage = null;
+      emit();
+
+      return enqueuePersistence(async function () {
+        var projectSaved = await persistence.saveProject(projectSnapshot);
+        var uiSaved = await persistence.saveUiState(uiSnapshot);
+        if (revision !== saveRevision) {
+          return projectSaved && uiSaved;
+        }
+
+        if (projectSaved && uiSaved) {
+          state.autosaveStatus = "Saved";
+          state.lastSavedAt = updatedAt;
+          state.autosaveErrorMessage = null;
+        } else {
+          setSaveError();
+        }
+        emit();
+        return projectSaved && uiSaved;
+      });
     }
 
     function saveUiOnly() {
-      if (Storage.saveUiState(storage, state.ui)) {
-        if (state.autosaveStatus !== "Error") {
-          state.autosaveErrorMessage = null;
+      var revision = ++saveRevision;
+      var uiSnapshot = Schema.clone(state.ui);
+      return enqueuePersistence(async function () {
+        var uiSaved = await persistence.saveUiState(uiSnapshot);
+        if (revision !== saveRevision) {
+          return uiSaved;
         }
-        return true;
-      }
 
-      state.autosaveStatus = "Error";
-      state.autosaveErrorMessage = "Changes could not be saved to browser storage. Export your project to avoid losing work.";
-      return false;
+        if (!uiSaved) {
+          setSaveError();
+          emit();
+        }
+        return uiSaved;
+      });
     }
 
     function updateProject(mutator, options) {
@@ -57,40 +87,42 @@
       mutator(nextProject);
       state.project = Schema.normalizeProject(nextProject);
       if (shouldPersist) {
-        save();
-      } else {
-        state.autosaveStatus = "Editing";
-        state.autosaveErrorMessage = null;
+        return save();
       }
+
+      state.autosaveStatus = "Editing";
+      state.autosaveErrorMessage = null;
       emit();
+      return Promise.resolve(true);
     }
 
     function replaceProject(project, options) {
       var shouldPersist = !options || options.persist !== false;
       state.project = Schema.normalizeProject(project);
       if (shouldPersist) {
-        save();
+        return save();
       }
+
       emit();
+      return Promise.resolve(true);
     }
 
     function setActiveTab(activeTab) {
       state.ui.activeTab = activeTab;
-      saveUiOnly();
       emit();
+      return saveUiOnly();
     }
 
     function updateUi(mutator) {
       var nextUi = Schema.clone(state.ui);
       mutator(nextUi);
       state.ui = Object.assign(Storage.defaultUiState(), nextUi);
-      saveUiOnly();
       emit();
+      return saveUiOnly();
     }
 
     function persistProject() {
-      save();
-      emit();
+      return save();
     }
 
     return {
@@ -111,6 +143,16 @@
       updateUi: updateUi,
       persistProject: persistProject
     };
+  }
+
+  function resolvePersistence(options) {
+    if (options && options.persistence) {
+      return options.persistence;
+    }
+    if (options && options.storage) {
+      return Storage.createLocalStoragePersistence(options.storage);
+    }
+    return Storage.createMemoryPersistence();
   }
 
   return {

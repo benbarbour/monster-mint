@@ -425,17 +425,22 @@ test("json import normalizes embedded image assets", async ({ page }) => {
     height: Number(node.getAttribute("height") || 0)
   }));
   expect(importedDimensions.width).toBeLessThan(importedDimensions.height);
+
+  await page.reload();
+  await expect(page.locator('select[name="selectedTokenId"]')).toHaveValue("token_imported");
+  await expect(page.locator('select[name="selectedComponentKey"]')).toHaveValue("image:image_imported");
+  await page.locator('select[name="selectedComponentKey"]').selectOption("");
+  await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toHaveValue("Imported Token");
 });
 
 test("save failures are surfaced in the header", async ({ page }) => {
   await page.evaluate(() => {
-    const storageProto = Object.getPrototypeOf(localStorage);
-    const originalSetItem = storageProto.setItem;
-    storageProto.setItem = function patchedSetItem() {
+    const originalPut = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function patchedPut() {
       throw new Error("Quota exceeded");
     };
-    globalThis.__restoreSetItem = () => {
-      storageProto.setItem = originalSetItem;
+    globalThis.__restoreIndexedDbPut = () => {
+      IDBObjectStore.prototype.put = originalPut;
     };
   });
 
@@ -443,9 +448,9 @@ test("save failures are surfaced in the header", async ({ page }) => {
   await expect(page.locator("[data-save-status]")).toContainText("could not be saved to browser storage");
 
   await page.evaluate(() => {
-    if (typeof globalThis.__restoreSetItem === "function") {
-      globalThis.__restoreSetItem();
-      delete globalThis.__restoreSetItem;
+    if (typeof globalThis.__restoreIndexedDbPut === "function") {
+      globalThis.__restoreIndexedDbPut();
+      delete globalThis.__restoreIndexedDbPut;
     }
   });
 });

@@ -21,14 +21,12 @@ function createMemoryStorage() {
   };
 }
 
-function createFailingStorage() {
+function createFailingPersistence() {
   return {
-    getItem() {
-      return null;
-    },
-    setItem() {
-      throw new Error("Quota exceeded");
-    }
+    loadProject: async () => Schema.createDefaultProject(),
+    saveProject: async () => false,
+    loadUiState: async () => Storage.defaultUiState(),
+    saveUiState: async () => false
   };
 }
 
@@ -86,51 +84,52 @@ test("normalizeProject fills missing values and rejects unknown page presets", (
   assert.equal(normalized.sequences.color[0].id, "builtin_color_rainbow");
 });
 
-test("storage round-trips a saved project", () => {
-  const storage = createMemoryStorage();
+test("local storage persistence round-trips a saved project", async () => {
+  const storage = Storage.createLocalStoragePersistence(createMemoryStorage());
   const project = Schema.createDefaultProject();
   project.meta.name = "Round Trip";
 
-  assert.equal(Storage.saveProject(storage, project), true);
+  assert.equal(await storage.saveProject(project), true);
 
-  const loaded = Storage.loadProject(storage);
+  const loaded = await storage.loadProject();
   assert.equal(loaded.meta.name, "Round Trip");
 });
 
-test("state store persists updates and active tab changes", () => {
-  const storage = createMemoryStorage();
-  const store = State.createStore({ storage });
+test("state store persists updates and active tab changes", async () => {
+  const persistence = Storage.createLocalStoragePersistence(createMemoryStorage());
+  const store = await State.createStore({ persistence });
 
-  store.updateProject((project) => {
+  await store.updateProject((project) => {
     project.meta.name = "Updated Project";
   });
-  store.setActiveTab("designer");
+  await store.setActiveTab("designer");
 
-  const savedProject = JSON.parse(storage.getItem(Schema.STORAGE_KEY));
-  const savedUi = JSON.parse(storage.getItem(Schema.UI_STORAGE_KEY));
+  const savedProject = await persistence.loadProject();
+  const savedUi = await persistence.loadUiState();
 
   assert.equal(savedProject.meta.name, "Updated Project");
   assert.equal(savedUi.activeTab, "designer");
 });
 
-test("state store can update without persisting until requested", () => {
-  const storage = createMemoryStorage();
-  const store = State.createStore({ storage });
+test("state store can update without persisting until requested", async () => {
+  const persistence = Storage.createMemoryPersistence();
+  const store = await State.createStore({ persistence });
 
-  store.updateProject((project) => {
+  await store.updateProject((project) => {
     project.meta.name = "Draft";
   }, { persist: false });
-  assert.equal(storage.getItem(Schema.STORAGE_KEY), null);
+  const beforePersist = await persistence.loadProject();
+  assert.equal(beforePersist.meta.name, "Untitled Project");
 
-  store.persistProject();
-  const savedProject = JSON.parse(storage.getItem(Schema.STORAGE_KEY));
+  await store.persistProject();
+  const savedProject = await persistence.loadProject();
   assert.equal(savedProject.meta.name, "Draft");
 });
 
-test("state store reports browser storage save failures", () => {
-  const store = State.createStore({ storage: createFailingStorage() });
+test("state store reports browser storage save failures", async () => {
+  const store = await State.createStore({ persistence: createFailingPersistence() });
 
-  store.replaceProject(Schema.createDefaultProject());
+  await store.replaceProject(Schema.createDefaultProject());
   const state = store.getState();
 
   assert.equal(state.autosaveStatus, "Error");
@@ -138,9 +137,9 @@ test("state store reports browser storage save failures", () => {
   assert.equal(state.lastSavedAt, null);
 });
 
-test("loadUiState provides the active UI defaults", () => {
-  const storage = createMemoryStorage();
-  const uiState = Storage.loadUiState(storage);
+test("loadUiState provides the active UI defaults", async () => {
+  const persistence = Storage.createLocalStoragePersistence(createMemoryStorage());
+  const uiState = await persistence.loadUiState();
 
   assert.deepEqual(uiState, {
     activeTab: "designer",

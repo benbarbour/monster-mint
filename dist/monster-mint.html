@@ -1685,79 +1685,152 @@ button {
     module.exports = api;
   }
 })(typeof globalThis !== "undefined" ? globalThis : window, function (Schema) {
-  function loadProject(storage) {
-    if (!storage) {
-      return Schema.createDefaultProject();
-    }
+  var DB_NAME = "monster-mint.db.v1";
+  var DB_VERSION = 1;
+  var STORE_NAME = "app";
+  var PROJECT_RECORD_KEY = "project";
+  var UI_RECORD_KEY = "ui";
 
-    try {
-      var raw = storage.getItem(Schema.STORAGE_KEY);
-      if (!raw) {
-        return Schema.createDefaultProject();
+  function createBrowserPersistence(options) {
+    var indexedDb = options && options.indexedDB ? options.indexedDB : null;
+    var fallbackStorage = options && options.storage ? options.storage : null;
+    if (indexedDb && typeof indexedDb.open === "function") {
+      return createIndexedDbPersistence(indexedDb, fallbackStorage);
+    }
+    return createLocalStoragePersistence(fallbackStorage);
+  }
+
+  function createIndexedDbPersistence(indexedDb, fallbackStorage) {
+    var dbPromise = openDatabase(indexedDb);
+    var migrationPromise = null;
+
+    async function ensureMigrated() {
+      if (!migrationPromise) {
+        migrationPromise = migrateLegacyLocalStorage(dbPromise, fallbackStorage);
       }
-
-      return Schema.normalizeProject(JSON.parse(raw));
-    } catch (error) {
-      console.warn("Failed to load saved project", error);
-      return Schema.createDefaultProject();
-    }
-  }
-
-  function saveProject(storage, project) {
-    if (!storage) {
-      return false;
+      return migrationPromise;
     }
 
-    try {
-      storage.setItem(Schema.STORAGE_KEY, JSON.stringify(project));
-      return true;
-    } catch (error) {
-      console.warn("Failed to save project", error);
-      return false;
-    }
-  }
-
-  function loadUiState(storage) {
-    if (!storage) {
-      return defaultUiState();
-    }
-
-    try {
-      var raw = storage.getItem(Schema.UI_STORAGE_KEY);
-      if (!raw) {
-        return defaultUiState();
+    return {
+      loadProject: async function () {
+        await ensureMigrated();
+        try {
+          var record = await getRecord(await dbPromise, PROJECT_RECORD_KEY);
+          return record ? Schema.normalizeProject(record) : Schema.createDefaultProject();
+        } catch (error) {
+          console.warn("Failed to load saved project", error);
+          return Schema.createDefaultProject();
+        }
+      },
+      saveProject: async function (project) {
+        try {
+          await putRecord(await dbPromise, PROJECT_RECORD_KEY, Schema.clone(project));
+          return true;
+        } catch (error) {
+          console.warn("Failed to save project", error);
+          return false;
+        }
+      },
+      loadUiState: async function () {
+        await ensureMigrated();
+        try {
+          var record = await getRecord(await dbPromise, UI_RECORD_KEY);
+          return normalizeUiState(record);
+        } catch (error) {
+          console.warn("Failed to load UI state", error);
+          return defaultUiState();
+        }
+      },
+      saveUiState: async function (uiState) {
+        try {
+          await putRecord(await dbPromise, UI_RECORD_KEY, normalizeUiState(uiState));
+          return true;
+        } catch (error) {
+          console.warn("Failed to save UI state", error);
+          return false;
+        }
       }
-
-      var parsed = JSON.parse(raw);
-      return {
-        activeTab: typeof parsed.activeTab === "string" ? parsed.activeTab : "designer",
-        showHelp: parsed.showHelp === true,
-        editingColorSequenceId: typeof parsed.editingColorSequenceId === "string" ? parsed.editingColorSequenceId : null,
-        selectedColorSequenceId: typeof parsed.selectedColorSequenceId === "string" ? parsed.selectedColorSequenceId : null,
-        selectedTokenId: typeof parsed.selectedTokenId === "string" ? parsed.selectedTokenId : null,
-        selectedComponentType: typeof parsed.selectedComponentType === "string" ? parsed.selectedComponentType : null,
-        selectedComponentId: typeof parsed.selectedComponentId === "string" ? parsed.selectedComponentId : null,
-        selectedPrintPreviewPage: Number.isFinite(parsed.selectedPrintPreviewPage) ? Math.max(0, parsed.selectedPrintPreviewPage) : 0,
-        printPanels: normalizePrintPanels(parsed.printPanels)
-      };
-    } catch (error) {
-      console.warn("Failed to load UI state", error);
-      return defaultUiState();
-    }
+    };
   }
 
-  function saveUiState(storage, uiState) {
-    if (!storage) {
-      return false;
-    }
+  function createLocalStoragePersistence(storage) {
+    return {
+      loadProject: async function () {
+        if (!storage) {
+          return Schema.createDefaultProject();
+        }
 
-    try {
-      storage.setItem(Schema.UI_STORAGE_KEY, JSON.stringify(uiState));
-      return true;
-    } catch (error) {
-      console.warn("Failed to save UI state", error);
-      return false;
-    }
+        try {
+          var raw = storage.getItem(Schema.STORAGE_KEY);
+          if (!raw) {
+            return Schema.createDefaultProject();
+          }
+
+          return Schema.normalizeProject(JSON.parse(raw));
+        } catch (error) {
+          console.warn("Failed to load saved project", error);
+          return Schema.createDefaultProject();
+        }
+      },
+      saveProject: async function (project) {
+        if (!storage) {
+          return false;
+        }
+
+        try {
+          storage.setItem(Schema.STORAGE_KEY, JSON.stringify(project));
+          return true;
+        } catch (error) {
+          console.warn("Failed to save project", error);
+          return false;
+        }
+      },
+      loadUiState: async function () {
+        if (!storage) {
+          return defaultUiState();
+        }
+
+        try {
+          return normalizeUiState(JSON.parse(storage.getItem(Schema.UI_STORAGE_KEY) || "null"));
+        } catch (error) {
+          console.warn("Failed to load UI state", error);
+          return defaultUiState();
+        }
+      },
+      saveUiState: async function (uiState) {
+        if (!storage) {
+          return false;
+        }
+
+        try {
+          storage.setItem(Schema.UI_STORAGE_KEY, JSON.stringify(normalizeUiState(uiState)));
+          return true;
+        } catch (error) {
+          console.warn("Failed to save UI state", error);
+          return false;
+        }
+      }
+    };
+  }
+
+  function createMemoryPersistence(seed) {
+    var state = seed && typeof seed === "object" ? seed : {};
+    return {
+      loadProject: async function () {
+        return Schema.normalizeProject(state.project || Schema.createDefaultProject());
+      },
+      saveProject: async function (project) {
+        state.project = Schema.clone(project);
+        return true;
+      },
+      loadUiState: async function () {
+        return normalizeUiState(state.ui);
+      },
+      saveUiState: async function (uiState) {
+        state.ui = normalizeUiState(uiState);
+        return true;
+      }
+    };
   }
 
   function defaultUiState() {
@@ -1778,6 +1851,21 @@ button {
     };
   }
 
+  function normalizeUiState(value) {
+    var parsed = value && typeof value === "object" ? value : {};
+    return {
+      activeTab: typeof parsed.activeTab === "string" ? parsed.activeTab : "designer",
+      showHelp: parsed.showHelp === true,
+      editingColorSequenceId: typeof parsed.editingColorSequenceId === "string" ? parsed.editingColorSequenceId : null,
+      selectedColorSequenceId: typeof parsed.selectedColorSequenceId === "string" ? parsed.selectedColorSequenceId : null,
+      selectedTokenId: typeof parsed.selectedTokenId === "string" ? parsed.selectedTokenId : null,
+      selectedComponentType: typeof parsed.selectedComponentType === "string" ? parsed.selectedComponentType : null,
+      selectedComponentId: typeof parsed.selectedComponentId === "string" ? parsed.selectedComponentId : null,
+      selectedPrintPreviewPage: Number.isFinite(parsed.selectedPrintPreviewPage) ? Math.max(0, parsed.selectedPrintPreviewPage) : 0,
+      printPanels: normalizePrintPanels(parsed.printPanels)
+    };
+  }
+
   function normalizePrintPanels(value) {
     var panels = value && typeof value === "object" ? value : {};
     return {
@@ -1787,12 +1875,96 @@ button {
     };
   }
 
+  function openDatabase(indexedDb) {
+    return new Promise(function (resolve, reject) {
+      var request = indexedDb.open(DB_NAME, DB_VERSION);
+      request.onupgradeneeded = function () {
+        var database = request.result;
+        if (!database.objectStoreNames.contains(STORE_NAME)) {
+          database.createObjectStore(STORE_NAME);
+        }
+      };
+      request.onsuccess = function () {
+        var database = request.result;
+        database.onversionchange = function () {
+          database.close();
+        };
+        resolve(database);
+      };
+      request.onerror = function () {
+        reject(request.error || new Error("Failed to open IndexedDB."));
+      };
+    });
+  }
+
+  function getRecord(database, key) {
+    return new Promise(function (resolve, reject) {
+      var transaction = database.transaction(STORE_NAME, "readonly");
+      var store = transaction.objectStore(STORE_NAME);
+      var request = store.get(key);
+      request.onsuccess = function () {
+        resolve(request.result || null);
+      };
+      request.onerror = function () {
+        reject(request.error || transaction.error || new Error("Failed to read IndexedDB record."));
+      };
+    });
+  }
+
+  function putRecord(database, key, value) {
+    return new Promise(function (resolve, reject) {
+      var transaction = database.transaction(STORE_NAME, "readwrite");
+      transaction.oncomplete = function () {
+        resolve(true);
+      };
+      transaction.onerror = function () {
+        reject(transaction.error || new Error("Failed to write IndexedDB record."));
+      };
+      transaction.onabort = function () {
+        reject(transaction.error || new Error("IndexedDB write was aborted."));
+      };
+      transaction.objectStore(STORE_NAME).put(value, key);
+    });
+  }
+
+  async function migrateLegacyLocalStorage(dbPromise, fallbackStorage) {
+    if (!fallbackStorage) {
+      return;
+    }
+
+    try {
+      var projectRaw = fallbackStorage.getItem(Schema.STORAGE_KEY);
+      var uiRaw = fallbackStorage.getItem(Schema.UI_STORAGE_KEY);
+      if (!projectRaw && !uiRaw) {
+        return;
+      }
+
+      var database = await dbPromise;
+      var existingProject = await getRecord(database, PROJECT_RECORD_KEY);
+      var existingUi = await getRecord(database, UI_RECORD_KEY);
+      if (existingProject || existingUi) {
+        return;
+      }
+
+      if (projectRaw) {
+        await putRecord(database, PROJECT_RECORD_KEY, Schema.normalizeProject(JSON.parse(projectRaw)));
+      }
+      if (uiRaw) {
+        await putRecord(database, UI_RECORD_KEY, normalizeUiState(JSON.parse(uiRaw)));
+      }
+    } catch (error) {
+      console.warn("Failed to migrate localStorage data into IndexedDB", error);
+    }
+  }
+
   return {
+    DB_NAME: DB_NAME,
     defaultUiState: defaultUiState,
-    loadProject: loadProject,
-    saveProject: saveProject,
-    loadUiState: loadUiState,
-    saveUiState: saveUiState
+    normalizeUiState: normalizeUiState,
+    createBrowserPersistence: createBrowserPersistence,
+    createIndexedDbPersistence: createIndexedDbPersistence,
+    createLocalStoragePersistence: createLocalStoragePersistence,
+    createMemoryPersistence: createMemoryPersistence
   };
 });
 
@@ -1804,12 +1976,14 @@ button {
     module.exports = api;
   }
 })(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, Storage) {
-  function createStore(options) {
-    var storage = options && options.storage ? options.storage : null;
+  async function createStore(options) {
+    var persistence = resolvePersistence(options);
     var listeners = [];
+    var saveQueue = Promise.resolve();
+    var saveRevision = 0;
     var state = {
-      project: Storage.loadProject(storage),
-      ui: Storage.loadUiState(storage),
+      project: await persistence.loadProject(),
+      ui: await persistence.loadUiState(),
       autosaveStatus: "Loaded",
       lastSavedAt: null,
       autosaveErrorMessage: null
@@ -1821,33 +1995,61 @@ button {
       });
     }
 
-    function save() {
-      state.project.meta.updatedAt = new Date().toISOString();
-      var projectSaved = Storage.saveProject(storage, state.project);
-      var uiSaved = Storage.saveUiState(storage, state.ui);
-      if (projectSaved && uiSaved) {
-        state.autosaveStatus = "Saved";
-        state.lastSavedAt = state.project.meta.updatedAt;
-        state.autosaveErrorMessage = null;
-        return true;
-      }
-
+    function setSaveError() {
       state.autosaveStatus = "Error";
       state.autosaveErrorMessage = "Changes could not be saved to browser storage. Export your project to avoid losing work.";
-      return false;
+    }
+
+    function enqueuePersistence(task) {
+      saveQueue = saveQueue.then(task, task);
+      return saveQueue;
+    }
+
+    function save() {
+      state.project.meta.updatedAt = new Date().toISOString();
+      var revision = ++saveRevision;
+      var updatedAt = state.project.meta.updatedAt;
+      var projectSnapshot = Schema.clone(state.project);
+      var uiSnapshot = Schema.clone(state.ui);
+
+      state.autosaveStatus = "Saving";
+      state.autosaveErrorMessage = null;
+      emit();
+
+      return enqueuePersistence(async function () {
+        var projectSaved = await persistence.saveProject(projectSnapshot);
+        var uiSaved = await persistence.saveUiState(uiSnapshot);
+        if (revision !== saveRevision) {
+          return projectSaved && uiSaved;
+        }
+
+        if (projectSaved && uiSaved) {
+          state.autosaveStatus = "Saved";
+          state.lastSavedAt = updatedAt;
+          state.autosaveErrorMessage = null;
+        } else {
+          setSaveError();
+        }
+        emit();
+        return projectSaved && uiSaved;
+      });
     }
 
     function saveUiOnly() {
-      if (Storage.saveUiState(storage, state.ui)) {
-        if (state.autosaveStatus !== "Error") {
-          state.autosaveErrorMessage = null;
+      var revision = ++saveRevision;
+      var uiSnapshot = Schema.clone(state.ui);
+      return enqueuePersistence(async function () {
+        var uiSaved = await persistence.saveUiState(uiSnapshot);
+        if (revision !== saveRevision) {
+          return uiSaved;
         }
-        return true;
-      }
 
-      state.autosaveStatus = "Error";
-      state.autosaveErrorMessage = "Changes could not be saved to browser storage. Export your project to avoid losing work.";
-      return false;
+        if (!uiSaved) {
+          setSaveError();
+          emit();
+        }
+        return uiSaved;
+      });
     }
 
     function updateProject(mutator, options) {
@@ -1856,40 +2058,42 @@ button {
       mutator(nextProject);
       state.project = Schema.normalizeProject(nextProject);
       if (shouldPersist) {
-        save();
-      } else {
-        state.autosaveStatus = "Editing";
-        state.autosaveErrorMessage = null;
+        return save();
       }
+
+      state.autosaveStatus = "Editing";
+      state.autosaveErrorMessage = null;
       emit();
+      return Promise.resolve(true);
     }
 
     function replaceProject(project, options) {
       var shouldPersist = !options || options.persist !== false;
       state.project = Schema.normalizeProject(project);
       if (shouldPersist) {
-        save();
+        return save();
       }
+
       emit();
+      return Promise.resolve(true);
     }
 
     function setActiveTab(activeTab) {
       state.ui.activeTab = activeTab;
-      saveUiOnly();
       emit();
+      return saveUiOnly();
     }
 
     function updateUi(mutator) {
       var nextUi = Schema.clone(state.ui);
       mutator(nextUi);
       state.ui = Object.assign(Storage.defaultUiState(), nextUi);
-      saveUiOnly();
       emit();
+      return saveUiOnly();
     }
 
     function persistProject() {
-      save();
-      emit();
+      return save();
     }
 
     return {
@@ -1910,6 +2114,16 @@ button {
       updateUi: updateUi,
       persistProject: persistProject
     };
+  }
+
+  function resolvePersistence(options) {
+    if (options && options.persistence) {
+      return options.persistence;
+    }
+    if (options && options.storage) {
+      return Storage.createLocalStoragePersistence(options.storage);
+    }
+    return Storage.createMemoryPersistence();
   }
 
   return {
@@ -3897,8 +4111,8 @@ button {
         var parsed = JSON.parse(contents);
         var projectWithDefaults = Schema.normalizeProject(parsed);
         var normalizedProject = await Utils.normalizeProjectImageAssets(projectWithDefaults, helpers.getImageImportOptions(projectWithDefaults));
-        store.replaceProject(normalizedProject);
-        store.updateUi(function (ui) {
+        await store.replaceProject(normalizedProject);
+        await store.updateUi(function (ui) {
           ui.editingColorSequenceId = null;
           ui.selectedColorSequenceId = null;
           ui.selectedTokenId = null;
@@ -4791,6 +5005,7 @@ button {
 (function (global, factory) {
   var api = factory(
     global.MonsterMintSchema,
+    global.MonsterMintStorage,
     global.MonsterMintState,
     global.MonsterMintSequences,
     global.MonsterMintUtils,
@@ -4804,7 +5019,7 @@ button {
     global.MonsterMintAppPrintPanel
   );
   global.MonsterMintApp = api;
-})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, State, Sequences, Utils, Tokens, Renderer, Print, Ui, AppHelpers, SettingsPanel, DesignerPanel, PrintPanel) {
+})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, Storage, State, Sequences, Utils, Tokens, Renderer, Print, Ui, AppHelpers, SettingsPanel, DesignerPanel, PrintPanel) {
   var runtimeGlobal = typeof globalThis !== "undefined" ? globalThis : window;
   var TAB_CONFIG = [
     { id: "designer", label: "Designer" },
@@ -5088,6 +5303,8 @@ button {
     var status = state.autosaveStatus || "Loaded";
     var text = status === "Error"
       ? (state.autosaveErrorMessage || "Changes could not be saved.")
+      : status === "Saving"
+        ? "Saving to this browser..."
       : status === "Editing"
         ? "Unsaved changes"
         : status === "Saved"
@@ -5096,6 +5313,8 @@ button {
     var className = "app-status" + (
       status === "Error"
         ? " is-error"
+        : status === "Saving"
+          ? " is-editing"
         : status === "Editing"
           ? " is-editing"
           : status === "Saved"
@@ -6074,9 +6293,14 @@ button {
     pendingPrintFieldFocus = value;
   }
 
-  function mount() {
+  async function mount() {
     var appElement = document.getElementById("app");
-    var store = State.createStore({ storage: runtimeGlobal.localStorage });
+    renderLoadingState(appElement);
+    var persistence = Storage.createBrowserPersistence({
+      indexedDB: runtimeGlobal.indexedDB,
+      storage: runtimeGlobal.localStorage
+    });
+    var store = await State.createStore({ persistence: persistence });
     mountedStore = store;
     mountedAppView = createAppView(appElement);
     bindDelegatedAppHandlers(appElement);
@@ -6087,6 +6311,10 @@ button {
     bindGlobalPointerHandlers();
     bindGlobalResizeHandlers(appElement);
     render(mountedAppView, store);
+  }
+
+  function renderLoadingState(appElement) {
+    appElement.innerHTML = '<main class="app-shell"><section class="tab-panel is-active"><div class="empty-state"><h2>Loading Project</h2><p>Opening browser storage...</p></div></section></main>';
   }
 
   function bindGlobalPointerHandlers() {
@@ -6116,7 +6344,15 @@ button {
   }
 
   if (typeof document !== "undefined") {
-    document.addEventListener("DOMContentLoaded", mount);
+    document.addEventListener("DOMContentLoaded", function () {
+      mount().catch(function (error) {
+        console.error(error);
+        var appElement = document.getElementById("app");
+        if (appElement) {
+          appElement.innerHTML = '<main class="app-shell"><section class="tab-panel is-active"><div class="empty-state"><h2>Storage Error</h2><p>Monster Mint could not open browser storage. Export any existing project JSON and reload the page.</p></div></section></main>';
+        }
+      });
+    });
   }
 
   return {

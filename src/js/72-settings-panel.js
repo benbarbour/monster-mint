@@ -214,8 +214,8 @@
         var parsed = JSON.parse(contents);
         var projectWithDefaults = Schema.normalizeProject(parsed);
         var normalizedProject = await Utils.normalizeProjectImageAssets(projectWithDefaults, helpers.getImageImportOptions(projectWithDefaults));
-        store.replaceProject(normalizedProject);
-        store.updateUi(function (ui) {
+        await store.replaceProject(normalizedProject);
+        await store.updateUi(function (ui) {
           ui.editingColorSequenceId = null;
           ui.selectedColorSequenceId = null;
           ui.selectedTokenId = null;

@@ -1,6 +1,7 @@
 (function (global, factory) {
   var api = factory(
     global.MonsterMintSchema,
+    global.MonsterMintStorage,
     global.MonsterMintState,
     global.MonsterMintSequences,
     global.MonsterMintUtils,
@@ -14,7 +15,7 @@
     global.MonsterMintAppPrintPanel
   );
   global.MonsterMintApp = api;
-})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, State, Sequences, Utils, Tokens, Renderer, Print, Ui, AppHelpers, SettingsPanel, DesignerPanel, PrintPanel) {
+})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, Storage, State, Sequences, Utils, Tokens, Renderer, Print, Ui, AppHelpers, SettingsPanel, DesignerPanel, PrintPanel) {
   var runtimeGlobal = typeof globalThis !== "undefined" ? globalThis : window;
   var TAB_CONFIG = [
     { id: "designer", label: "Designer" },
@@ -298,6 +299,8 @@
     var status = state.autosaveStatus || "Loaded";
     var text = status === "Error"
       ? (state.autosaveErrorMessage || "Changes could not be saved.")
+      : status === "Saving"
+        ? "Saving to this browser..."
       : status === "Editing"
         ? "Unsaved changes"
         : status === "Saved"
@@ -306,6 +309,8 @@
     var className = "app-status" + (
       status === "Error"
         ? " is-error"
+        : status === "Saving"
+          ? " is-editing"
         : status === "Editing"
           ? " is-editing"
           : status === "Saved"
@@ -1284,9 +1289,14 @@
     pendingPrintFieldFocus = value;
   }
 
-  function mount() {
+  async function mount() {
     var appElement = document.getElementById("app");
-    var store = State.createStore({ storage: runtimeGlobal.localStorage });
+    renderLoadingState(appElement);
+    var persistence = Storage.createBrowserPersistence({
+      indexedDB: runtimeGlobal.indexedDB,
+      storage: runtimeGlobal.localStorage
+    });
+    var store = await State.createStore({ persistence: persistence });
     mountedStore = store;
     mountedAppView = createAppView(appElement);
     bindDelegatedAppHandlers(appElement);
@@ -1297,6 +1307,10 @@
     bindGlobalPointerHandlers();
     bindGlobalResizeHandlers(appElement);
     render(mountedAppView, store);
+  }
+
+  function renderLoadingState(appElement) {
+    appElement.innerHTML = '<main class="app-shell"><section class="tab-panel is-active"><div class="empty-state"><h2>Loading Project</h2><p>Opening browser storage...</p></div></section></main>';
   }
 
   function bindGlobalPointerHandlers() {
@@ -1326,7 +1340,15 @@
   }
 
   if (typeof document !== "undefined") {
-    document.addEventListener("DOMContentLoaded", mount);
+    document.addEventListener("DOMContentLoaded", function () {
+      mount().catch(function (error) {
+        console.error(error);
+        var appElement = document.getElementById("app");
+        if (appElement) {
+          appElement.innerHTML = '<main class="app-shell"><section class="tab-panel is-active"><div class="empty-state"><h2>Storage Error</h2><p>Monster Mint could not open browser storage. Export any existing project JSON and reload the page.</p></div></section></main>';
+        }
+      });
+    });
   }
 
   return {
