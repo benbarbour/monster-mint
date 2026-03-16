@@ -57,7 +57,7 @@
         currentSequenceRef: tokenDefaults.borderColorSequenceRef,
         sequences: colorSequences
       }),
-      '  <p class="field-help">New tokens copy these defaults onto both faces.</p>',
+      '  <p class="field-help">New tokens start with these defaults.</p>',
       "</form>"
     ].join("");
   }

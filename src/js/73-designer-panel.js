@@ -7,6 +7,7 @@
   );
   global.MonsterMintAppDesignerPanel = api;
 })(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, Tokens, Renderer, Ui) {
+  var runtimeGlobal = typeof globalThis !== "undefined" ? globalThis : window;
   var escapeHtml = Ui.escapeHtml;
 
   function renderPanel(state, helpers) {
@@ -366,7 +367,7 @@
             ui.selectedComponentId = component.id;
           });
         } catch (error) {
-          window.alert("Image import failed.");
+          runtimeGlobal.alert("Image import failed.");
           console.error(error);
         } finally {
           addImageInput.value = "";
@@ -478,7 +479,7 @@
               }
             });
           } catch (error) {
-            window.alert("Image import failed.");
+            runtimeGlobal.alert("Image import failed.");
             console.error(error);
           } finally {
             replaceImageInput.value = "";
