@@ -29,6 +29,9 @@
     var backgroundInsetMarkup = renderBackgroundInset(face, backgroundColor, tokenBaseFill);
     var backgroundImageMarkup = renderBackgroundImage(face, tokenSlug);
     var outerSquareFill = opts.outerSquareFill || "#f6efe2";
+    var tokenBaseCircleMarkup = tokenBaseFill === outerSquareFill
+      ? ""
+      : '<circle cx="50" cy="50" r="50" fill="' + escapeAttr(tokenBaseFill) + '"></circle>';
     var orderedComponents = Tokens.getSortedFaceComponents(face);
     var lowerComponents = orderedComponents.filter(function (entry) {
       return entry.component.zIndex < 0;
@@ -44,7 +47,7 @@
       renderTextClipPaths(face.texts, tokenSlug),
       "  </defs>",
       '  <rect x="0" y="0" width="100" height="100" fill="' + escapeAttr(outerSquareFill) + '"></rect>',
-      '  <circle cx="50" cy="50" r="50" fill="' + escapeAttr(tokenBaseFill) + '"></circle>',
+      tokenBaseCircleMarkup,
       backgroundInsetMarkup,
       backgroundImageMarkup,
       renderOrderedComponents(lowerComponents, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
