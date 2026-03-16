@@ -202,6 +202,19 @@ test("token settings own appearance controls and color sequences show in preview
   await expect(page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]')).toHaveValue("45");
   await expect(page.locator('form[data-form="image-component-settings"] input[name="mirrorX"]')).toBeChecked();
   await expect(page.locator('[data-preview-stage] svg image[transform*="rotate(45"]')).toHaveCount(1);
+  const edgeHandle = page.locator('[data-component-type="image"] [data-drag-mode="resize-top"]').first();
+  const edgeBox = await edgeHandle.boundingBox();
+  if (!edgeBox) {
+    throw new Error("Missing rotated image edge resize handle");
+  }
+  const edgeHitTarget = await page.evaluate(({ x, y }) => {
+    const target = document.elementFromPoint(x, y);
+    return target ? target.getAttribute("data-drag-mode") : null;
+  }, {
+    x: edgeBox.x + edgeBox.width / 2,
+    y: edgeBox.y + edgeBox.height / 2
+  });
+  expect(edgeHitTarget).toBe("resize-top");
   await expect(page.getByRole("button", { name: "Up" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Down" })).toBeVisible();
   await page.locator('select[name="selectedComponentKey"]').selectOption({ label: "token.svg" });

@@ -3040,7 +3040,7 @@ button {
 
   function renderImageResizeHandle(x, y, width, height, mode, cursor) {
     return [
-      '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="2" fill="transparent" data-drag-mode="' + mode + '" cursor="' + cursor + '"></rect>',
+      '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="2" fill="rgba(255,255,255,0.001)" pointer-events="all" data-drag-mode="' + mode + '" cursor="' + cursor + '"></rect>',
       '<line x1="' + x + '" y1="' + (y + height / 2) + '" x2="' + (x + width) + '" y2="' + (y + height / 2) + '" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" pointer-events="none"></line>',
       '<line x1="' + x + '" y1="' + (y + height / 2) + '" x2="' + (x + width) + '" y2="' + (y + height / 2) + '" stroke="#111111" stroke-width="0.55" stroke-linecap="round" stroke-dasharray="2 2" stroke-dashoffset="2" pointer-events="none"></line>'
     ].join("");
