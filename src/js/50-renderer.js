@@ -40,11 +40,9 @@
       '  <circle cx="50" cy="50" r="50" fill="' + escapeAttr(tokenBaseFill) + '"></circle>',
       backgroundInsetMarkup,
       borderUnderImages ? borderMarkup : "",
-      '  <g clip-path="url(#token-clip-' + tokenSlug + ')">',
-      renderImageComponents(face.images, opts.interactive, selectedComponentType, selectedComponentId),
+      renderImageComponents(face.images, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
       borderUnderImages ? "" : (borderUnderText ? borderMarkup : ""),
       renderTextComponents(face.texts, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
-      "  </g>",
       borderUnderText ? "" : borderMarkup,
       opts.interactive
         ? renderInteractiveOverlays(face, selectedComponentType, selectedComponentId, tokenSlug)
@@ -53,7 +51,7 @@
     ].join("");
   }
 
-  function renderImageComponents(images, interactive, selectedComponentType, selectedComponentId) {
+  function renderImageComponents(images, tokenSlug, interactive, selectedComponentType, selectedComponentId) {
     return images.map(function (component) {
       var box = toSvgRect(component, "image");
       var centerX = box.x + box.width / 2;
@@ -67,7 +65,7 @@
         "translate(" + (-box.width / 2) + " " + (-box.height / 2) + ")"
       ].join(" ");
       var isSelected = interactive && selectedComponentType === "image" && selectedComponentId === component.id;
-      return '<image href="' + escapeAttr(component.source) + '" width="' + box.width + '" height="' + box.height + '" preserveAspectRatio="none" transform="' + transform + '" data-component-id="' + component.id + '" data-component-type="image"' + (isSelected ? ' data-drag-mode="move"' : "") + '></image>';
+      return '<image href="' + escapeAttr(component.source) + '" width="' + box.width + '" height="' + box.height + '" preserveAspectRatio="none" transform="' + transform + '" clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="image"' + (isSelected ? ' data-drag-mode="move"' : "") + '></image>';
     }).join("");
   }
 
@@ -126,8 +124,10 @@
         : "#111111";
       var isSelected = previewMode && selectedComponentType === "text" && selectedComponentId === component.id;
       return [
-        '<g clip-path="url(#text-clip-' + tokenSlug + "-" + component.id + ')" data-component-id="' + component.id + '" data-component-type="text"' + (isSelected ? ' data-drag-mode="move"' : "") + '>',
-        '  <text x="' + (box.x + box.width / 2) + '" y="' + baselineY + '" fill="' + escapeAttr(color) + '" stroke="' + (borderWidth > 0 ? escapeAttr(borderColor) : "none") + '" stroke-width="' + borderWidth + '" paint-order="stroke fill" stroke-linejoin="round" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-style="normal" font-size="' + fontSize + '" text-anchor="middle">' + escapeText(value) + "</text>",
+        '<g clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="text"' + (isSelected ? ' data-drag-mode="move"' : "") + '>',
+        '  <g clip-path="url(#text-clip-' + tokenSlug + "-" + component.id + ')">',
+        '    <text x="' + (box.x + box.width / 2) + '" y="' + baselineY + '" fill="' + escapeAttr(color) + '" stroke="' + (borderWidth > 0 ? escapeAttr(borderColor) : "none") + '" stroke-width="' + borderWidth + '" paint-order="stroke fill" stroke-linejoin="round" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-style="normal" font-size="' + fontSize + '" text-anchor="middle">' + escapeText(value) + "</text>",
+        "  </g>",
         "</g>"
       ].join("");
     }).join("");

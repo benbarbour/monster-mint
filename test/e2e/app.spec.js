@@ -184,6 +184,15 @@ test("token settings own appearance controls and color sequences show in preview
   await expect(page.locator('form[data-form="text-component-settings"] select[name="fontFamily"]')).toHaveValue("Arial");
   await expect(page.locator('form[data-form="text-component-settings"] select[name="fontWeight"]')).toHaveValue("500");
   await expect(page.locator('form[data-form="text-component-settings"] input[name="textBorderWidth"]')).toHaveValue("1.5");
+
+  await page.getByRole("tab", { name: "Print" }).click();
+  const printCopiesInput = page.locator('input[name^="copies-"]').first();
+  await printCopiesInput.fill("1");
+  await printCopiesInput.blur();
+  await expect(page.locator('.preview-page-svg image[clip-path*="token-clip-"]')).toHaveCount(1);
+  await page.getByRole("button", { name: "Print", exact: true }).click();
+  await expect(page.locator("iframe.print-frame")).toHaveCount(1);
+  await expect(page.frameLocator("iframe.print-frame").locator('image[clip-path*="token-clip-"]')).toHaveCount(1);
 });
 
 test("built-in text modes and color sequences drive live print preview", async ({ page }) => {
