@@ -263,6 +263,60 @@ test("trimTransparentImageAssetSource falls back when trimming cannot encode", a
   assert.equal(result.height, 4);
 });
 
+test("normalizeProjectImageAssets updates imported token images and backgrounds", async () => {
+  const project = {
+    settings: {
+      tokenDefaults: {
+        backgroundImageSource: "data:image/png;base64,defaults"
+      }
+    },
+    tokens: [
+      {
+        id: "token_1",
+        front: {
+          backgroundImageSource: "data:image/png;base64,background",
+          images: [
+            {
+              id: "image_1",
+              source: "data:image/png;base64,component",
+              aspectRatio: 1
+            },
+            {
+              id: "image_2",
+              source: "https://example.com/external.png",
+              aspectRatio: 1
+            }
+          ]
+        }
+      }
+    ]
+  };
+
+  const seenSources = [];
+  const normalized = await Utils.normalizeProjectImageAssets(project, {
+    normalizeImageAssetSource: async (source) => {
+      seenSources.push(source);
+      if (source.indexOf("component") >= 0) {
+        return { source: "data:image/webp;base64,trimmed", width: 80, height: 200 };
+      }
+      return { source: source + "-optimized", width: 300, height: 150 };
+    }
+  });
+
+  assert.notStrictEqual(normalized, project);
+  assert.equal(project.settings.tokenDefaults.backgroundImageSource, "data:image/png;base64,defaults");
+  assert.deepEqual(seenSources, [
+    "data:image/png;base64,defaults",
+    "data:image/png;base64,background",
+    "data:image/png;base64,component"
+  ]);
+  assert.equal(normalized.settings.tokenDefaults.backgroundImageSource, "data:image/png;base64,defaults-optimized");
+  assert.equal(normalized.tokens[0].front.backgroundImageSource, "data:image/png;base64,background-optimized");
+  assert.equal(normalized.tokens[0].front.images[0].source, "data:image/webp;base64,trimmed");
+  assert.equal(normalized.tokens[0].front.images[0].aspectRatio, 0.4);
+  assert.equal(normalized.tokens[0].front.images[1].source, "https://example.com/external.png");
+});
+
 test("optimizeImageAssetSource leaves small images unchanged", async () => {
   const source = makeDataUrl("image/png", 768);
   let loadCount = 0;

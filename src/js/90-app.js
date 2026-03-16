@@ -863,7 +863,8 @@
         try {
           var contents = await Utils.readTextFile(file);
           var parsed = JSON.parse(contents);
-          store.replaceProject(parsed);
+          var normalizedProject = await Utils.normalizeProjectImageAssets(parsed);
+          store.replaceProject(normalizedProject);
           store.updateUi(function (ui) {
             ui.editingTextSequenceId = null;
             ui.editingColorSequenceId = null;

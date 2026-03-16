@@ -76,20 +76,52 @@
   async function readImageAssetFile(file) {
     var source = await readDataUrlFile(file);
     var dimensions = await loadImageDimensions(source);
-    var trimmed = await trimTransparentImageAssetSource(source, {
+    var optimized = await normalizeEmbeddedImageAssetSource(source, {
       dimensions: dimensions
-    });
-    var optimized = await optimizeImageAssetSource(trimmed.source, {
-      dimensions: {
-        width: trimmed.width,
-        height: trimmed.height
-      }
     });
     return {
       source: optimized.source,
       width: optimized.width,
       height: optimized.height
     };
+  }
+
+  async function normalizeEmbeddedImageAssetSource(source, options) {
+    if (!isImageDataUrl(source)) {
+      return {
+        source: source,
+        width: null,
+        height: null,
+        bytes: estimateDataUrlBytes(source)
+      };
+    }
+
+    var settings = options && typeof options === "object" ? options : {};
+    var dimensions = settings.dimensions || await loadImageDimensions(source);
+    var trimmed = await trimTransparentImageAssetSource(source, {
+      dimensions: dimensions,
+      loadImageDimensions: settings.loadImageDimensions,
+      loadImage: settings.loadImage,
+      createCanvas: settings.createCanvas,
+      encodeCanvas: settings.encodeCanvas,
+      findOpaqueBounds: settings.findOpaqueBounds
+    });
+    return optimizeImageAssetSource(trimmed.source, {
+      dimensions: {
+        width: trimmed.width,
+        height: trimmed.height
+      },
+      maxBytes: settings.maxBytes,
+      maxLongestEdge: settings.maxLongestEdge,
+      minLongestEdge: settings.minLongestEdge,
+      scaleStep: settings.scaleStep,
+      qualitySteps: settings.qualitySteps,
+      loadImageDimensions: settings.loadImageDimensions,
+      loadImage: settings.loadImage,
+      detectTransparency: settings.detectTransparency,
+      createCanvas: settings.createCanvas,
+      encodeCanvas: settings.encodeCanvas
+    });
   }
 
   async function optimizeImageAssetSource(source, options) {
@@ -253,6 +285,67 @@
     } catch (error) {
       return originalAsset;
     }
+  }
+
+  async function normalizeProjectImageAssets(project, options) {
+    if (!project || typeof project !== "object") {
+      return project;
+    }
+
+    var settings = options && typeof options === "object" ? options : {};
+    var normalizeAsset = typeof settings.normalizeImageAssetSource === "function"
+      ? settings.normalizeImageAssetSource
+      : normalizeEmbeddedImageAssetSource;
+    var nextProject = JSON.parse(JSON.stringify(project));
+
+    if (nextProject.settings && nextProject.settings.tokenDefaults) {
+      var defaultImageSource = nextProject.settings.tokenDefaults.backgroundImageSource;
+      if (isImageDataUrl(defaultImageSource)) {
+        var normalizedDefaultBackground = await normalizeAsset(defaultImageSource, settings);
+        nextProject.settings.tokenDefaults.backgroundImageSource = normalizedDefaultBackground.source;
+      }
+    }
+
+    if (!Array.isArray(nextProject.tokens)) {
+      return nextProject;
+    }
+
+    for (var tokenIndex = 0; tokenIndex < nextProject.tokens.length; tokenIndex += 1) {
+      var token = nextProject.tokens[tokenIndex];
+      if (!token || !token.front) {
+        continue;
+      }
+      var face = token.front;
+
+      if (isImageDataUrl(face.backgroundImageSource)) {
+        var normalizedBackground = await normalizeAsset(face.backgroundImageSource, settings);
+        face.backgroundImageSource = normalizedBackground.source;
+      }
+
+      if (!Array.isArray(face.images)) {
+        continue;
+      }
+
+      for (var imageIndex = 0; imageIndex < face.images.length; imageIndex += 1) {
+        var image = face.images[imageIndex];
+        if (!image || !isImageDataUrl(image.source)) {
+          continue;
+        }
+
+        var normalizedImage = await normalizeAsset(image.source, settings);
+        image.source = normalizedImage.source;
+        if (
+          Number.isFinite(normalizedImage.width) &&
+          normalizedImage.width > 0 &&
+          Number.isFinite(normalizedImage.height) &&
+          normalizedImage.height > 0
+        ) {
+          image.aspectRatio = normalizedImage.width / normalizedImage.height;
+        }
+      }
+    }
+
+    return nextProject;
   }
 
   function normalizeImageOptimizationOptions(options) {
@@ -428,6 +521,10 @@
     return typeof source === "string" && source.indexOf("data:") === 0;
   }
 
+  function isImageDataUrl(source) {
+    return isDataUrl(source) && getDataUrlMimeType(source).indexOf("image/") === 0;
+  }
+
   function asPositiveInteger(value, fallback) {
     var parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback;
@@ -453,6 +550,8 @@
     loadImageDimensions: loadImageDimensions,
     findOpaqueBounds: findOpaqueBounds,
     estimateDataUrlBytes: estimateDataUrlBytes,
+    normalizeEmbeddedImageAssetSource: normalizeEmbeddedImageAssetSource,
+    normalizeProjectImageAssets: normalizeProjectImageAssets,
     trimTransparentImageAssetSource: trimTransparentImageAssetSource,
     optimizeImageAssetSource: optimizeImageAssetSource,
     readImageAssetFile: readImageAssetFile

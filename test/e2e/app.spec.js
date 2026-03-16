@@ -305,3 +305,105 @@ test("built-in text modes and color sequences drive live print preview", async (
   await page.getByRole("button", { name: "Print", exact: true }).click();
   await expect(page.locator("iframe.print-frame")).toHaveCount(1);
 });
+
+test("json import normalizes embedded image assets", async ({ page }) => {
+  const paddedSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300">' +
+    '<rect x="120" y="40" width="60" height="220" fill="red"/>' +
+    '</svg>';
+  const importedProject = {
+    version: 1,
+    meta: {
+      name: "Imported",
+      updatedAt: "2026-03-16T00:00:00.000Z"
+    },
+    settings: {
+      pagePresetId: "letter",
+      pageOrientation: "portrait",
+      pageMarginIn: 0.25,
+      bleedIn: 0.0625,
+      tokenDefaults: {
+        diameterIn: 1,
+        backgroundMode: "color",
+        backgroundColorMode: "manual",
+        backgroundColor: "#f3e7c9",
+        backgroundColorSequenceRef: null,
+        backgroundImageSource: "",
+        borderWidthRatio: 0.03,
+        borderColorMode: "manual",
+        borderColor: "#000000",
+        borderColorSequenceRef: null
+      },
+      textDefaults: {
+        fontFamily: "Times New Roman",
+        fontWeight: "700",
+        colorMode: "manual",
+        color: "#ffffff",
+        colorSequenceRef: null,
+        textBorder: {
+          width: 3,
+          colorMode: "manual",
+          color: "#000000",
+          colorSequenceRef: null
+        }
+      }
+    },
+    sequences: {
+      text: [],
+      color: []
+    },
+    tokens: [
+      {
+        id: "token_imported",
+        name: "Imported Token",
+        diameterIn: 1,
+        front: {
+          backgroundMode: "color",
+          backgroundColorMode: "manual",
+          backgroundColor: "#ffffff",
+          backgroundColorSequenceRef: null,
+          backgroundImageSource: "",
+          border: {
+            enabled: true,
+            widthRatio: 0.03,
+            colorMode: "manual",
+            color: "#000000",
+            colorSequenceRef: null
+          },
+          images: [
+            {
+              id: "image_imported",
+              name: "dagger.svg",
+              x: 0,
+              y: 0,
+              scale: 0.5,
+              aspectRatio: 1,
+              rotationDeg: 0,
+              mirrorX: false,
+              mirrorY: false,
+              zIndex: 1,
+              source: "data:image/svg+xml;base64," + Buffer.from(paddedSvg).toString("base64")
+            }
+          ],
+          texts: []
+        }
+      }
+    ],
+    printSelections: []
+  };
+
+  await page.locator("[data-import-input]").setInputFiles({
+    name: "imported.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(importedProject))
+  });
+
+  await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toHaveValue("Imported Token");
+  await page.locator('select[name="selectedComponentKey"]').selectOption({ label: "dagger.svg" });
+  const importedImage = page.locator('[data-preview-stage] svg g[data-component-type="image"] image').first();
+  await expect(importedImage).toHaveAttribute("href", /data:image\/(png|webp);base64,/);
+  const importedDimensions = await importedImage.evaluate((node) => ({
+    width: Number(node.getAttribute("width") || 0),
+    height: Number(node.getAttribute("height") || 0)
+  }));
+  expect(importedDimensions.width).toBeLessThan(importedDimensions.height);
+});
