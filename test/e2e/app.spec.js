@@ -12,6 +12,11 @@ test("can create and manipulate a token template", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(page.getByRole("heading", { name: "Monster Mint" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Designer" })).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("button", { name: "Hotkey Help" }).click();
+  await expect(page.getByRole("dialog", { name: "Hotkeys" })).toBeVisible();
+  await expect(page.getByText("Delete the selected designer component.")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Hotkeys" })).toHaveCount(0);
   await page.getByRole("button", { name: "Create Token" }).click();
 
   const initialScroll = await page.evaluate(() => ({
@@ -99,6 +104,16 @@ test("can create and manipulate a token template", async ({ page }) => {
   await expect(page.locator('form[data-form="text-component-settings"] input[name="width"]')).not.toHaveValue("0.50");
 
   await page.locator('[data-preview-stage]').click({ position: { x: 20, y: 20 } });
+  await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toBeVisible();
+  await page.keyboard.press("Shift+/");
+  await expect(page.getByRole("dialog", { name: "Hotkeys" })).toBeVisible();
+  await page.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("dialog", { name: "Hotkeys" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Add Text" }).click();
+  await expect(page.locator('form[data-form="text-component-settings"]')).toBeVisible();
+  await page.keyboard.press("Delete");
+  await expect(page.locator('form[data-form="text-component-settings"]')).toHaveCount(0);
   await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toBeVisible();
 
   await page.reload();

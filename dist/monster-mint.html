@@ -169,6 +169,83 @@ button {
   display: block;
 }
 
+.help-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.help-overlay.is-visible {
+  display: flex;
+}
+
+.help-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(42, 31, 16, 0.38);
+  backdrop-filter: blur(3px);
+}
+
+.help-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(34rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  background: rgba(255, 252, 246, 0.98);
+  border: 1px solid rgba(184, 171, 150, 0.9);
+  border-radius: var(--radius);
+  box-shadow: 0 22px 44px var(--shadow);
+}
+
+.help-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-bottom: 1px solid rgba(184, 171, 150, 0.75);
+}
+
+.help-dialog-body {
+  padding: var(--space-2);
+}
+
+.hotkey-list {
+  display: grid;
+  gap: 0.8rem;
+  margin: 0;
+}
+
+.hotkey-list div {
+  display: grid;
+  grid-template-columns: minmax(9rem, auto) 1fr;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.hotkey-list dt,
+.hotkey-list dd {
+  margin: 0;
+}
+
+.hotkey-list kbd {
+  display: inline-block;
+  min-width: 2rem;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid rgba(184, 171, 150, 0.9);
+  border-radius: 0.45rem;
+  background: #fffdfa;
+  box-shadow: inset 0 -1px 0 rgba(184, 171, 150, 0.45);
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  text-align: center;
+}
+
 .panel-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -297,6 +374,14 @@ button {
 
   .editor-drawer {
     position: static;
+  }
+
+  .help-overlay {
+    padding: 0.75rem;
+  }
+
+  .hotkey-list div {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1616,6 +1701,7 @@ button {
       var parsed = JSON.parse(raw);
       return {
         activeTab: typeof parsed.activeTab === "string" ? parsed.activeTab : "designer",
+        showHelp: parsed.showHelp === true,
         editingColorSequenceId: typeof parsed.editingColorSequenceId === "string" ? parsed.editingColorSequenceId : null,
         selectedColorSequenceId: typeof parsed.selectedColorSequenceId === "string" ? parsed.selectedColorSequenceId : null,
         selectedTokenId: typeof parsed.selectedTokenId === "string" ? parsed.selectedTokenId : null,
@@ -1647,6 +1733,7 @@ button {
   function defaultUiState() {
     return {
       activeTab: "designer",
+      showHelp: false,
       editingColorSequenceId: null,
       selectedColorSequenceId: null,
       selectedTokenId: null,
@@ -4774,7 +4861,7 @@ button {
     var focusState = captureFocusState(appElement);
     var state = store.getState();
     var activeTab = state.ui.activeTab;
-    updateShellState(appView, activeTab);
+    updateShellState(appView, state.ui);
     updatePanelContent(appView, "settings", activeTab === "settings" ? SettingsPanel.renderPanel(state, SETTINGS_PANEL_HELPERS) : "", store);
     updatePanelContent(appView, "designer", activeTab === "designer" ? DesignerPanel.renderPanel(state, DESIGNER_PANEL_HELPERS) : "", store);
     updatePanelContent(appView, "print", activeTab === "print" ? PrintPanel.renderPanel(state) : "", store);
@@ -4829,6 +4916,7 @@ button {
       '      <button class="menu-button" type="button" data-action="export-project" aria-label="Export JSON" title="Export JSON"><span aria-hidden="true">&#8595;</span></button>',
       '      <button class="menu-button" type="button" data-action="import-project" aria-label="Import JSON" title="Import JSON"><span aria-hidden="true">&#8593;</span></button>',
       '      <button class="menu-button" type="button" data-action="reset-project" aria-label="Reset Project" title="Reset Project"><span aria-hidden="true">&#8635;</span></button>',
+      '      <button class="menu-button" type="button" data-action="toggle-help" aria-label="Hotkey Help" title="Hotkey Help"><span aria-hidden="true">?</span></button>',
       '      <button class="menu-button" type="button" data-action="open-settings" aria-label="Settings" title="Settings"><span aria-hidden="true">&#9881;</span></button>',
       '      <input class="visually-hidden" type="file" accept="application/json,.json" data-import-input>',
       "    </div>",
@@ -4841,12 +4929,15 @@ button {
       '<section class="tab-panel" data-panel="settings"></section>',
       '<section class="tab-panel" data-panel="designer"></section>',
       '<section class="tab-panel" data-panel="print"></section>',
+      renderHelpDialog(),
       "</main>"
     ].join("");
 
     return {
       appElement: appElement,
+      helpButton: appElement.querySelector('[data-action="toggle-help"]'),
       settingsButton: appElement.querySelector('[data-action="open-settings"]'),
+      helpDialog: appElement.querySelector("[data-help-dialog]"),
       panels: {
         settings: appElement.querySelector('[data-panel="settings"]'),
         designer: appElement.querySelector('[data-panel="designer"]'),
@@ -4864,9 +4955,44 @@ button {
     };
   }
 
-  function updateShellState(appView, activeTab) {
+  function renderHelpDialog() {
+    return [
+      '<div class="help-overlay" data-help-dialog hidden>',
+      '  <div class="help-backdrop" data-action="close-help"></div>',
+      '  <section class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title">',
+      '    <div class="help-dialog-header">',
+      '      <div>',
+      '        <p class="drawer-eyebrow">Help</p>',
+      '        <h2 id="help-title">Hotkeys</h2>',
+      "      </div>",
+      '      <button class="button" type="button" data-action="close-help">Close</button>',
+      "    </div>",
+      '    <div class="help-dialog-body">',
+      '      <dl class="hotkey-list">',
+      '        <div><dt><kbd>?</kbd></dt><dd>Open or close this help.</dd></div>',
+      '        <div><dt><kbd>Delete</kbd> / <kbd>Backspace</kbd></dt><dd>Delete the selected designer component.</dd></div>',
+      '        <div><dt><kbd>Esc</kbd></dt><dd>Close help, or clear the selected designer component.</dd></div>',
+      '        <div><dt><kbd>T</kbd></dt><dd>Add a text component on the Designer tab.</dd></div>',
+      '        <div><dt><kbd>I</kbd></dt><dd>Open image import for a new image component on the Designer tab.</dd></div>',
+      "      </dl>",
+      '      <p class="field-help">Hotkeys are disabled while typing in inputs, textareas, and selects.</p>',
+      "    </div>",
+      "  </section>",
+      "</div>"
+    ].join("");
+  }
+
+  function updateShellState(appView, uiState) {
+    var activeTab = uiState.activeTab;
     if (appView.settingsButton) {
       appView.settingsButton.classList.toggle("is-active", activeTab === "settings");
+    }
+    if (appView.helpButton) {
+      appView.helpButton.classList.toggle("is-active", uiState.showHelp === true);
+    }
+    if (appView.helpDialog) {
+      appView.helpDialog.hidden = uiState.showHelp !== true;
+      appView.helpDialog.classList.toggle("is-visible", uiState.showHelp === true);
     }
 
     Object.keys(appView.panels).forEach(function (tabId) {
@@ -5232,6 +5358,7 @@ button {
     appElement.addEventListener("wheel", function (event) {
       handleDelegatedWheel(event);
     }, { passive: false });
+    runtimeGlobal.addEventListener("keydown", handleGlobalKeyDown);
   }
 
   function handleDelegatedClick(appElement, event) {
@@ -5265,6 +5392,16 @@ button {
 
     if (action === "open-settings") {
       mountedStore.setActiveTab("settings");
+      return;
+    }
+
+    if (action === "toggle-help") {
+      toggleHelp();
+      return;
+    }
+
+    if (action === "close-help") {
+      setHelpOpen(false);
       return;
     }
 
@@ -5495,6 +5632,110 @@ button {
     }
   }
 
+  function handleGlobalKeyDown(event) {
+    if (!mountedStore) {
+      return;
+    }
+
+    var isHelpToggle = event.key === "?" || (event.key === "/" && event.shiftKey);
+    if (isHelpToggle && !shouldIgnoreHotkeysForTarget(event.target)) {
+      event.preventDefault();
+      toggleHelp();
+      return;
+    }
+
+    if (shouldIgnoreHotkeysForTarget(event.target)) {
+      return;
+    }
+
+    var state = mountedStore.getState();
+    if (event.key === "Escape") {
+      if (state.ui.showHelp) {
+        event.preventDefault();
+        setHelpOpen(false);
+        return;
+      }
+
+      if (state.ui.activeTab === "designer" && state.ui.selectedComponentId) {
+        event.preventDefault();
+        clearSelectedComponent();
+      }
+      return;
+    }
+
+    if (state.ui.showHelp) {
+      return;
+    }
+
+    if (event.ctrlKey || event.metaKey || event.altKey) {
+      return;
+    }
+
+    if (event.key === "Delete" || event.key === "Backspace") {
+      if (state.ui.activeTab === "designer" && state.ui.selectedComponentId) {
+        event.preventDefault();
+        deleteSelectedComponent();
+      }
+      return;
+    }
+
+    if (state.ui.activeTab !== "designer") {
+      return;
+    }
+
+    if (event.key === "t" || event.key === "T") {
+      if (getDesignerSelection(state).token) {
+        event.preventDefault();
+        addTextComponent();
+      }
+      return;
+    }
+
+    if ((event.key === "i" || event.key === "I") && getDesignerSelection(state).token) {
+      event.preventDefault();
+      clickInput(runtimeGlobal.document.querySelector("[data-image-upload-input]"));
+    }
+  }
+
+  function shouldIgnoreHotkeysForTarget(target) {
+    if (!target || !(target instanceof runtimeGlobal.Element)) {
+      return false;
+    }
+
+    if (target.closest("[data-help-dialog]")) {
+      return false;
+    }
+
+    var editable = target.closest("input, textarea, select, [contenteditable='true']");
+    if (!editable) {
+      return false;
+    }
+
+    if (editable.tagName === "INPUT") {
+      var inputType = (editable.getAttribute("type") || "text").toLowerCase();
+      return ["button", "checkbox", "file", "radio", "range"].indexOf(inputType) === -1;
+    }
+
+    return true;
+  }
+
+  function toggleHelp() {
+    setHelpOpen(!(mountedStore.getState().ui.showHelp === true));
+  }
+
+  function setHelpOpen(isOpen) {
+    mountedStore.updateUi(function (ui) {
+      ui.showHelp = isOpen;
+    });
+  }
+
+  function clearSelectedComponent() {
+    mountedStore.updateUi(function (ui) {
+      ui.selectedComponentType = null;
+      ui.selectedComponentId = null;
+    });
+  }
+
   function resetProject() {
     if (!runtimeGlobal.confirm("Reset the current project? This clears saved tokens and sequences.")) {
       return;
@@ -5508,6 +5749,7 @@ button {
       ui.selectedComponentType = null;
       ui.selectedComponentId = null;
       ui.selectedPrintPreviewPage = 0;
+      ui.showHelp = false;
     });
   }
 

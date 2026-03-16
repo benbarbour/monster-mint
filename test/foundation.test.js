@@ -122,6 +122,7 @@ test("loadUiState provides the active UI defaults", () => {
 
   assert.deepEqual(uiState, {
     activeTab: "designer",
+    showHelp: false,
     editingColorSequenceId: null,
     selectedColorSequenceId: null,
     selectedTokenId: null,

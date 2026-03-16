@@ -124,7 +124,7 @@
     var focusState = captureFocusState(appElement);
     var state = store.getState();
     var activeTab = state.ui.activeTab;
-    updateShellState(appView, activeTab);
+    updateShellState(appView, state.ui);
     updatePanelContent(appView, "settings", activeTab === "settings" ? SettingsPanel.renderPanel(state, SETTINGS_PANEL_HELPERS) : "", store);
     updatePanelContent(appView, "designer", activeTab === "designer" ? DesignerPanel.renderPanel(state, DESIGNER_PANEL_HELPERS) : "", store);
     updatePanelContent(appView, "print", activeTab === "print" ? PrintPanel.renderPanel(state) : "", store);
@@ -179,6 +179,7 @@
       '      <button class="menu-button" type="button" data-action="export-project" aria-label="Export JSON" title="Export JSON"><span aria-hidden="true">&#8595;</span></button>',
       '      <button class="menu-button" type="button" data-action="import-project" aria-label="Import JSON" title="Import JSON"><span aria-hidden="true">&#8593;</span></button>',
       '      <button class="menu-button" type="button" data-action="reset-project" aria-label="Reset Project" title="Reset Project"><span aria-hidden="true">&#8635;</span></button>',
+      '      <button class="menu-button" type="button" data-action="toggle-help" aria-label="Hotkey Help" title="Hotkey Help"><span aria-hidden="true">?</span></button>',
       '      <button class="menu-button" type="button" data-action="open-settings" aria-label="Settings" title="Settings"><span aria-hidden="true">&#9881;</span></button>',
       '      <input class="visually-hidden" type="file" accept="application/json,.json" data-import-input>',
       "    </div>",
@@ -191,12 +192,15 @@
       '<section class="tab-panel" data-panel="settings"></section>',
       '<section class="tab-panel" data-panel="designer"></section>',
       '<section class="tab-panel" data-panel="print"></section>',
+      renderHelpDialog(),
       "</main>"
     ].join("");
 
     return {
       appElement: appElement,
+      helpButton: appElement.querySelector('[data-action="toggle-help"]'),
       settingsButton: appElement.querySelector('[data-action="open-settings"]'),
+      helpDialog: appElement.querySelector("[data-help-dialog]"),
       panels: {
         settings: appElement.querySelector('[data-panel="settings"]'),
         designer: appElement.querySelector('[data-panel="designer"]'),
@@ -214,9 +218,44 @@
     };
   }
 
-  function updateShellState(appView, activeTab) {
+  function renderHelpDialog() {
+    return [
+      '<div class="help-overlay" data-help-dialog hidden>',
+      '  <div class="help-backdrop" data-action="close-help"></div>',
+      '  <section class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title">',
+      '    <div class="help-dialog-header">',
+      '      <div>',
+      '        <p class="drawer-eyebrow">Help</p>',
+      '        <h2 id="help-title">Hotkeys</h2>',
+      "      </div>",
+      '      <button class="button" type="button" data-action="close-help">Close</button>',
+      "    </div>",
+      '    <div class="help-dialog-body">',
+      '      <dl class="hotkey-list">',
+      '        <div><dt><kbd>?</kbd></dt><dd>Open or close this help.</dd></div>',
+      '        <div><dt><kbd>Delete</kbd> / <kbd>Backspace</kbd></dt><dd>Delete the selected designer component.</dd></div>',
+      '        <div><dt><kbd>Esc</kbd></dt><dd>Close help, or clear the selected designer component.</dd></div>',
+      '        <div><dt><kbd>T</kbd></dt><dd>Add a text component on the Designer tab.</dd></div>',
+      '        <div><dt><kbd>I</kbd></dt><dd>Open image import for a new image component on the Designer tab.</dd></div>',
+      "      </dl>",
+      '      <p class="field-help">Hotkeys are disabled while typing in inputs, textareas, and selects.</p>',
+      "    </div>",
+      "  </section>",
+      "</div>"
+    ].join("");
+  }
+
+  function updateShellState(appView, uiState) {
+    var activeTab = uiState.activeTab;
     if (appView.settingsButton) {
       appView.settingsButton.classList.toggle("is-active", activeTab === "settings");
+    }
+    if (appView.helpButton) {
+      appView.helpButton.classList.toggle("is-active", uiState.showHelp === true);
+    }
+    if (appView.helpDialog) {
+      appView.helpDialog.hidden = uiState.showHelp !== true;
+      appView.helpDialog.classList.toggle("is-visible", uiState.showHelp === true);
     }
 
     Object.keys(appView.panels).forEach(function (tabId) {
@@ -582,6 +621,7 @@
     appElement.addEventListener("wheel", function (event) {
       handleDelegatedWheel(event);
     }, { passive: false });
+    runtimeGlobal.addEventListener("keydown", handleGlobalKeyDown);
   }
 
   function handleDelegatedClick(appElement, event) {
@@ -615,6 +655,16 @@
 
     if (action === "open-settings") {
       mountedStore.setActiveTab("settings");
+      return;
+    }
+
+    if (action === "toggle-help") {
+      toggleHelp();
+      return;
+    }
+
+    if (action === "close-help") {
+      setHelpOpen(false);
       return;
     }
 
@@ -845,6 +895,110 @@
     }
   }
 
+  function handleGlobalKeyDown(event) {
+    if (!mountedStore) {
+      return;
+    }
+
+    var isHelpToggle = event.key === "?" || (event.key === "/" && event.shiftKey);
+    if (isHelpToggle && !shouldIgnoreHotkeysForTarget(event.target)) {
+      event.preventDefault();
+      toggleHelp();
+      return;
+    }
+
+    if (shouldIgnoreHotkeysForTarget(event.target)) {
+      return;
+    }
+
+    var state = mountedStore.getState();
+    if (event.key === "Escape") {
+      if (state.ui.showHelp) {
+        event.preventDefault();
+        setHelpOpen(false);
+        return;
+      }
+
+      if (state.ui.activeTab === "designer" && state.ui.selectedComponentId) {
+        event.preventDefault();
+        clearSelectedComponent();
+      }
+      return;
+    }
+
+    if (state.ui.showHelp) {
+      return;
+    }
+
+    if (event.ctrlKey || event.metaKey || event.altKey) {
+      return;
+    }
+
+    if (event.key === "Delete" || event.key === "Backspace") {
+      if (state.ui.activeTab === "designer" && state.ui.selectedComponentId) {
+        event.preventDefault();
+        deleteSelectedComponent();
+      }
+      return;
+    }
+
+    if (state.ui.activeTab !== "designer") {
+      return;
+    }
+
+    if (event.key === "t" || event.key === "T") {
+      if (getDesignerSelection(state).token) {
+        event.preventDefault();
+        addTextComponent();
+      }
+      return;
+    }
+
+    if ((event.key === "i" || event.key === "I") && getDesignerSelection(state).token) {
+      event.preventDefault();
+      clickInput(runtimeGlobal.document.querySelector("[data-image-upload-input]"));
+    }
+  }
+
+  function shouldIgnoreHotkeysForTarget(target) {
+    if (!target || !(target instanceof runtimeGlobal.Element)) {
+      return false;
+    }
+
+    if (target.closest("[data-help-dialog]")) {
+      return false;
+    }
+
+    var editable = target.closest("input, textarea, select, [contenteditable='true']");
+    if (!editable) {
+      return false;
+    }
+
+    if (editable.tagName === "INPUT") {
+      var inputType = (editable.getAttribute("type") || "text").toLowerCase();
+      return ["button", "checkbox", "file", "radio", "range"].indexOf(inputType) === -1;
+    }
+
+    return true;
+  }
+
+  function toggleHelp() {
+    setHelpOpen(!(mountedStore.getState().ui.showHelp === true));
+  }
+
+  function setHelpOpen(isOpen) {
+    mountedStore.updateUi(function (ui) {
+      ui.showHelp = isOpen;
+    });
+  }
+
+  function clearSelectedComponent() {
+    mountedStore.updateUi(function (ui) {
+      ui.selectedComponentType = null;
+      ui.selectedComponentId = null;
+    });
+  }
+
   function resetProject() {
     if (!runtimeGlobal.confirm("Reset the current project? This clears saved tokens and sequences.")) {
       return;
@@ -858,6 +1012,7 @@
       ui.selectedComponentType = null;
       ui.selectedComponentId = null;
       ui.selectedPrintPreviewPage = 0;
+      ui.showHelp = false;
     });
   }
 
