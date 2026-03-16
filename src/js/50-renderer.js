@@ -1,7 +1,7 @@
 (function (global, factory) {
-  var api = factory(global.MonsterMintTokens, global.MonsterMintSequences);
+  var api = factory(global.MonsterMintTokens);
   global.MonsterMintRenderer = api;
-})(typeof globalThis !== "undefined" ? globalThis : window, function (Tokens, Sequences) {
+})(typeof globalThis !== "undefined" ? globalThis : window, function (Tokens) {
   var fitCanvas = typeof document !== "undefined" ? document.createElement("canvas") : null;
   var fitContext = fitCanvas ? fitCanvas.getContext("2d") : null;
   var COMPONENT_CLIP_RADIUS = 49.75;
@@ -51,7 +51,7 @@
       borderMarkup,
       renderOrderedComponents(upperComponents, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
       opts.interactive
-        ? renderInteractiveOverlays(face, selectedComponentType, selectedComponentId, tokenSlug)
+        ? renderInteractiveOverlays(face, selectedComponentType, selectedComponentId)
         : "",
       "</svg>"
     ].join("");
@@ -170,25 +170,25 @@
     }).join("");
   }
 
-  function renderInteractiveOverlays(face, selectedComponentType, selectedComponentId, tokenSlug) {
+  function renderInteractiveOverlays(face, selectedComponentType, selectedComponentId) {
     var overlays = [];
 
     face.images.forEach(function (component) {
       if (selectedComponentType === "image" && selectedComponentId === component.id) {
-        overlays.push(renderOverlay(component, "image", tokenSlug));
+        overlays.push(renderOverlay(component, "image"));
       }
     });
 
     face.texts.forEach(function (component) {
       if (selectedComponentType === "text" && selectedComponentId === component.id) {
-        overlays.push(renderOverlay(component, "text", tokenSlug));
+        overlays.push(renderOverlay(component, "text"));
       }
     });
 
     return overlays.join("");
   }
 
-  function renderOverlay(component, type, tokenSlug) {
+  function renderOverlay(component, type) {
     var box = toSvgRect(component, type);
     var handleX = box.x + box.width - 2;
     var handleY = box.y + box.height - 2;

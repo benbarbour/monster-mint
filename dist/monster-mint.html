@@ -1186,7 +1186,7 @@ button {
       }
 
       return bestCandidate || originalAsset;
-    } catch (error) {
+    } catch {
       return originalAsset;
     }
   }
@@ -1278,7 +1278,7 @@ button {
         height: bounds.height,
         bytes: estimateDataUrlBytes(trimmedSource)
       };
-    } catch (error) {
+    } catch {
       return originalAsset;
     }
   }
@@ -1502,7 +1502,7 @@ button {
 
     try {
       return encodeURIComponent(decodeURIComponent(payload)).replace(/%../g, "x").length;
-    } catch (error) {
+    } catch {
       return payload.length;
     }
   }
@@ -2171,11 +2171,6 @@ button {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   }
 
-  function asPositive(value, fallback) {
-    var parsed = Number(value);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-  }
-
   function asBorderWidth(value, fallback) {
     var parsed = Number(value);
     return Number.isFinite(parsed) ? clamp(parsed, 0, 8) : fallback;
@@ -2184,11 +2179,6 @@ button {
   function asRatio(value, fallback) {
     var parsed = Number(value);
     return Number.isFinite(parsed) ? clamp(parsed, 0, 0.25) : fallback;
-  }
-
-  function asSigned(value, fallback) {
-    var parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
   }
 
   function asRotation(value, fallback) {
@@ -2465,9 +2455,9 @@ button {
 
 
 (function (global, factory) {
-  var api = factory(global.MonsterMintTokens, global.MonsterMintSequences);
+  var api = factory(global.MonsterMintTokens);
   global.MonsterMintRenderer = api;
-})(typeof globalThis !== "undefined" ? globalThis : window, function (Tokens, Sequences) {
+})(typeof globalThis !== "undefined" ? globalThis : window, function (Tokens) {
   var fitCanvas = typeof document !== "undefined" ? document.createElement("canvas") : null;
   var fitContext = fitCanvas ? fitCanvas.getContext("2d") : null;
   var COMPONENT_CLIP_RADIUS = 49.75;
@@ -2517,7 +2507,7 @@ button {
       borderMarkup,
       renderOrderedComponents(upperComponents, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
       opts.interactive
-        ? renderInteractiveOverlays(face, selectedComponentType, selectedComponentId, tokenSlug)
+        ? renderInteractiveOverlays(face, selectedComponentType, selectedComponentId)
         : "",
       "</svg>"
     ].join("");
@@ -2636,25 +2626,25 @@ button {
     }).join("");
   }
 
-  function renderInteractiveOverlays(face, selectedComponentType, selectedComponentId, tokenSlug) {
+  function renderInteractiveOverlays(face, selectedComponentType, selectedComponentId) {
     var overlays = [];
 
     face.images.forEach(function (component) {
       if (selectedComponentType === "image" && selectedComponentId === component.id) {
-        overlays.push(renderOverlay(component, "image", tokenSlug));
+        overlays.push(renderOverlay(component, "image"));
       }
     });
 
     face.texts.forEach(function (component) {
       if (selectedComponentType === "text" && selectedComponentId === component.id) {
-        overlays.push(renderOverlay(component, "text", tokenSlug));
+        overlays.push(renderOverlay(component, "text"));
       }
     });
 
     return overlays.join("");
   }
 
-  function renderOverlay(component, type, tokenSlug) {
+  function renderOverlay(component, type) {
     var box = toSvgRect(component, type);
     var handleX = box.x + box.width - 2;
     var handleY = box.y + box.height - 2;
@@ -2848,12 +2838,12 @@ button {
 
 
 (function (global, factory) {
-  var api = factory(global.MonsterMintSchema, global.MonsterMintSequences, global.MonsterMintTokens);
+  var api = factory(global.MonsterMintSchema);
   global.MonsterMintPrint = api;
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
   }
-})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, Sequences, Tokens) {
+})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema) {
   function getSelectionMap(project) {
     var map = new Map();
     project.printSelections.forEach(function (selection) {
@@ -4700,12 +4690,10 @@ button {
     "defaultBorderColorSource",
     "defaultBackgroundMode"
   ];
-  var escapeHtml = Ui.escapeHtml;
   var renderConditionalField = Ui.renderConditionalField;
   var renderConditionalBlock = Ui.renderConditionalBlock;
   var syncConditionalFields = Ui.syncConditionalFields;
   var parseColorSourceValue = Ui.parseColorSourceValue;
-  var normalizeColorInput = Ui.normalizeColorInput;
   var toNumberOrDefault = Ui.toNumberOrDefault;
   var toIntegerOrDefault = Ui.toIntegerOrDefault;
   var toNonNegativeNumberOrDefault = Ui.toNonNegativeNumberOrDefault;
@@ -4734,7 +4722,6 @@ button {
   var renderFontWeightOptions = AppHelpers.renderFontWeightOptions;
   var renderFontFamilyOptions = AppHelpers.renderFontFamilyOptions;
   var getSelectedSequence = AppHelpers.getSelectedSequence;
-  var getSequenceName = AppHelpers.getSequenceName;
   var SETTINGS_PANEL_HELPERS = {
     conditionalFieldPreserve: CONDITIONAL_FIELD_PRESERVE,
     getSelectedSequence: getSelectedSequence,

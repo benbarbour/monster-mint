@@ -257,11 +257,6 @@
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   }
 
-  function asPositive(value, fallback) {
-    var parsed = Number(value);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-  }
-
   function asBorderWidth(value, fallback) {
     var parsed = Number(value);
     return Number.isFinite(parsed) ? clamp(parsed, 0, 8) : fallback;
@@ -270,11 +265,6 @@
   function asRatio(value, fallback) {
     var parsed = Number(value);
     return Number.isFinite(parsed) ? clamp(parsed, 0, 0.25) : fallback;
-  }
-
-  function asSigned(value, fallback) {
-    var parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
   }
 
   function asRotation(value, fallback) {

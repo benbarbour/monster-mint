@@ -40,12 +40,10 @@
     "defaultBorderColorSource",
     "defaultBackgroundMode"
   ];
-  var escapeHtml = Ui.escapeHtml;
   var renderConditionalField = Ui.renderConditionalField;
   var renderConditionalBlock = Ui.renderConditionalBlock;
   var syncConditionalFields = Ui.syncConditionalFields;
   var parseColorSourceValue = Ui.parseColorSourceValue;
-  var normalizeColorInput = Ui.normalizeColorInput;
   var toNumberOrDefault = Ui.toNumberOrDefault;
   var toIntegerOrDefault = Ui.toIntegerOrDefault;
   var toNonNegativeNumberOrDefault = Ui.toNonNegativeNumberOrDefault;
@@ -74,7 +72,6 @@
   var renderFontWeightOptions = AppHelpers.renderFontWeightOptions;
   var renderFontFamilyOptions = AppHelpers.renderFontFamilyOptions;
   var getSelectedSequence = AppHelpers.getSelectedSequence;
-  var getSequenceName = AppHelpers.getSequenceName;
   var SETTINGS_PANEL_HELPERS = {
     conditionalFieldPreserve: CONDITIONAL_FIELD_PRESERVE,
     getSelectedSequence: getSelectedSequence,

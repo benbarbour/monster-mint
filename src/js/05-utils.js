@@ -198,7 +198,7 @@
       }
 
       return bestCandidate || originalAsset;
-    } catch (error) {
+    } catch {
       return originalAsset;
     }
   }
@@ -290,7 +290,7 @@
         height: bounds.height,
         bytes: estimateDataUrlBytes(trimmedSource)
       };
-    } catch (error) {
+    } catch {
       return originalAsset;
     }
   }
@@ -514,7 +514,7 @@
 
     try {
       return encodeURIComponent(decodeURIComponent(payload)).replace(/%../g, "x").length;
-    } catch (error) {
+    } catch {
       return payload.length;
     }
   }

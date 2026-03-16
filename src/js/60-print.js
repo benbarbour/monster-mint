@@ -1,10 +1,10 @@
 (function (global, factory) {
-  var api = factory(global.MonsterMintSchema, global.MonsterMintSequences, global.MonsterMintTokens);
+  var api = factory(global.MonsterMintSchema);
   global.MonsterMintPrint = api;
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
   }
-})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, Sequences, Tokens) {
+})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema) {
   function getSelectionMap(project) {
     var map = new Map();
     project.printSelections.forEach(function (selection) {
