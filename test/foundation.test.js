@@ -151,7 +151,7 @@ test("loadUiState provides the active UI defaults", async () => {
     selectedComponentId: null,
     selectedPrintPreviewPage: 0,
     printPanels: {
-      settings: true,
+      settings: false,
       selections: true,
       preview: true
     }

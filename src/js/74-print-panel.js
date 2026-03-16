@@ -21,10 +21,13 @@
   }
 
   function renderPanel(state) {
-    var rows = Print.getSelectionRows(state.project);
+    var rows = getSortedSelectionRows(state.project);
     var layout = Print.layoutProject(state.project);
     var activePreviewPage = Math.min(state.ui.selectedPrintPreviewPage || 0, Math.max(0, layout.pages.length - 1));
     var printPanels = state.ui.printPanels || {};
+    var previewItemCount = layout.pages.reduce(function (total, page) {
+      return total + page.items.length;
+    }, 0);
     return [
       '<div class="print-layout">',
       renderPrintSection({
@@ -42,6 +45,7 @@
       renderPrintSection({
         key: "preview",
         title: "Preview",
+        metaText: formatPreviewSummary(previewItemCount, layout.pages.length),
         isOpen: printPanels.preview !== false,
         actions: '<button class="button button-primary" type="button" data-action="print-layout">Print</button>',
         content: layout.pages.length && layout.pages[0].items.length
@@ -57,7 +61,10 @@
       '<section class="panel-card print-panel' + (config.isOpen ? " is-open" : " is-collapsed") + '">',
       '  <div class="panel-header print-panel-header">',
       '    <button class="panel-toggle" type="button" data-action="toggle-print-panel" data-panel-key="' + config.key + '" aria-expanded="' + (config.isOpen ? "true" : "false") + '">',
-      "      <h2>" + escapeHtml(config.title) + "</h2>",
+      '      <span class="panel-toggle-label">',
+      "        <h2>" + escapeHtml(config.title) + "</h2>",
+      (config.metaText ? '        <span class="panel-toggle-meta">' + escapeHtml(config.metaText) + "</span>" : ""),
+      "      </span>",
       '      <span class="panel-toggle-icon" aria-hidden="true">' + (config.isOpen ? "▾" : "▸") + "</span>",
       "    </button>",
       config.actions || "",
@@ -188,6 +195,19 @@
       '  <p class="field-help">Changes update the preview automatically. Color sequences repeat when copies exceed their length.</p>',
       "</form>"
     ].join("");
+  }
+
+  function getSortedSelectionRows(project) {
+    return Print.getSelectionRows(project).slice().sort(function (left, right) {
+      return naturalLabelCompare(
+        left.tokenName + " (" + left.diameterIn + '")',
+        right.tokenName + " (" + right.diameterIn + '")'
+      );
+    });
+  }
+
+  function formatPreviewSummary(tokenCount, pageCount) {
+    return tokenCount + " token" + (tokenCount === 1 ? "" : "s") + " · " + pageCount + " page" + (pageCount === 1 ? "" : "s");
   }
 
   function renderPreviewTabs(layout, project, activeIndex) {

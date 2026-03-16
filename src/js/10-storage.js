@@ -164,7 +164,7 @@
       selectedComponentId: null,
       selectedPrintPreviewPage: 0,
       printPanels: {
-        settings: true,
+        settings: false,
         selections: true,
         preview: true
       }
@@ -189,7 +189,7 @@
   function normalizePrintPanels(value) {
     var panels = value && typeof value === "object" ? value : {};
     return {
-      settings: panels.settings !== false,
+      settings: panels.settings === true,
       selections: panels.selections !== false,
       preview: panels.preview !== false
     };

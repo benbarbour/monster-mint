@@ -34,9 +34,21 @@
   text-align: left;
 }
 
+.panel-toggle-label {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
 .panel-toggle h2 {
   min-width: 0;
   margin: 0;
+}
+
+.panel-toggle-meta {
+  color: var(--ink-muted);
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
 }
 
 .panel-toggle-icon {
