@@ -343,7 +343,8 @@
       }).join("") + "</select></label>",
       '    <label class="field">Back face<select name="backEnabled"><option value="true"' + (token.back.enabled ? " selected" : "") + '>Enabled</option><option value="false"' + (!token.back.enabled ? " selected" : "") + '>Disabled</option></select></label>',
       "  </div>",
-      '  <label class="field checkbox-field"><input type="checkbox" name="borderUnderContent"' + (token.borderUnderContent ? " checked" : "") + '>Render border under images and text</label>',
+      '  <label class="field checkbox-field"><input type="checkbox" name="borderUnderImages"' + (token.borderUnderImages ? " checked" : "") + '>Render border under images</label>',
+      '  <label class="field checkbox-field"><input type="checkbox" name="borderUnderText"' + (token.borderUnderText ? " checked" : "") + '>Render border under text</label>',
       '  <p class="field-help">Editing ' + escapeHtml(faceName === "front" ? "front" : "back") + ' face appearance.</p>',
       renderColorPicker({
         label: "Background",
@@ -873,7 +874,8 @@
           token.name = String(formData.get("name")) || token.name;
           token.diameterIn = Number(formData.get("diameterIn")) || token.diameterIn;
           token.back.enabled = String(formData.get("backEnabled")) === "true";
-          token.borderUnderContent = formData.get("borderUnderContent") === "on";
+          token.borderUnderImages = formData.get("borderUnderImages") === "on";
+          token.borderUnderText = formData.get("borderUnderText") === "on";
           face.backgroundColorMode = backgroundColorSelection.mode;
           face.backgroundColor = String(formData.get("backgroundColor") || face.backgroundColor);
           face.backgroundColorSequenceRef = backgroundColorSelection.sequenceRef;

@@ -246,7 +246,8 @@ test("token templates cap border width ratio at twenty-five percent", () => {
     }
   });
 
-  assert.equal(token.borderUnderContent, true);
+  assert.equal(token.borderUnderImages, true);
+  assert.equal(token.borderUnderText, true);
   assert.equal(token.front.border.widthRatio, 0.25);
 });
 

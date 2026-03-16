@@ -108,6 +108,8 @@ test("token settings own appearance controls and color sequences show in preview
   expect(componentOptions).not.toContain("Background");
   expect(componentOptions).not.toContain("Border");
   await expect(page.getByRole("button", { name: "Copy Front to Back" })).toBeVisible();
+  await expect(page.locator('form[data-form="token-settings"] input[name="borderUnderImages"]')).toBeVisible();
+  await expect(page.locator('form[data-form="token-settings"] input[name="borderUnderText"]')).toBeVisible();
 
   await expect(page.locator('form[data-form="token-settings"] input[name="borderWidthRatio"]')).toHaveAttribute("max", "0.25");
   const tokenBorderPicker = page.locator('.color-picker-field').filter({ hasText: "Token border" });

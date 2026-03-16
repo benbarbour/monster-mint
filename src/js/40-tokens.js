@@ -7,11 +7,13 @@
 })(typeof globalThis !== "undefined" ? globalThis : window, function (Utils, Sequences) {
   function createTokenTemplate(input) {
     var payload = input || {};
+    var legacyBorderUnderContent = payload.borderUnderContent === true;
     return {
       id: payload.id || Utils.uid("token"),
       name: payload.name || "Untitled Token",
       diameterIn: normalizeDiameter(payload.diameterIn),
-      borderUnderContent: payload.borderUnderContent === true,
+      borderUnderImages: payload.borderUnderImages === true || legacyBorderUnderContent,
+      borderUnderText: payload.borderUnderText === true || legacyBorderUnderContent,
       front: normalizeFace(payload.front),
       back: normalizeBackFace(payload.back)
     };
@@ -60,7 +62,8 @@
     return createTokenTemplate({
       name: (token.name || "Untitled Token") + " Copy",
       diameterIn: token.diameterIn,
-      borderUnderContent: token.borderUnderContent === true,
+      borderUnderImages: token.borderUnderImages === true,
+      borderUnderText: token.borderUnderText === true,
       front: cloneFace(token.front),
       back: cloneBackFace(token.back)
     });

@@ -1387,11 +1387,13 @@ button {
 })(typeof globalThis !== "undefined" ? globalThis : window, function (Utils, Sequences) {
   function createTokenTemplate(input) {
     var payload = input || {};
+    var legacyBorderUnderContent = payload.borderUnderContent === true;
     return {
       id: payload.id || Utils.uid("token"),
       name: payload.name || "Untitled Token",
       diameterIn: normalizeDiameter(payload.diameterIn),
-      borderUnderContent: payload.borderUnderContent === true,
+      borderUnderImages: payload.borderUnderImages === true || legacyBorderUnderContent,
+      borderUnderText: payload.borderUnderText === true || legacyBorderUnderContent,
       front: normalizeFace(payload.front),
       back: normalizeBackFace(payload.back)
     };
@@ -1440,7 +1442,8 @@ button {
     return createTokenTemplate({
       name: (token.name || "Untitled Token") + " Copy",
       diameterIn: token.diameterIn,
-      borderUnderContent: token.borderUnderContent === true,
+      borderUnderImages: token.borderUnderImages === true,
+      borderUnderText: token.borderUnderText === true,
       front: cloneFace(token.front),
       back: cloneBackFace(token.back)
     });
@@ -1846,6 +1849,8 @@ button {
     var borderMarkup = renderBorder(face, colorSequences, sequenceIndex);
     var backgroundInsetMarkup = renderBackgroundInset(face, background, tokenBaseFill);
     var outerSquareFill = opts.outerSquareFill || "#f6efe2";
+    var borderUnderImages = token.borderUnderImages === true;
+    var borderUnderText = token.borderUnderText === true || borderUnderImages;
 
     return [
       '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" data-preview-svg' + svgAttributes + '>',
@@ -1856,12 +1861,13 @@ button {
       '  <rect x="0" y="0" width="100" height="100" fill="' + escapeAttr(outerSquareFill) + '"></rect>',
       '  <circle cx="50" cy="50" r="50" fill="' + escapeAttr(tokenBaseFill) + '"></circle>',
       backgroundInsetMarkup,
-      token.borderUnderContent ? borderMarkup : "",
+      borderUnderImages ? borderMarkup : "",
       '  <g clip-path="url(#token-clip-' + tokenSlug + ')">',
       renderImageComponents(face.images, opts.interactive, selectedComponentType, selectedComponentId),
+      borderUnderImages ? "" : (borderUnderText ? borderMarkup : ""),
       renderTextComponents(face.texts, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
       "  </g>",
-      token.borderUnderContent ? "" : borderMarkup,
+      borderUnderText ? "" : borderMarkup,
       opts.interactive
         ? renderInteractiveOverlays(face, selectedComponentType, selectedComponentId, tokenSlug)
         : "",
@@ -2670,7 +2676,8 @@ button {
       }).join("") + "</select></label>",
       '    <label class="field">Back face<select name="backEnabled"><option value="true"' + (token.back.enabled ? " selected" : "") + '>Enabled</option><option value="false"' + (!token.back.enabled ? " selected" : "") + '>Disabled</option></select></label>',
       "  </div>",
-      '  <label class="field checkbox-field"><input type="checkbox" name="borderUnderContent"' + (token.borderUnderContent ? " checked" : "") + '>Render border under images and text</label>',
+      '  <label class="field checkbox-field"><input type="checkbox" name="borderUnderImages"' + (token.borderUnderImages ? " checked" : "") + '>Render border under images</label>',
+      '  <label class="field checkbox-field"><input type="checkbox" name="borderUnderText"' + (token.borderUnderText ? " checked" : "") + '>Render border under text</label>',
       '  <p class="field-help">Editing ' + escapeHtml(faceName === "front" ? "front" : "back") + ' face appearance.</p>',
       renderColorPicker({
         label: "Background",
@@ -3200,7 +3207,8 @@ button {
           token.name = String(formData.get("name")) || token.name;
           token.diameterIn = Number(formData.get("diameterIn")) || token.diameterIn;
           token.back.enabled = String(formData.get("backEnabled")) === "true";
-          token.borderUnderContent = formData.get("borderUnderContent") === "on";
+          token.borderUnderImages = formData.get("borderUnderImages") === "on";
+          token.borderUnderText = formData.get("borderUnderText") === "on";
           face.backgroundColorMode = backgroundColorSelection.mode;
           face.backgroundColor = String(formData.get("backgroundColor") || face.backgroundColor);
           face.backgroundColorSequenceRef = backgroundColorSelection.sequenceRef;
