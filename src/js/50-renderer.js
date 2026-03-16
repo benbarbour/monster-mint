@@ -79,7 +79,7 @@
       ].join(" ");
       var isSelected = interactive && selectedComponentType === "image" && selectedComponentId === component.id;
       return [
-        '<g clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="image"' + (isSelected ? ' data-drag-mode="move"' : "") + '>',
+        '<g clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="image"' + (isSelected ? ' data-drag-mode="move" cursor="grab"' : "") + '>',
         '  <image href="' + escapeAttr(component.source) + '" width="' + box.width + '" height="' + box.height + '" preserveAspectRatio="none" transform="' + transform + '"></image>',
         "</g>"
       ].join("");
@@ -151,7 +151,7 @@
         : "#111111";
       var isSelected = previewMode && selectedComponentType === "text" && selectedComponentId === component.id;
       return [
-        '<g clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="text"' + (isSelected ? ' data-drag-mode="move"' : "") + '>',
+        '<g clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="text"' + (isSelected ? ' data-drag-mode="move" cursor="default"' : "") + '>',
         '  <g clip-path="url(#text-clip-' + tokenSlug + "-" + component.id + ')">',
         '    <text x="' + (box.x + box.width / 2) + '" y="' + baselineY + '" fill="' + escapeAttr(color) + '" stroke="' + (borderWidth > 0 ? escapeAttr(borderColor) : "none") + '" stroke-width="' + borderWidth + '" paint-order="stroke fill" stroke-linejoin="round" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-style="normal" font-size="' + fontSize + '" text-anchor="middle">' + escapeText(value) + "</text>",
         "  </g>",
@@ -190,8 +190,6 @@
 
   function renderOverlay(component, type) {
     var box = toSvgRect(component, type);
-    var handleX = box.x + box.width - 2;
-    var handleY = box.y + box.height - 2;
     var rotateHandleX = box.x + box.width / 2;
     var rotateHandleY = box.y - 8;
     var centerX = box.x + box.width / 2;
@@ -202,13 +200,38 @@
     return [
       '<g data-component-id="' + component.id + '" data-component-type="' + type + '"' + transform + '>',
       renderSelectionBox(box),
-      '  <rect x="' + handleX + '" y="' + handleY + '" width="4" height="4" rx="1" fill="#ffffff" stroke="#111111" stroke-width="0.6" data-drag-mode="resize"></rect>',
+      type === "image" ? renderImageResizeHandles(box) : renderTextResizeHandle(box),
       type === "image"
         ? '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#ffffff" stroke-width="0.9"></line>' +
           '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#111111" stroke-width="0.45" stroke-dasharray="2 2" stroke-dashoffset="2"></line>' +
-          '  <circle cx="' + rotateHandleX + '" cy="' + rotateHandleY + '" r="3.5" fill="#ffffff" stroke="#111111" stroke-width="0.6" data-drag-mode="rotate"></circle>'
+          '  <circle cx="' + rotateHandleX + '" cy="' + rotateHandleY + '" r="3.5" fill="#ffffff" stroke="#111111" stroke-width="0.6" data-drag-mode="rotate" cursor="crosshair"></circle>'
         : "",
       "</g>"
+    ].join("");
+  }
+
+  function renderTextResizeHandle(box) {
+    return '<rect x="' + (box.x + box.width - 2) + '" y="' + (box.y + box.height - 2) + '" width="4" height="4" rx="1" fill="#ffffff" stroke="#111111" stroke-width="0.6" data-drag-mode="resize" cursor="nwse-resize"></rect>';
+  }
+
+  function renderImageResizeHandles(box) {
+    var inset = Math.min(4, box.width / 6);
+    var visibleWidth = Math.max(8, box.width - inset * 2);
+    var handleHeight = 5;
+    var topX = box.x + (box.width - visibleWidth) / 2;
+    var topY = box.y - handleHeight / 2;
+    var bottomY = box.y + box.height - handleHeight / 2;
+    return [
+      renderImageResizeHandle(topX, topY, visibleWidth, handleHeight, "resize-top"),
+      renderImageResizeHandle(topX, bottomY, visibleWidth, handleHeight, "resize-bottom")
+    ].join("");
+  }
+
+  function renderImageResizeHandle(x, y, width, height, mode) {
+    return [
+      '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" rx="2" fill="transparent" data-drag-mode="' + mode + '" cursor="ns-resize"></rect>',
+      '<line x1="' + x + '" y1="' + (y + height / 2) + '" x2="' + (x + width) + '" y2="' + (y + height / 2) + '" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" pointer-events="none"></line>',
+      '<line x1="' + x + '" y1="' + (y + height / 2) + '" x2="' + (x + width) + '" y2="' + (y + height / 2) + '" stroke="#111111" stroke-width="0.55" stroke-linecap="round" stroke-dasharray="2 2" stroke-dashoffset="2" pointer-events="none"></line>'
     ].join("");
   }
 

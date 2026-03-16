@@ -37,6 +37,7 @@ test("can create and manipulate a token template", async ({ page }) => {
   await expect(page.locator('form[data-form="text-component-settings"] input[name="customText"]')).toBeHidden();
   await expect(page.locator('form[data-form="text-component-settings"] input[name="sequenceStart"]')).toBeVisible();
   await expect(page.locator('form[data-form="text-component-settings"] input[name="sequencePad"]')).toBeVisible();
+  await expect(page.locator('[data-component-type="text"][data-drag-mode="move"]').first()).toHaveAttribute("cursor", "default");
   const textNode = page.locator('[data-preview-stage] svg text').first();
   const initialFontSize = Number(await textNode.getAttribute("font-size"));
   await page.locator('form[data-form="text-component-settings"] input[name="textBorderWidth"]').fill("6");
@@ -183,6 +184,8 @@ test("token settings own appearance controls and color sequences show in preview
   await expect(page.locator('form[data-form="image-component-settings"] input[name="scale"]')).toHaveValue("0.5");
   await expect(page.locator('form[data-form="image-component-settings"] input[name="scale"]')).toHaveAttribute("type", "range");
   await expect(page.locator('form[data-form="image-component-settings"] input[name="rotationDeg"]')).toHaveAttribute("type", "range");
+  await expect(page.locator('[data-component-type="image"] [data-drag-mode="resize-top"]').first()).toHaveAttribute("cursor", "ns-resize");
+  await expect(page.locator('[data-component-type="image"] [data-drag-mode="resize-bottom"]').first()).toHaveAttribute("cursor", "ns-resize");
   const uploadedImage = page.locator('[data-preview-stage] svg g[data-component-type="image"] image').first();
   await expect(uploadedImage).toHaveAttribute("href", /data:image\/(jpeg|png|webp);base64,/);
   const uploadedDimensions = await uploadedImage.evaluate((node) => ({

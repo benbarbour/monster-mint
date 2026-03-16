@@ -379,15 +379,21 @@
       componentType: interaction.componentType
     };
 
-    if (interaction.mode === "resize") {
+    if (interaction.mode === "resize" || interaction.mode === "resize-top" || interaction.mode === "resize-bottom") {
       if (interaction.componentType === "image") {
         var startDimensions = Tokens.getImageDimensions(interaction.startRect);
-        var widthRatio = (startDimensions.width / 2 + deltaX) / Math.max(startDimensions.width / 2, 0.001);
-        var heightRatio = (startDimensions.height / 2 + deltaY) / Math.max(startDimensions.height / 2, 0.001);
+        var rotationRadians = -Number(interaction.startRect.rotationDeg || 0) * Math.PI / 180;
+        var localDeltaY = deltaX * Math.sin(rotationRadians) + deltaY * Math.cos(rotationRadians);
+        var halfHeight = Math.max(startDimensions.height / 2, 0.001);
+        var heightRatio = interaction.mode === "resize-top"
+          ? (halfHeight - localDeltaY) / halfHeight
+          : interaction.mode === "resize-bottom"
+            ? (halfHeight + localDeltaY) / halfHeight
+            : (startDimensions.height / 2 + deltaY) / Math.max(startDimensions.height / 2, 0.001);
         state.componentState = {
           x: interaction.startRect.x,
           y: interaction.startRect.y,
-          scale: interaction.startRect.scale * Math.max(0.1, widthRatio, heightRatio),
+          scale: interaction.startRect.scale * Math.max(0.1, heightRatio),
           rotationDeg: interaction.startRect.rotationDeg
         };
       } else {
