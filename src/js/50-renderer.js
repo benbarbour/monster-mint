@@ -200,7 +200,7 @@
     return [
       '<g data-component-id="' + component.id + '" data-component-type="' + type + '"' + transform + '>',
       renderSelectionBox(box),
-      type === "image" ? renderImageResizeHandles(box, component) : renderTextResizeHandle(box),
+      type === "image" ? renderImageResizeHandles(box, component) : renderTextResizeHandles(box),
       type === "image"
         ? '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#ffffff" stroke-width="0.9"></line>' +
           '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#111111" stroke-width="0.45" stroke-dasharray="2 2" stroke-dashoffset="2"></line>' +
@@ -210,8 +210,36 @@
     ].join("");
   }
 
-  function renderTextResizeHandle(box) {
-    return '<rect x="' + (box.x + box.width - 2) + '" y="' + (box.y + box.height - 2) + '" width="4" height="4" rx="1" fill="#ffffff" stroke="#111111" stroke-width="0.6" data-drag-mode="resize" cursor="nwse-resize"></rect>';
+  function renderTextResizeHandles(box) {
+    var handleOverhang = 4;
+    var edgeThickness = 6;
+    var topX = box.x - handleOverhang;
+    var topY = box.y - edgeThickness / 2;
+    var leftX = box.x - edgeThickness / 2;
+    var leftY = box.y - handleOverhang;
+    var visibleWidth = Math.max(6, box.width + handleOverhang * 2);
+    var visibleHeight = Math.max(6, box.height + handleOverhang * 2);
+    return [
+      renderTextEdgeHandle(topX, topY, visibleWidth, edgeThickness, "resize-top", "ns-resize", false),
+      renderTextEdgeHandle(topX, box.y + box.height - edgeThickness / 2, visibleWidth, edgeThickness, "resize-bottom", "ns-resize", false),
+      renderTextEdgeHandle(leftX, leftY, edgeThickness, visibleHeight, "resize-left", "ew-resize", true),
+      renderTextEdgeHandle(box.x + box.width - edgeThickness / 2, leftY, edgeThickness, visibleHeight, "resize-right", "ew-resize", true),
+      '<rect x="' + (box.x + box.width - 2) + '" y="' + (box.y + box.height - 2) + '" width="4" height="4" rx="1" fill="#ffffff" stroke="#111111" stroke-width="0.6" data-drag-mode="resize" cursor="nwse-resize"></rect>'
+    ].join("");
+  }
+
+  function renderTextEdgeHandle(x, y, width, height, mode, cursor, vertical) {
+    var midX = x + width / 2;
+    var midY = y + height / 2;
+    return [
+      '<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" fill="rgba(255,255,255,0.001)" pointer-events="all" data-drag-mode="' + mode + '" cursor="' + cursor + '"></rect>',
+      vertical
+        ? '<line x1="' + midX + '" y1="' + y + '" x2="' + midX + '" y2="' + (y + height) + '" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" pointer-events="none"></line>'
+        : '<line x1="' + x + '" y1="' + midY + '" x2="' + (x + width) + '" y2="' + midY + '" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" pointer-events="none"></line>',
+      vertical
+        ? '<line x1="' + midX + '" y1="' + y + '" x2="' + midX + '" y2="' + (y + height) + '" stroke="#111111" stroke-width="0.55" stroke-linecap="round" stroke-dasharray="2 2" stroke-dashoffset="2" pointer-events="none"></line>'
+        : '<line x1="' + x + '" y1="' + midY + '" x2="' + (x + width) + '" y2="' + midY + '" stroke="#111111" stroke-width="0.55" stroke-linecap="round" stroke-dasharray="2 2" stroke-dashoffset="2" pointer-events="none"></line>'
+    ].join("");
   }
 
   function renderImageResizeHandles(box, component) {

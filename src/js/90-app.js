@@ -414,11 +414,25 @@
           rotationDeg: interaction.startRect.rotationDeg
         };
       } else {
+        var nextWidth = interaction.startRect.width;
+        var nextHeight = interaction.startRect.height;
+        if (interaction.mode === "resize-left") {
+          nextWidth = interaction.startRect.width - deltaX * 2;
+        } else if (interaction.mode === "resize-right") {
+          nextWidth = interaction.startRect.width + deltaX * 2;
+        } else if (interaction.mode === "resize-top") {
+          nextHeight = interaction.startRect.height - deltaY * 2;
+        } else if (interaction.mode === "resize-bottom") {
+          nextHeight = interaction.startRect.height + deltaY * 2;
+        } else {
+          nextWidth = interaction.startRect.width + deltaX * 2;
+          nextHeight = interaction.startRect.height + deltaY * 2;
+        }
         state.componentState = {
           x: interaction.startRect.x,
           y: interaction.startRect.y,
-          width: interaction.startRect.width + deltaX * 2,
-          height: interaction.startRect.height + deltaY * 2
+          width: nextWidth,
+          height: nextHeight
         };
       }
       return state;

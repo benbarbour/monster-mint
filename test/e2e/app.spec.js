@@ -103,6 +103,9 @@ test("can create and manipulate a token template", async ({ page }) => {
   await page.mouse.up();
 
   await expect(page.locator('form[data-form="text-component-settings"] input[name="width"]')).not.toHaveValue("0.50");
+  await expect(page.locator('[data-component-type="text"] [data-drag-mode="resize-left"]').first()).toHaveAttribute("cursor", "ew-resize");
+  await expect(page.locator('[data-component-type="text"] [data-drag-mode="resize-top"]').first()).toHaveAttribute("cursor", "ns-resize");
+  await expect(page.locator('[data-component-type="text"] [data-drag-mode="resize-right"]').first()).toHaveAttribute("cursor", "ew-resize");
 
   await page.locator('[data-preview-stage]').click({ position: { x: 20, y: 20 } });
   await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toBeVisible();

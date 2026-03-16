@@ -70,7 +70,7 @@
         selectedComponentId: selection.selectedComponentId
       }),
       "      </div>",
-      '      <p class="preview-note">Drag visible content to move it. Resize images from any edge, resize text from the corner handle, rotate images from the top handle, or use the mouse wheel to scale the selected component.</p>',
+      '      <p class="preview-note">Drag visible content to move it. Resize images from any edge, resize text from any edge or the corner handle, rotate images from the top handle, or use the mouse wheel to scale the selected component.</p>',
       "    </section>",
       "  </section>",
       '  <aside class="editor-drawer designer-drawer">',
