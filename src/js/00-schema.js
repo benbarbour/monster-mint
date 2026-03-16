@@ -44,15 +44,15 @@
 
   function createDefaultTextDefaults() {
     return {
-      fontFamily: "Georgia",
+      fontFamily: "Times New Roman",
       fontWeight: "700",
       colorMode: "manual",
-      color: "#111111",
+      color: "#ffffff",
       colorSequenceRef: null,
       textBorder: {
-        width: 0,
+        width: 3,
         colorMode: "manual",
-        color: "#111111",
+        color: "#000000",
         colorSequenceRef: null
       }
     };

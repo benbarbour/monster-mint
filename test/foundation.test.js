@@ -38,8 +38,10 @@ test("createDefaultProject returns the expected baseline structure", () => {
   assert.equal(project.settings.tokenDefaults.backgroundColor, "#f3e7c9");
   assert.equal(project.settings.tokenDefaults.borderWidthRatio, 0.03);
   assert.equal(project.settings.tokenDefaults.borderColor, "#000000");
-  assert.equal(project.settings.textDefaults.fontFamily, "Georgia");
-  assert.equal(project.settings.textDefaults.textBorder.width, 0);
+  assert.equal(project.settings.textDefaults.fontFamily, "Times New Roman");
+  assert.equal(project.settings.textDefaults.color, "#ffffff");
+  assert.equal(project.settings.textDefaults.textBorder.width, 3);
+  assert.equal(project.settings.textDefaults.textBorder.color, "#000000");
   assert.deepEqual(project.sequences.text.map((sequence) => sequence.id), [
     "builtin_text_numeric",
     "builtin_text_alphabet"
@@ -67,7 +69,7 @@ test("normalizeProject fills missing values and rejects unknown page presets", (
   assert.equal(normalized.settings.pageOrientation, "landscape");
   assert.equal(normalized.settings.pageMarginIn, 0.5);
   assert.equal(normalized.settings.tokenDefaults.backgroundMode, "color");
-  assert.equal(normalized.settings.textDefaults.fontFamily, "Georgia");
+  assert.equal(normalized.settings.textDefaults.fontFamily, "Times New Roman");
   assert.equal(normalized.sequences.text[0].id, "builtin_text_numeric");
   assert.equal(normalized.sequences.color[0].id, "builtin_color_rainbow");
 });
