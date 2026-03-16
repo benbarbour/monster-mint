@@ -12,7 +12,8 @@
       project: Storage.loadProject(storage),
       ui: Storage.loadUiState(storage),
       autosaveStatus: "Loaded",
-      lastSavedAt: null
+      lastSavedAt: null,
+      autosaveErrorMessage: null
     };
 
     function emit() {
@@ -23,10 +24,31 @@
 
     function save() {
       state.project.meta.updatedAt = new Date().toISOString();
-      Storage.saveProject(storage, state.project);
-      Storage.saveUiState(storage, state.ui);
-      state.autosaveStatus = "Saved";
-      state.lastSavedAt = state.project.meta.updatedAt;
+      var projectSaved = Storage.saveProject(storage, state.project);
+      var uiSaved = Storage.saveUiState(storage, state.ui);
+      if (projectSaved && uiSaved) {
+        state.autosaveStatus = "Saved";
+        state.lastSavedAt = state.project.meta.updatedAt;
+        state.autosaveErrorMessage = null;
+        return true;
+      }
+
+      state.autosaveStatus = "Error";
+      state.autosaveErrorMessage = "Changes could not be saved to browser storage. Export your project to avoid losing work.";
+      return false;
+    }
+
+    function saveUiOnly() {
+      if (Storage.saveUiState(storage, state.ui)) {
+        if (state.autosaveStatus !== "Error") {
+          state.autosaveErrorMessage = null;
+        }
+        return true;
+      }
+
+      state.autosaveStatus = "Error";
+      state.autosaveErrorMessage = "Changes could not be saved to browser storage. Export your project to avoid losing work.";
+      return false;
     }
 
     function updateProject(mutator, options) {
@@ -38,6 +60,7 @@
         save();
       } else {
         state.autosaveStatus = "Editing";
+        state.autosaveErrorMessage = null;
       }
       emit();
     }
@@ -53,7 +76,7 @@
 
     function setActiveTab(activeTab) {
       state.ui.activeTab = activeTab;
-      Storage.saveUiState(storage, state.ui);
+      saveUiOnly();
       emit();
     }
 
@@ -61,7 +84,7 @@
       var nextUi = Schema.clone(state.ui);
       mutator(nextUi);
       state.ui = Object.assign(Storage.defaultUiState(), nextUi);
-      Storage.saveUiState(storage, state.ui);
+      saveUiOnly();
       emit();
     }
 

@@ -60,7 +60,7 @@ button {
 .app-shell {
   width: min(1200px, calc(100vw - 2rem));
   margin: 0 auto;
-  padding: var(--space-3) 0 var(--space-4);
+  padding: var(--space-2) 0 var(--space-3);
 }
 
 .app-header {
@@ -69,7 +69,7 @@ button {
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--space-2);
-  margin-bottom: var(--space-2);
+  margin-bottom: 0.6rem;
 }
 
 .app-brand {
@@ -83,9 +83,39 @@ button {
 }
 
 .app-subtitle {
-  margin: 0.35rem 0 0;
+  margin: 0.2rem 0 0;
   color: var(--ink-muted);
   font-family: var(--font-ui);
+}
+
+.app-status {
+  display: inline-block;
+  margin: 0.35rem 0 0;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-family: var(--font-ui);
+  font-size: 0.84rem;
+  line-height: 1.3;
+}
+
+.app-status.is-muted {
+  color: var(--ink-muted);
+  background: rgba(184, 171, 150, 0.15);
+}
+
+.app-status.is-saved {
+  color: #2f5a26;
+  background: rgba(134, 181, 116, 0.18);
+}
+
+.app-status.is-editing {
+  color: #7a5c1e;
+  background: rgba(227, 196, 120, 0.22);
+}
+
+.app-status.is-error {
+  color: #7d1f1f;
+  background: rgba(208, 94, 94, 0.2);
 }
 
 .app-menu {
@@ -1781,7 +1811,8 @@ button {
       project: Storage.loadProject(storage),
       ui: Storage.loadUiState(storage),
       autosaveStatus: "Loaded",
-      lastSavedAt: null
+      lastSavedAt: null,
+      autosaveErrorMessage: null
     };
 
     function emit() {
@@ -1792,10 +1823,31 @@ button {
 
     function save() {
       state.project.meta.updatedAt = new Date().toISOString();
-      Storage.saveProject(storage, state.project);
-      Storage.saveUiState(storage, state.ui);
-      state.autosaveStatus = "Saved";
-      state.lastSavedAt = state.project.meta.updatedAt;
+      var projectSaved = Storage.saveProject(storage, state.project);
+      var uiSaved = Storage.saveUiState(storage, state.ui);
+      if (projectSaved && uiSaved) {
+        state.autosaveStatus = "Saved";
+        state.lastSavedAt = state.project.meta.updatedAt;
+        state.autosaveErrorMessage = null;
+        return true;
+      }
+
+      state.autosaveStatus = "Error";
+      state.autosaveErrorMessage = "Changes could not be saved to browser storage. Export your project to avoid losing work.";
+      return false;
+    }
+
+    function saveUiOnly() {
+      if (Storage.saveUiState(storage, state.ui)) {
+        if (state.autosaveStatus !== "Error") {
+          state.autosaveErrorMessage = null;
+        }
+        return true;
+      }
+
+      state.autosaveStatus = "Error";
+      state.autosaveErrorMessage = "Changes could not be saved to browser storage. Export your project to avoid losing work.";
+      return false;
     }
 
     function updateProject(mutator, options) {
@@ -1807,6 +1859,7 @@ button {
         save();
       } else {
         state.autosaveStatus = "Editing";
+        state.autosaveErrorMessage = null;
       }
       emit();
     }
@@ -1822,7 +1875,7 @@ button {
 
     function setActiveTab(activeTab) {
       state.ui.activeTab = activeTab;
-      Storage.saveUiState(storage, state.ui);
+      saveUiOnly();
       emit();
     }
 
@@ -1830,7 +1883,7 @@ button {
       var nextUi = Schema.clone(state.ui);
       mutator(nextUi);
       state.ui = Object.assign(Storage.defaultUiState(), nextUi);
-      Storage.saveUiState(storage, state.ui);
+      saveUiOnly();
       emit();
     }
 
@@ -4911,6 +4964,7 @@ button {
       '    <div class="app-brand">',
       '      <h1 class="app-title">Monster Mint</h1>',
       '      <p class="app-subtitle">Design printable tabletop token sheets in one self-contained browser app.</p>',
+      '      <p class="app-status" data-save-status></p>',
       "    </div>",
       '    <div class="app-menu" role="toolbar" aria-label="Project actions">',
       '      <button class="menu-button" type="button" data-action="export-project" aria-label="Export JSON" title="Export JSON"><span aria-hidden="true">&#8595;</span></button>',
@@ -4935,6 +4989,7 @@ button {
 
     return {
       appElement: appElement,
+      saveStatus: appElement.querySelector("[data-save-status]"),
       helpButton: appElement.querySelector('[data-action="toggle-help"]'),
       settingsButton: appElement.querySelector('[data-action="open-settings"]'),
       helpDialog: appElement.querySelector("[data-help-dialog]"),
@@ -4994,6 +5049,7 @@ button {
       appView.helpDialog.hidden = uiState.showHelp !== true;
       appView.helpDialog.classList.toggle("is-visible", uiState.showHelp === true);
     }
+    updateSaveStatus(appView, mountedStore ? mountedStore.getState() : null);
 
     Object.keys(appView.panels).forEach(function (tabId) {
       var panel = appView.panels[tabId];
@@ -5022,6 +5078,33 @@ button {
     panel.innerHTML = nextHtml;
     appView.panelHtml[tabId] = nextHtml;
     bindPanelForms(tabId, appView.appElement, store);
+  }
+
+  function updateSaveStatus(appView, state) {
+    if (!appView.saveStatus || !state) {
+      return;
+    }
+
+    var status = state.autosaveStatus || "Loaded";
+    var text = status === "Error"
+      ? (state.autosaveErrorMessage || "Changes could not be saved.")
+      : status === "Editing"
+        ? "Unsaved changes"
+        : status === "Saved"
+          ? "Saved to this browser"
+          : "Loaded from this browser";
+    var className = "app-status" + (
+      status === "Error"
+        ? " is-error"
+        : status === "Editing"
+          ? " is-editing"
+          : status === "Saved"
+            ? " is-saved"
+            : " is-muted"
+    );
+
+    appView.saveStatus.className = className;
+    appView.saveStatus.textContent = text;
   }
 
   function bindPanelForms(tabId, appElement, store) {

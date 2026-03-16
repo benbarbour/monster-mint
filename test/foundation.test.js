@@ -21,6 +21,17 @@ function createMemoryStorage() {
   };
 }
 
+function createFailingStorage() {
+  return {
+    getItem() {
+      return null;
+    },
+    setItem() {
+      throw new Error("Quota exceeded");
+    }
+  };
+}
+
 function makeDataUrl(mimeType, byteLength) {
   const payload = Buffer.alloc(byteLength, 97).toString("base64");
   return `data:${mimeType};base64,${payload}`;
@@ -114,6 +125,17 @@ test("state store can update without persisting until requested", () => {
   store.persistProject();
   const savedProject = JSON.parse(storage.getItem(Schema.STORAGE_KEY));
   assert.equal(savedProject.meta.name, "Draft");
+});
+
+test("state store reports browser storage save failures", () => {
+  const store = State.createStore({ storage: createFailingStorage() });
+
+  store.replaceProject(Schema.createDefaultProject());
+  const state = store.getState();
+
+  assert.equal(state.autosaveStatus, "Error");
+  assert.match(state.autosaveErrorMessage, /could not be saved to browser storage/i);
+  assert.equal(state.lastSavedAt, null);
 });
 
 test("loadUiState provides the active UI defaults", () => {

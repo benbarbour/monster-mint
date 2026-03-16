@@ -174,6 +174,7 @@
       '    <div class="app-brand">',
       '      <h1 class="app-title">Monster Mint</h1>',
       '      <p class="app-subtitle">Design printable tabletop token sheets in one self-contained browser app.</p>',
+      '      <p class="app-status" data-save-status></p>',
       "    </div>",
       '    <div class="app-menu" role="toolbar" aria-label="Project actions">',
       '      <button class="menu-button" type="button" data-action="export-project" aria-label="Export JSON" title="Export JSON"><span aria-hidden="true">&#8595;</span></button>',
@@ -198,6 +199,7 @@
 
     return {
       appElement: appElement,
+      saveStatus: appElement.querySelector("[data-save-status]"),
       helpButton: appElement.querySelector('[data-action="toggle-help"]'),
       settingsButton: appElement.querySelector('[data-action="open-settings"]'),
       helpDialog: appElement.querySelector("[data-help-dialog]"),
@@ -257,6 +259,7 @@
       appView.helpDialog.hidden = uiState.showHelp !== true;
       appView.helpDialog.classList.toggle("is-visible", uiState.showHelp === true);
     }
+    updateSaveStatus(appView, mountedStore ? mountedStore.getState() : null);
 
     Object.keys(appView.panels).forEach(function (tabId) {
       var panel = appView.panels[tabId];
@@ -285,6 +288,33 @@
     panel.innerHTML = nextHtml;
     appView.panelHtml[tabId] = nextHtml;
     bindPanelForms(tabId, appView.appElement, store);
+  }
+
+  function updateSaveStatus(appView, state) {
+    if (!appView.saveStatus || !state) {
+      return;
+    }
+
+    var status = state.autosaveStatus || "Loaded";
+    var text = status === "Error"
+      ? (state.autosaveErrorMessage || "Changes could not be saved.")
+      : status === "Editing"
+        ? "Unsaved changes"
+        : status === "Saved"
+          ? "Saved to this browser"
+          : "Loaded from this browser";
+    var className = "app-status" + (
+      status === "Error"
+        ? " is-error"
+        : status === "Editing"
+          ? " is-editing"
+          : status === "Saved"
+            ? " is-saved"
+            : " is-muted"
+    );
+
+    appView.saveStatus.className = className;
+    appView.saveStatus.textContent = text;
   }
 
   function bindPanelForms(tabId, appElement, store) {

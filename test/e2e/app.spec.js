@@ -426,3 +426,26 @@ test("json import normalizes embedded image assets", async ({ page }) => {
   }));
   expect(importedDimensions.width).toBeLessThan(importedDimensions.height);
 });
+
+test("save failures are surfaced in the header", async ({ page }) => {
+  await page.evaluate(() => {
+    const storageProto = Object.getPrototypeOf(localStorage);
+    const originalSetItem = storageProto.setItem;
+    storageProto.setItem = function patchedSetItem() {
+      throw new Error("Quota exceeded");
+    };
+    globalThis.__restoreSetItem = () => {
+      storageProto.setItem = originalSetItem;
+    };
+  });
+
+  await page.getByRole("button", { name: "Create Token" }).click();
+  await expect(page.locator("[data-save-status]")).toContainText("could not be saved to browser storage");
+
+  await page.evaluate(() => {
+    if (typeof globalThis.__restoreSetItem === "function") {
+      globalThis.__restoreSetItem();
+      delete globalThis.__restoreSetItem;
+    }
+  });
+});
