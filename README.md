@@ -46,6 +46,8 @@ A ready-to-print sample project is included as [example/monster-mint.json](/home
 
 You can download that JSON, import it into Monster Mint, and print the included token set directly, or use it as a starting point for your own edits.
 
+The app also has a `Load Latest Example` button in the header. It downloads the sample project directly from the latest GitHub release and replaces the current project, so you can try the shipped example without manually importing JSON first.
+
 The token artwork in that sample project uses AI-generated images made with Sora. The parchment background texture is from a Creative Commons source and was lightened slightly for this set before being included in the project.
 
 | Sword | Abberation |
@@ -79,6 +81,8 @@ The build output is `dist/monster-mint.html`.
 ## Run
 
 For normal use, just open `dist/monster-mint.html` in a browser.
+
+If you want the bundled sample project, use the `Load Latest Example` button in the header, or download [example/monster-mint.json](/home/ben/code/monster-mint/example/monster-mint.json) and import it manually.
 
 If you prefer serving it over HTTP during development, you can also run:
 
