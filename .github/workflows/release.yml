@@ -61,11 +61,6 @@ jobs:
           path: release/*.html
           if-no-files-found: error
 
-      - name: Upload GitHub Pages artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: pages-site
-
   publish-assets:
     runs-on: ubuntu-latest
     timeout-minutes: 10
