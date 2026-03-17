@@ -67,34 +67,25 @@
 
     var pages = [];
     var currentPage = createPage(pageWidthIn, pageHeightIn);
-    var currentX = project.settings.pageMarginIn;
-    var currentY = project.settings.pageMarginIn;
-    var rowHeight = 0;
-    var gutterIn = 0;
+    var marginIn = project.settings.pageMarginIn;
+    var maxX = marginIn + availableWidth;
+    var maxY = marginIn + availableHeight;
 
     items.forEach(function (item) {
       var footprint = item.token.diameterIn + project.settings.bleedIn * 2;
-      var rowWidth = footprint;
-      var cellSize = footprint;
+      var placement = findPlacement(currentPage.items, footprint, marginIn, maxX, maxY);
 
-      if (currentX + rowWidth > project.settings.pageMarginIn + availableWidth) {
-        currentX = project.settings.pageMarginIn;
-        currentY += rowHeight + gutterIn;
-        rowHeight = 0;
-      }
-
-      if (currentY + cellSize > project.settings.pageMarginIn + availableHeight) {
+      if (!placement) {
         pages.push(currentPage);
         currentPage = createPage(pageWidthIn, pageHeightIn);
-        currentX = project.settings.pageMarginIn;
-        currentY = project.settings.pageMarginIn;
-        rowHeight = 0;
+        placement = findPlacement(currentPage.items, footprint, marginIn, maxX, maxY);
       }
 
-      currentPage.items.push(createCellItem(item, currentX, currentY, footprint, project.settings.bleedIn));
+      if (!placement) {
+        return;
+      }
 
-      currentX += rowWidth + gutterIn;
-      rowHeight = Math.max(rowHeight, cellSize);
+      currentPage.items.push(createCellItem(item, placement.x, placement.y, footprint, project.settings.bleedIn));
     });
 
     if (currentPage.items.length || !pages.length) {
@@ -137,6 +128,71 @@
     }
 
     return Math.max(0, Math.floor((Number(selection.sequenceStartIndex) || 0) + 1));
+  }
+
+  function findPlacement(existingItems, cellSizeIn, marginIn, maxX, maxY) {
+    var epsilon = 0.000001;
+    var xCandidates = [marginIn];
+    var yCandidates = [marginIn];
+
+    existingItems.forEach(function (item) {
+      xCandidates.push(item.cellXIn + item.cellSizeIn);
+      yCandidates.push(item.cellYIn + item.cellSizeIn);
+    });
+
+    xCandidates = uniqueSortedNumbers(xCandidates);
+    yCandidates = uniqueSortedNumbers(yCandidates);
+
+    for (var yIndex = 0; yIndex < yCandidates.length; yIndex += 1) {
+      var y = yCandidates[yIndex];
+      if (y + cellSizeIn > maxY + epsilon) {
+        continue;
+      }
+
+      for (var xIndex = 0; xIndex < xCandidates.length; xIndex += 1) {
+        var x = xCandidates[xIndex];
+        if (x + cellSizeIn > maxX + epsilon) {
+          continue;
+        }
+
+        if (!overlapsExisting(existingItems, x, y, cellSizeIn, epsilon)) {
+          return { x: x, y: y };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  function uniqueSortedNumbers(values) {
+    return values.slice().sort(function (left, right) {
+      return left - right;
+    }).filter(function (value, index, all) {
+      return index === 0 || Math.abs(value - all[index - 1]) > 0.000001;
+    });
+  }
+
+  function overlapsExisting(existingItems, x, y, cellSizeIn, epsilon) {
+    return existingItems.some(function (item) {
+      return rectanglesOverlap(
+        x,
+        y,
+        cellSizeIn,
+        cellSizeIn,
+        item.cellXIn,
+        item.cellYIn,
+        item.cellSizeIn,
+        item.cellSizeIn,
+        epsilon
+      );
+    });
+  }
+
+  function rectanglesOverlap(ax, ay, aw, ah, bx, by, bw, bh, epsilon) {
+    return ax < bx + bw - epsilon &&
+      ax + aw > bx + epsilon &&
+      ay < by + bh - epsilon &&
+      ay + ah > by + epsilon;
   }
 
   function getSortedPrintSelections(project) {

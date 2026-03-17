@@ -689,6 +689,28 @@ test("print layout sorts token groups alphabetically by token name", () => {
   ]);
 });
 
+test("print layout backfills smaller tokens beneath taller neighbors", () => {
+  const project = Schema.createDefaultProject();
+  project.settings.bleedIn = 0;
+  const large = Tokens.createTokenTemplate({ id: "token-large", name: "Large", diameterIn: 2 });
+  const small = Tokens.createTokenTemplate({ id: "token-small", name: "Small", diameterIn: 1 });
+
+  project.tokens.push(large, small);
+  project.printSelections = [
+    { tokenId: "token-large", copies: 2, sequenceStart: 0 },
+    { tokenId: "token-small", copies: 7, sequenceStart: 0 }
+  ];
+
+  const layout = Print.layoutProject(project);
+  const smallItems = layout.pages[0].items.filter((item) => item.tokenId === "token-small");
+
+  assert.equal(smallItems.length, 7);
+  assert.equal(smallItems[0].cellXIn, 4.25);
+  assert.equal(smallItems[0].cellYIn, 0.25);
+  assert.equal(smallItems[4].cellXIn, 4.25);
+  assert.equal(smallItems[4].cellYIn, 1.25);
+});
+
 test("print start 0 yields a first numeric value of 0", () => {
   const project = Schema.createDefaultProject();
   const token = Tokens.createTokenTemplate({

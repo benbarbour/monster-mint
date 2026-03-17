@@ -274,40 +274,82 @@
   }
 
   function renderCutLines(page) {
-    var bounds = getPageGridBounds(page);
-    if (!bounds) {
+    if (!page.items.length) {
       return "";
     }
-    return collectInternalBoundaries(page, "x").map(function (value) {
-      return '<line x1="' + value + '" y1="' + bounds.minY + '" x2="' + value + '" y2="' + bounds.maxY + '" stroke="#7f7f7f" stroke-width="0.75" stroke-dasharray="2 2"></line>';
-    }).concat(collectInternalBoundaries(page, "y").map(function (value) {
-      return '<line x1="' + bounds.minX + '" y1="' + value + '" x2="' + bounds.maxX + '" y2="' + value + '" stroke="#7f7f7f" stroke-width="0.75" stroke-dasharray="2 2"></line>';
+    return collectBoundarySegments(page, "vertical").map(function (segment) {
+      return '<line x1="' + segment.fixed + '" y1="' + segment.start + '" x2="' + segment.fixed + '" y2="' + segment.end + '" stroke="#7f7f7f" stroke-width="0.75" stroke-dasharray="2 2"></line>';
+    }).concat(collectBoundarySegments(page, "horizontal").map(function (segment) {
+      return '<line x1="' + segment.start + '" y1="' + segment.fixed + '" x2="' + segment.end + '" y2="' + segment.fixed + '" stroke="#7f7f7f" stroke-width="0.75" stroke-dasharray="2 2"></line>';
     })).join("");
   }
 
-  function getPageGridBounds(page) {
-    if (!page.items.length) {
-      return null;
-    }
-    var minX = Math.min.apply(Math, page.items.map(function (item) { return item.cellXIn * 100; }));
-    var minY = Math.min.apply(Math, page.items.map(function (item) { return item.cellYIn * 100; }));
-    var maxX = Math.max.apply(Math, page.items.map(function (item) { return (item.cellXIn + item.cellSizeIn) * 100; }));
-    var maxY = Math.max.apply(Math, page.items.map(function (item) { return (item.cellYIn + item.cellSizeIn) * 100; }));
-    return { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
+  function collectBoundarySegments(page, orientation) {
+    var segmentsByLine = new Map();
+
+    page.items.forEach(function (item) {
+      var left = item.cellXIn * 100;
+      var right = (item.cellXIn + item.cellSizeIn) * 100;
+      var top = item.cellYIn * 100;
+      var bottom = (item.cellYIn + item.cellSizeIn) * 100;
+
+      if (orientation === "vertical") {
+        addSegment(segmentsByLine, left, top, bottom);
+        addSegment(segmentsByLine, right, top, bottom);
+      } else {
+        addSegment(segmentsByLine, top, left, right);
+        addSegment(segmentsByLine, bottom, left, right);
+      }
+    });
+
+    return Array.from(segmentsByLine.entries()).sort(function (left, right) {
+      return left[0] - right[0];
+    }).flatMap(function (entry) {
+      var fixed = entry[0];
+      var intervals = entry[1];
+      var breakpoints = intervals.reduce(function (points, interval) {
+        points.push(interval.start, interval.end);
+        return points;
+      }, []).sort(function (left, right) {
+        return left - right;
+      }).filter(function (value, index, all) {
+        return index === 0 || Math.abs(value - all[index - 1]) > 0.000001;
+      });
+
+      var segments = [];
+      for (var index = 0; index < breakpoints.length - 1; index += 1) {
+        var start = breakpoints[index];
+        var end = breakpoints[index + 1];
+        if (end - start <= 0.000001) {
+          continue;
+        }
+        var covered = intervals.some(function (interval) {
+          return interval.start <= start + 0.000001 && interval.end >= end - 0.000001;
+        });
+        if (covered) {
+          segments.push({
+            fixed: fixed,
+            start: start,
+            end: end
+          });
+        }
+      }
+      return segments;
+    });
   }
 
-  function collectInternalBoundaries(page, axis) {
-    var values = page.items.map(function (item) {
-      return axis === "x"
-        ? (item.cellXIn + item.cellSizeIn) * 100
-        : (item.cellYIn + item.cellSizeIn) * 100;
-    }).filter(function (value, index, all) {
-      return all.indexOf(value) === index;
-    }).sort(function (a, b) {
-      return a - b;
+  function addSegment(segmentsByLine, fixed, start, end) {
+    var roundedFixed = roundCoordinate(fixed);
+    var segments = segmentsByLine.get(roundedFixed) || [];
+    segments.push({
+      start: Math.min(start, end),
+      end: Math.max(start, end)
     });
-    values.pop();
-    return values;
+    segmentsByLine.set(roundedFixed, segments);
+  }
+
+  function roundCoordinate(value) {
+    return Number(value.toFixed(4));
   }
 
   function getPageCellFill(face, colorSequences, sequenceIndex) {
