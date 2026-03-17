@@ -21,7 +21,8 @@ Everything in this repo, other than this Disclaimer (including the rest of this 
 
 That being said, I chose this project because monster-mint is a tool I wanted to use and I'm happy with the result.
 
-> [!WARNING] Run at your own risk!
+> [!WARNING]
+> Run at your own risk!
 > I purposefully avoided looking at a single line of code; that was a goal when I started this project. I haven't even viewed, let alone reviewed or edited anything in here. I know what it does when I use the tool, but I have *no idea* what else it might be doing behind the screen. The chances that it does anything other than let you build and print monster tokens is negligible, but if you notice it doing anything naughty, please let me know and I'll take it down!
 
 I used OpenAI but if I did it again I'd use Claude / Anthropic because they seem to be the only AI company out there doing the bare minimum for ethical human behavior.
