@@ -406,6 +406,7 @@ test("built-in text modes and color sequences drive live print preview", async (
   await page.getByRole("button", { name: "Print Settings" }).click();
   await expect(page.locator('form[data-form="page-settings"]')).toBeVisible();
   const cutlineGapInput = page.locator('form[data-form="page-settings"] input[name="cutlineGapMm"]');
+  await expect(cutlineGapInput).toHaveAttribute("step", "0.5");
   await cutlineGapInput.fill("2.5");
   await cutlineGapInput.blur();
   await expect(cutlineGapInput).toHaveValue("2.5");

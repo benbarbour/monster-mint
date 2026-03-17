@@ -155,7 +155,7 @@
       "  </div>",
       '  <div class="field-row two-up">',
       '    <label class="field">Margin (in)<input type="number" min="0.05" step="0.05" name="pageMarginIn" value="' + settings.pageMarginIn + '"></label>',
-      '    <label class="field">Cutline gap (mm)<input type="number" min="0" step="0.1" name="cutlineGapMm" value="' + (settings.cutlineGapMm || 0) + '"></label>',
+      '    <label class="field">Cutline gap (mm)<input type="number" min="0" step="0.5" name="cutlineGapMm" value="' + (settings.cutlineGapMm || 0) + '"></label>',
       "  </div>",
       '  <p class="field-help">Changes save automatically. Cutline gap adds matching square padding around tokens while keeping mixed sizes aligned.</p>',
       "</form>"
@@ -264,11 +264,11 @@
     var tokenX = item.xIn * 100;
     var tokenY = item.yIn * 100;
     var tokenSize = item.diameterIn * 100;
-    var tickLength = Math.min(6, Math.max(3, (cellSize - tokenSize) * 0.5 - 1));
+    var tickInset = Math.max(1.5, Math.min(4, (cellSize - tokenSize) * 0.3));
     var tickColor = "#cc3b3b";
     return [
       '<circle cx="' + (cellX + cellSize / 2) + '" cy="' + (cellY + cellSize / 2) + '" r="' + (cellSize / 2) + '" fill="' + escapeHtml(fill) + '" data-cut-gap-fill="true"></circle>',
-      renderCornerTicks(tokenX, tokenY, tokenSize, tickLength, tickColor)
+      renderCutlineTicks(cellX, cellY, cellSize, tokenX, tokenY, tokenSize, tickInset, tickColor)
     ].join("");
   }
 
@@ -285,20 +285,24 @@
     });
   }
 
-  function renderCornerTicks(x, y, size, length, color) {
+  function renderCutlineTicks(cellX, cellY, cellSize, tokenX, tokenY, tokenSize, inset, color) {
+    var centerX = cellX + cellSize / 2;
+    var centerY = cellY + cellSize / 2;
+    var lineWidth = 1;
+    var topEnd = tokenY - inset;
+    var bottomStart = tokenY + tokenSize + inset;
+    var leftEnd = tokenX - inset;
+    var rightStart = tokenX + tokenSize + inset;
     return [
-      renderCornerTick(x, y, length, color, 1, 1),
-      renderCornerTick(x + size, y, length, color, -1, 1),
-      renderCornerTick(x, y + size, length, color, 1, -1),
-      renderCornerTick(x + size, y + size, length, color, -1, -1)
+      renderCutlineTick(centerX, cellY, centerX, topEnd, color, lineWidth),
+      renderCutlineTick(centerX, bottomStart, centerX, cellY + cellSize, color, lineWidth),
+      renderCutlineTick(cellX, centerY, leftEnd, centerY, color, lineWidth),
+      renderCutlineTick(rightStart, centerY, cellX + cellSize, centerY, color, lineWidth)
     ].join("");
   }
 
-  function renderCornerTick(x, y, length, color, horizontalDirection, verticalDirection) {
-    return [
-      '<line x1="' + x + '" y1="' + y + '" x2="' + (x + length * horizontalDirection) + '" y2="' + y + '" stroke="' + color + '" stroke-width="1" data-cut-tick="true"></line>',
-      '<line x1="' + x + '" y1="' + y + '" x2="' + x + '" y2="' + (y + length * verticalDirection) + '" stroke="' + color + '" stroke-width="1" data-cut-tick="true"></line>'
-    ].join("");
+  function renderCutlineTick(x1, y1, x2, y2, color, lineWidth) {
+    return '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + color + '" stroke-width="' + lineWidth + '" data-cut-tick="true"></line>';
   }
 
   function renderCutLines(page) {
