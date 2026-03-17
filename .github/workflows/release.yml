@@ -53,9 +53,6 @@ jobs:
         run: |
           mkdir -p release
           cp dist/monster-mint.html "release/monster-mint-${RELEASE_TAG}.html"
-          mkdir -p pages-site
-          cp dist/monster-mint.html pages-site/index.html
-          cp dist/monster-mint.html pages-site/monster-mint.html
 
       - name: Upload release asset artifact
         uses: actions/upload-artifact@v4
@@ -90,23 +87,3 @@ jobs:
           tag_name: ${{ github.event.release.tag_name }}
           files: |
             release/*.html
-
-  deploy-pages:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs:
-      - build
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    steps:
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-
-      - name: Deploy GitHub Pages site
-        id: deployment
-        uses: actions/deploy-pages@v4
