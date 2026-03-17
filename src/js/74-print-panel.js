@@ -38,6 +38,7 @@
       renderPrintSection({
         key: "selections",
         title: "Print Selections",
+        metaText: formatSelectionSummary(rows.length),
         isOpen: printPanels.selections !== false,
         content: renderPrintSelectionForm(rows)
       }),
@@ -198,6 +199,10 @@
 
   function formatPreviewSummary(tokenCount, pageCount) {
     return tokenCount + " token" + (tokenCount === 1 ? "" : "s") + " · " + pageCount + " page" + (pageCount === 1 ? "" : "s");
+  }
+
+  function formatSelectionSummary(designCount) {
+    return designCount + " design" + (designCount === 1 ? "" : "s");
   }
 
   function renderPreviewTabs(layout, project, activeIndex) {

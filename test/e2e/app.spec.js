@@ -190,6 +190,7 @@ test("designer dropdowns are sorted", async ({ page }) => {
     'Mint 2 (1")',
     'Zulu (1")'
   ]);
+  await expect(page.locator(".panel-toggle-meta").filter({ hasText: "3 designs" })).toBeVisible();
 });
 
 test("token settings own appearance controls and color sequences show in preview", async ({ page }) => {
