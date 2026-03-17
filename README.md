@@ -42,7 +42,7 @@ Monster Mint is meant to solve the full token workflow in one browser tab:
 
 ## Sample Project
 
-A ready-to-print sample project is included as [example/monster-mint.json](/home/ben/code/monster-mint/example/monster-mint.json).
+A ready-to-print sample project is included as [example/monster-mint.json](example/monster-mint.json).
 
 You can download that JSON, import it into Monster Mint, and print the included token set directly, or use it as a starting point for your own edits.
 
@@ -82,7 +82,7 @@ The build output is `dist/monster-mint.html`.
 
 For normal use, just open `dist/monster-mint.html` in a browser.
 
-If you want the bundled sample project, use the `Load Latest Example` button in the header, or download [example/monster-mint.json](/home/ben/code/monster-mint/example/monster-mint.json) and import it manually.
+If you want the bundled sample project, use the `Load Latest Example` button in the header, or download [example/monster-mint.json](example/monster-mint.json) and import it manually.
 
 If you prefer serving it over HTTP during development, you can also run:
 
@@ -161,7 +161,7 @@ npm run lint
   - edge dragging to resize
   - preserved aspect ratio while resizing
   - mouse-wheel scaling
-  - rotation slider
+  - numeric rotation control
   - draggable rotation handle
   - horizontal and vertical mirroring
   - label/name editing
