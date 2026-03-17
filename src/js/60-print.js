@@ -53,6 +53,8 @@
     var pageHeightIn = project.settings.pageOrientation === "landscape" ? pagePreset.widthIn : pagePreset.heightIn;
     var availableWidth = pageWidthIn - project.settings.pageMarginIn * 2;
     var availableHeight = pageHeightIn - project.settings.pageMarginIn * 2;
+    var cutlineGapIn = millimetersToInches(project.settings.cutlineGapMm || 0);
+    var gridUnitIn = getPrintGridUnitIn();
     var items = [];
 
     getSortedPrintSelections(project).forEach(function (entry) {
@@ -73,7 +75,7 @@
     var maxY = marginIn + availableHeight;
 
     items.forEach(function (item) {
-      var footprint = item.token.diameterIn;
+      var footprint = getTokenFootprintIn(item.token.diameterIn, cutlineGapIn, gridUnitIn);
       var placement = findPlacement(
         currentPage.items,
         footprint,
@@ -123,6 +125,7 @@
   }
 
   function createCellItem(item, cellXIn, cellYIn, footprintIn) {
+    var insetIn = (footprintIn - item.token.diameterIn) / 2;
     return {
       tokenId: item.tokenId,
       token: item.token,
@@ -130,8 +133,8 @@
       cellXIn: cellXIn,
       cellYIn: cellYIn,
       cellSizeIn: footprintIn,
-      xIn: cellXIn,
-      yIn: cellYIn,
+      xIn: cellXIn + insetIn,
+      yIn: cellYIn + insetIn,
       diameterIn: item.token.diameterIn
     };
   }
@@ -281,6 +284,19 @@
       }
     }
     return true;
+  }
+
+  function getPrintGridUnitIn() {
+    return Math.min.apply(null, Schema.TOKEN_SIZES);
+  }
+
+  function getTokenFootprintIn(diameterIn, cutlineGapIn, gridUnitIn) {
+    var units = Math.max(1, Math.round(Number(diameterIn) / gridUnitIn));
+    return Number(diameterIn) + cutlineGapIn * units;
+  }
+
+  function millimetersToInches(valueMm) {
+    return Number(valueMm) / 25.4;
   }
 
   function rectanglesOverlap(ax, ay, aw, ah, bx, by, bw, bh, epsilon) {

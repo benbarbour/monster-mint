@@ -83,6 +83,7 @@
           project.settings.pagePresetId = String(formData.get("pagePresetId"));
           project.settings.pageOrientation = String(formData.get("pageOrientation"));
           project.settings.pageMarginIn = helpers.toNonNegativeNumberOrDefault(formData.get("pageMarginIn"), project.settings.pageMarginIn);
+          project.settings.cutlineGapMm = helpers.toNonNegativeNumberOrDefault(formData.get("cutlineGapMm"), project.settings.cutlineGapMm || 0);
         });
       });
     }
@@ -154,8 +155,9 @@
       "  </div>",
       '  <div class="field-row two-up">',
       '    <label class="field">Margin (in)<input type="number" min="0.05" step="0.05" name="pageMarginIn" value="' + settings.pageMarginIn + '"></label>',
+      '    <label class="field">Cutline gap (mm)<input type="number" min="0" step="0.1" name="cutlineGapMm" value="' + (settings.cutlineGapMm || 0) + '"></label>',
       "  </div>",
-      '  <p class="field-help">Changes save automatically.</p>',
+      '  <p class="field-help">Changes save automatically. Cutline gap adds matching square padding around tokens while keeping mixed sizes aligned.</p>',
       "</form>"
     ].join("");
   }

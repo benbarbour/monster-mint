@@ -42,6 +42,7 @@ test("createDefaultProject returns the expected baseline structure", () => {
   assert.equal(project.meta.name, "Untitled Project");
   assert.equal(project.settings.pagePresetId, "letter");
   assert.equal(project.settings.tokenDefaults.diameterIn, 1);
+  assert.equal(project.settings.cutlineGapMm, 0);
   assert.equal(project.settings.imageTrimAlphaThreshold, 1);
   assert.equal(project.settings.tokenDefaults.backgroundMode, "color");
   assert.equal(project.settings.tokenDefaults.backgroundColor, "#f3e7c9");
@@ -77,6 +78,7 @@ test("normalizeProject fills missing values and rejects unknown page presets", (
   assert.equal(normalized.settings.pagePresetId, "letter");
   assert.equal(normalized.settings.pageOrientation, "landscape");
   assert.equal(normalized.settings.pageMarginIn, 0.5);
+  assert.equal(normalized.settings.cutlineGapMm, 0);
   assert.equal(normalized.settings.imageTrimAlphaThreshold, 1);
   assert.equal(normalized.settings.tokenDefaults.backgroundMode, "color");
   assert.equal(normalized.settings.textDefaults.fontFamily, "Times New Roman");
@@ -708,6 +710,30 @@ test("print layout backfills smaller tokens beneath taller neighbors", () => {
   assert.equal(smallItems[0].cellYIn, 2.25);
   assert.equal(smallItems[4].cellXIn, 0.25);
   assert.equal(smallItems[4].cellYIn, 6.25);
+});
+
+test("print cutline gap keeps larger tokens aligned with smaller-token multiples", () => {
+  const project = Schema.createDefaultProject();
+  project.settings.cutlineGapMm = 2.54;
+  const large = Tokens.createTokenTemplate({ id: "token-large", name: "Large", diameterIn: 2 });
+  const small = Tokens.createTokenTemplate({ id: "token-small", name: "Small", diameterIn: 1 });
+
+  project.tokens.push(large, small);
+  project.printSelections = [
+    { tokenId: "token-large", copies: 1, sequenceStart: 0 },
+    { tokenId: "token-small", copies: 2, sequenceStart: 0 }
+  ];
+
+  const layout = Print.layoutProject(project);
+  const largeItem = layout.pages[0].items.find((item) => item.tokenId === "token-large");
+  const smallItems = layout.pages[0].items.filter((item) => item.tokenId === "token-small");
+
+  assert.ok(Math.abs(largeItem.cellSizeIn - 2.4) < 0.000001);
+  assert.ok(Math.abs(smallItems[0].cellSizeIn - 1.2) < 0.000001);
+  assert.ok(Math.abs((smallItems[1].cellYIn - smallItems[0].cellYIn) - 1.2) < 0.000001);
+  assert.ok(Math.abs(largeItem.cellSizeIn - (smallItems[0].cellSizeIn + smallItems[1].cellSizeIn)) < 0.000001);
+  assert.ok(Math.abs((largeItem.xIn - largeItem.cellXIn) - 0.2) < 0.000001);
+  assert.ok(Math.abs((smallItems[0].xIn - smallItems[0].cellXIn) - 0.1) < 0.000001);
 });
 
 test("print layout avoids starting a staggered mixed-size row in a one-token shelf", () => {

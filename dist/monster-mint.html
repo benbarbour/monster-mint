@@ -976,6 +976,7 @@ button {
         pagePresetId: "letter",
         pageOrientation: "portrait",
         pageMarginIn: 0.25,
+        cutlineGapMm: 0,
         imageTrimAlphaThreshold: 1,
         tokenDefaults: createDefaultTokenDefaults(),
         textDefaults: createDefaultTextDefaults()
@@ -1005,6 +1006,7 @@ button {
         pagePresetId: project.settings && findPagePreset(project.settings.pagePresetId) ? project.settings.pagePresetId : defaults.settings.pagePresetId,
         pageOrientation: project.settings && project.settings.pageOrientation === "landscape" ? "landscape" : "portrait",
         pageMarginIn: asPositiveNumber(project.settings && project.settings.pageMarginIn, defaults.settings.pageMarginIn),
+        cutlineGapMm: asNonNegativeNumber(project.settings && project.settings.cutlineGapMm, defaults.settings.cutlineGapMm),
         imageTrimAlphaThreshold: asAlphaThreshold(project.settings && project.settings.imageTrimAlphaThreshold, defaults.settings.imageTrimAlphaThreshold),
         tokenDefaults: normalizeTokenDefaults(
           project.settings && (project.settings.tokenDefaults || project.settings.backgroundDefaults),
@@ -1033,6 +1035,10 @@ button {
 
   function asPositiveNumber(value, fallback) {
     return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
+  }
+
+  function asNonNegativeNumber(value, fallback) {
+    return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : fallback;
   }
 
   function asAlphaThreshold(value, fallback) {
@@ -3335,6 +3341,8 @@ button {
     var pageHeightIn = project.settings.pageOrientation === "landscape" ? pagePreset.widthIn : pagePreset.heightIn;
     var availableWidth = pageWidthIn - project.settings.pageMarginIn * 2;
     var availableHeight = pageHeightIn - project.settings.pageMarginIn * 2;
+    var cutlineGapIn = millimetersToInches(project.settings.cutlineGapMm || 0);
+    var gridUnitIn = getPrintGridUnitIn();
     var items = [];
 
     getSortedPrintSelections(project).forEach(function (entry) {
@@ -3355,7 +3363,7 @@ button {
     var maxY = marginIn + availableHeight;
 
     items.forEach(function (item) {
-      var footprint = item.token.diameterIn;
+      var footprint = getTokenFootprintIn(item.token.diameterIn, cutlineGapIn, gridUnitIn);
       var placement = findPlacement(
         currentPage.items,
         footprint,
@@ -3405,6 +3413,7 @@ button {
   }
 
   function createCellItem(item, cellXIn, cellYIn, footprintIn) {
+    var insetIn = (footprintIn - item.token.diameterIn) / 2;
     return {
       tokenId: item.tokenId,
       token: item.token,
@@ -3412,8 +3421,8 @@ button {
       cellXIn: cellXIn,
       cellYIn: cellYIn,
       cellSizeIn: footprintIn,
-      xIn: cellXIn,
-      yIn: cellYIn,
+      xIn: cellXIn + insetIn,
+      yIn: cellYIn + insetIn,
       diameterIn: item.token.diameterIn
     };
   }
@@ -3563,6 +3572,19 @@ button {
       }
     }
     return true;
+  }
+
+  function getPrintGridUnitIn() {
+    return Math.min.apply(null, Schema.TOKEN_SIZES);
+  }
+
+  function getTokenFootprintIn(diameterIn, cutlineGapIn, gridUnitIn) {
+    var units = Math.max(1, Math.round(Number(diameterIn) / gridUnitIn));
+    return Number(diameterIn) + cutlineGapIn * units;
+  }
+
+  function millimetersToInches(valueMm) {
+    return Number(valueMm) / 25.4;
   }
 
   function rectanglesOverlap(ax, ay, aw, ah, bx, by, bw, bh, epsilon) {
@@ -5027,6 +5049,7 @@ button {
           project.settings.pagePresetId = String(formData.get("pagePresetId"));
           project.settings.pageOrientation = String(formData.get("pageOrientation"));
           project.settings.pageMarginIn = helpers.toNonNegativeNumberOrDefault(formData.get("pageMarginIn"), project.settings.pageMarginIn);
+          project.settings.cutlineGapMm = helpers.toNonNegativeNumberOrDefault(formData.get("cutlineGapMm"), project.settings.cutlineGapMm || 0);
         });
       });
     }
@@ -5098,8 +5121,9 @@ button {
       "  </div>",
       '  <div class="field-row two-up">',
       '    <label class="field">Margin (in)<input type="number" min="0.05" step="0.05" name="pageMarginIn" value="' + settings.pageMarginIn + '"></label>',
+      '    <label class="field">Cutline gap (mm)<input type="number" min="0" step="0.1" name="cutlineGapMm" value="' + (settings.cutlineGapMm || 0) + '"></label>',
       "  </div>",
-      '  <p class="field-help">Changes save automatically.</p>',
+      '  <p class="field-help">Changes save automatically. Cutline gap adds matching square padding around tokens while keeping mixed sizes aligned.</p>',
       "</form>"
     ].join("");
   }

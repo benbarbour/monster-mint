@@ -171,6 +171,7 @@ npm run lint
   - A4
 - Portrait and landscape page orientation.
 - Adjustable page margins.
+- Optional cutline gap in millimeters to add extra square padding around tokens while keeping mixed sizes aligned.
 - Per-token print copy counts.
 - Per-token sequence start values.
 - Live print preview that updates as print selections change.
