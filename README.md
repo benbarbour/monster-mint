@@ -39,6 +39,20 @@ Monster Mint is meant to solve the full token workflow in one browser tab:
 - print token sheets with cut guides
 - save work in the browser and move projects around as JSON
 
+## Sample Project
+
+A ready-to-print sample project is included as [example/monster-mint.json](/home/ben/code/monster-mint/example/monster-mint.json).
+
+You can download that JSON, import it into Monster Mint, and print the included token set directly, or use it as a starting point for your own edits.
+
+The token artwork in that sample project uses AI-generated images made with Sora. The parchment background texture is from a Creative Commons source and was lightened slightly for this set before being included in the project.
+
+| Sword | Abberation |
+| --- | --- |
+| <img src="example/sword.png" alt="Sword token sample" width="180"> | <img src="example/abberation.png" alt="Abberation token sample" width="180"> |
+| Dragon | Minion 2 |
+| <img src="example/dragon.png" alt="Dragon token sample" width="180"> | <img src="example/minion-2.png" alt="Minion 2 token sample" width="180"> |
+
 ## Build
 
 Install dependencies:
