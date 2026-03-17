@@ -664,6 +664,126 @@ test("json import accepts compact asset references", async ({ page }) => {
   await expect(importedBackground).toHaveAttribute("href", /data:image\/(png|webp);base64,/);
 });
 
+test("latest example action imports the latest released sample project", async ({ page }) => {
+  const validTinyPng =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO0V4Q0AAAAASUVORK5CYII=";
+  const compactProject = {
+    version: 1,
+    meta: { name: "Released Example", updatedAt: "2026-03-17T00:00:00.000Z" },
+    settings: {
+      pagePresetId: "letter",
+      pageOrientation: "portrait",
+      pageMarginIn: 0.25,
+      cutlineGapMm: 0,
+      imageTrimAlphaThreshold: 1,
+      tokenDefaults: {
+        diameterIn: 1,
+        backgroundMode: "image",
+        backgroundColorMode: "manual",
+        backgroundColor: "#f3e7c9",
+        backgroundColorSequenceRef: null,
+        backgroundImageSource: { assetRef: "image_1" },
+        borderWidthRatio: 0.03,
+        borderColorMode: "manual",
+        borderColor: "#000000",
+        borderColorSequenceRef: null
+      },
+      textDefaults: {
+        fontFamily: "Times New Roman",
+        fontWeight: "700",
+        colorMode: "manual",
+        color: "#ffffff",
+        colorSequenceRef: null,
+        textBorder: {
+          width: 3,
+          colorMode: "manual",
+          color: "#000000",
+          colorSequenceRef: null
+        }
+      }
+    },
+    sequences: {
+      text: [
+        { id: "builtin_text_numeric", name: "Numeric", builtIn: true, type: "numeric" },
+        { id: "builtin_text_alphabet", name: "Alphabet", builtIn: true, type: "alphabetic" }
+      ],
+      color: [
+        { id: "builtin_color_rainbow", name: "Rainbow", builtIn: true, values: ["#ff0000", "#00ff00"] },
+        { id: "builtin_color_primary", name: "Primary Colors", builtIn: true, values: ["#ff0000", "#0000ff"] }
+      ]
+    },
+    tokens: [
+      {
+        id: "token_release_example",
+        name: "Released Token",
+        diameterIn: 1,
+        borderUnderImages: false,
+        borderUnderText: false,
+        front: {
+          backgroundMode: "image",
+          backgroundColorMode: "manual",
+          backgroundColor: "#f3e7c9",
+          backgroundColorSequenceRef: null,
+          backgroundImageSource: { assetRef: "image_1" },
+          images: [],
+          texts: [],
+          border: {
+            enabled: true,
+            widthRatio: 0.03,
+            colorMode: "manual",
+            color: "#000000",
+            colorSequenceRef: null
+          }
+        }
+      }
+    ],
+    printSelections: [],
+    assets: {
+      images: [
+        {
+          id: "image_1",
+          source: validTinyPng
+        }
+      ]
+    }
+  };
+
+  await page.route("https://api.github.com/repos/benbarbour/monster-mint/releases/latest", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        tag_name: "v1.0.0",
+        assets: [
+          {
+            name: "monster-mint-example.json",
+            url: "https://api.github.com/repos/benbarbour/monster-mint/releases/assets/123"
+          }
+        ]
+      })
+    });
+  });
+
+  await page.route("https://api.github.com/repos/benbarbour/monster-mint/releases/assets/123", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(compactProject)
+    });
+  });
+
+  const dialogMessages = [];
+  page.on("dialog", (dialog) => {
+    dialogMessages.push(dialog.message());
+    void dialog.accept();
+  });
+  await page.getByRole("button", { name: "Load Latest Example" }).click();
+
+  await expect(page.locator('select[name="selectedTokenId"]')).toHaveValue("token_release_example");
+  await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toHaveValue("Released Token");
+  expect(dialogMessages).not.toContain("Loading the latest example failed. Please try again later or import the example JSON manually.");
+});
+
 test("save failures are surfaced in the header", async ({ page }) => {
   await page.evaluate(() => {
     const originalPut = IDBObjectStore.prototype.put;
