@@ -186,6 +186,14 @@
   padding: var(--space-2);
 }
 
+.help-dialog-body h3 {
+  margin: 0 0 var(--space-2);
+}
+
+.help-dialog-body h3:not(:first-child) {
+  margin-top: var(--space-3);
+}
+
 .hotkey-list {
   display: grid;
   gap: 0.8rem;
@@ -215,6 +223,13 @@
   font-family: var(--font-ui);
   font-size: 0.92rem;
   text-align: center;
+}
+
+.help-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.55rem;
 }
 
 .panel-grid {

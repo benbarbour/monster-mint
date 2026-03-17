@@ -438,6 +438,7 @@
     printWindow.document.open();
     printWindow.document.write([
       "<!doctype html><html><head><title>Monster Mint Print</title><style>",
+      "@page{size:" + layout.pageWidthIn + "in " + layout.pageHeightIn + "in;margin:0;}",
       "html,body{margin:0;padding:0;background:#fff;font-family:Georgia,serif;}",
       ".print-page{page-break-after:always;break-after:page;display:block;}",
       ".print-page:last-child{page-break-after:auto;break-after:auto;}",

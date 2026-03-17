@@ -19,6 +19,7 @@
       colorSequences,
       sequenceIndex
     );
+    var backgroundImageSource = Tokens.resolveImageSource(project, face.backgroundImageSource);
     var tokenBaseFill = opts.tokenBaseFill || backgroundColor;
     var selectedComponentType = opts.selectedComponentType;
     var selectedComponentId = opts.selectedComponentId;
@@ -27,7 +28,7 @@
     var svgAttributes = opts.svgAttributes ? " " + opts.svgAttributes : "";
     var borderMarkup = renderBorder(face, colorSequences, sequenceIndex);
     var backgroundInsetMarkup = renderBackgroundInset(face, backgroundColor, tokenBaseFill);
-    var backgroundImageMarkup = renderBackgroundImage(face, tokenSlug);
+    var backgroundImageMarkup = renderBackgroundImage(backgroundImageSource, tokenSlug);
     var outerSquareFill = opts.outerSquareFill || "#f6efe2";
     var tokenBaseCircleMarkup = tokenBaseFill === outerSquareFill
       ? ""
@@ -50,9 +51,9 @@
       tokenBaseCircleMarkup,
       backgroundInsetMarkup,
       backgroundImageMarkup,
-      renderOrderedComponents(lowerComponents, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
+      renderOrderedComponents(lowerComponents, project, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
       borderMarkup,
-      renderOrderedComponents(upperComponents, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
+      renderOrderedComponents(upperComponents, project, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
       opts.interactive
         ? renderInteractiveOverlays(face, selectedComponentType, selectedComponentId)
         : "",
@@ -60,15 +61,15 @@
     ].join("");
   }
 
-  function renderOrderedComponents(entries, textSequences, colorSequences, sequenceIndex, tokenSlug, interactive, selectedComponentType, selectedComponentId) {
+  function renderOrderedComponents(entries, project, textSequences, colorSequences, sequenceIndex, tokenSlug, interactive, selectedComponentType, selectedComponentId) {
     return entries.map(function (entry) {
       return entry.type === "image"
-        ? renderImageComponent(entry.component, tokenSlug, interactive, selectedComponentType, selectedComponentId)
+        ? renderImageComponent(entry.component, project, tokenSlug, interactive, selectedComponentType, selectedComponentId)
         : renderTextComponent(entry.component, textSequences, colorSequences, sequenceIndex, tokenSlug, interactive, selectedComponentType, selectedComponentId);
     }).join("");
   }
 
-  function renderImageComponent(component, tokenSlug, interactive, selectedComponentType, selectedComponentId) {
+  function renderImageComponent(component, project, tokenSlug, interactive, selectedComponentType, selectedComponentId) {
       var box = toSvgRect(component, "image");
       var centerX = box.x + box.width / 2;
       var centerY = box.y + box.height / 2;
@@ -81,9 +82,10 @@
         "translate(" + (-box.width / 2) + " " + (-box.height / 2) + ")"
       ].join(" ");
       var isSelected = interactive && selectedComponentType === "image" && selectedComponentId === component.id;
+      var source = Tokens.resolveImageSource(project, component.source);
       return [
         '<g clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="image"' + (isSelected ? ' data-drag-mode="move" cursor="grab"' : "") + '>',
-        '  <image href="' + escapeAttr(component.source) + '" width="' + box.width + '" height="' + box.height + '" preserveAspectRatio="none" transform="' + transform + '"></image>',
+        '  <image href="' + escapeAttr(source) + '" width="' + box.width + '" height="' + box.height + '" preserveAspectRatio="none" transform="' + transform + '"></image>',
         "</g>"
       ].join("");
   }
@@ -105,14 +107,14 @@
     return '<circle cx="50" cy="50" r="' + radius + '" fill="none" stroke="' + escapeAttr(color) + '" stroke-width="' + width + '"></circle>';
   }
 
-  function renderBackgroundImage(face, tokenSlug) {
-    if (face.backgroundMode !== "image" || !face.backgroundImageSource) {
+  function renderBackgroundImage(backgroundImageSource, tokenSlug) {
+    if (!backgroundImageSource) {
       return "";
     }
 
     return [
       '<g clip-path="url(#token-clip-' + tokenSlug + ')">',
-      '  <image href="' + escapeAttr(face.backgroundImageSource) + '" x="0" y="0" width="100" height="100" preserveAspectRatio="xMidYMid slice" data-background-image="true"></image>',
+      '  <image href="' + escapeAttr(backgroundImageSource) + '" x="0" y="0" width="100" height="100" preserveAspectRatio="xMidYMid slice" data-background-image="true"></image>',
       "</g>"
     ].join("");
   }

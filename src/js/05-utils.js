@@ -356,42 +356,116 @@
     return nextProject;
   }
 
-  function compactProjectImageAssets(project) {
+  function materializeProjectImageAssets(project) {
     if (!project || typeof project !== "object") {
       return project;
     }
 
     var nextProject = JSON.parse(JSON.stringify(project));
-    var sourceCounts = new Map();
-    collectProjectImageSources(nextProject).forEach(function (source) {
-      sourceCounts.set(source, (sourceCounts.get(source) || 0) + 1);
+    var existingAssets = nextProject.assets && Array.isArray(nextProject.assets.images)
+      ? nextProject.assets.images
+      : [];
+    var sourceByAssetId = new Map();
+    var assetIdBySource = new Map();
+    existingAssets.forEach(function (asset) {
+      if (!asset || typeof asset.id !== "string" || !asset.id || typeof asset.source !== "string" || !asset.source) {
+        return;
+      }
+      if (!sourceByAssetId.has(asset.id)) {
+        sourceByAssetId.set(asset.id, asset.source);
+      }
+      if (!assetIdBySource.has(asset.source)) {
+        assetIdBySource.set(asset.source, asset.id);
+      }
     });
+    var nextAssetIndex = getNextImageAssetIndex(existingAssets);
 
-    var sharedSources = Array.from(sourceCounts.entries()).filter(function (entry) {
-      return entry[1] > 1;
-    });
-    if (!sharedSources.length) {
-      return nextProject;
-    }
+    var referencedAssetIds = [];
+    var referencedLookup = new Set();
 
-    var assets = [];
-    var assetIdsBySource = new Map();
-    sharedSources.forEach(function (entry, index) {
-      var assetId = "image_" + (index + 1);
-      assetIdsBySource.set(entry[0], assetId);
-      assets.push({
-        id: assetId,
-        source: entry[0]
-      });
-    });
+    rewriteProjectImageSources(nextProject, function (value) {
+      if (typeof value !== "string" || !value) {
+        return "";
+      }
 
-    rewriteProjectImageSources(nextProject, function (source) {
-      var assetId = assetIdsBySource.get(source);
-      return assetId ? { assetRef: assetId } : source;
+      var assetId = sourceByAssetId.has(value) ? value : assetIdBySource.get(value);
+      if (!assetId) {
+        assetId = "image_" + nextAssetIndex;
+        nextAssetIndex += 1;
+        sourceByAssetId.set(assetId, value);
+        assetIdBySource.set(value, assetId);
+      }
+
+      if (!referencedLookup.has(assetId)) {
+        referencedLookup.add(assetId);
+        referencedAssetIds.push(assetId);
+      }
+
+      return assetId;
     });
 
     nextProject.assets = nextProject.assets && typeof nextProject.assets === "object" ? nextProject.assets : {};
-    nextProject.assets.images = assets;
+    nextProject.assets.images = referencedAssetIds.map(function (assetId) {
+      return {
+        id: assetId,
+        source: sourceByAssetId.get(assetId)
+      };
+    });
+
+    return nextProject;
+  }
+
+  function getNextImageAssetIndex(existingAssets) {
+    var highestIndex = 0;
+    (existingAssets || []).forEach(function (asset) {
+      if (!asset || typeof asset.id !== "string") {
+        return;
+      }
+      var match = /^image_(\d+)$/.exec(asset.id);
+      if (!match) {
+        return;
+      }
+      var parsed = Number(match[1]);
+      if (Number.isFinite(parsed) && parsed > highestIndex) {
+        highestIndex = parsed;
+      }
+    });
+    return highestIndex + 1;
+  }
+
+  function resolveProjectImageSource(project, value) {
+    if (typeof value !== "string" || !value) {
+      return "";
+    }
+
+    var imageAssets = project && project.assets && Array.isArray(project.assets.images)
+      ? project.assets.images
+      : [];
+    var matched = imageAssets.find(function (asset) {
+      return asset && asset.id === value;
+    });
+    return matched && typeof matched.source === "string" ? matched.source : value;
+  }
+
+  function compactProjectImageAssets(project) {
+    if (!project || typeof project !== "object") {
+      return project;
+    }
+
+    var nextProject = materializeProjectImageAssets(project);
+    var imageAssets = nextProject.assets && Array.isArray(nextProject.assets.images)
+      ? nextProject.assets.images
+      : [];
+    if (!imageAssets.length) {
+      return nextProject;
+    }
+
+    var assetIds = new Set(imageAssets.map(function (asset) {
+      return asset.id;
+    }));
+    rewriteProjectImageSources(nextProject, function (value) {
+      return typeof value === "string" && assetIds.has(value) ? { assetRef: value } : value;
+    });
     return nextProject;
   }
 
@@ -430,16 +504,6 @@
     }
 
     return nextProject;
-  }
-
-  function collectProjectImageSources(project) {
-    var sources = [];
-    visitProjectImageSources(project, function (source) {
-      if (isImageDataUrl(source)) {
-        sources.push(source);
-      }
-    });
-    return sources;
   }
 
   function rewriteProjectImageSources(project, rewriteValue) {
@@ -699,6 +763,8 @@
     compactProjectImageAssets: compactProjectImageAssets,
     hydrateProjectImageAssets: hydrateProjectImageAssets,
     normalizeEmbeddedImageAssetSource: normalizeEmbeddedImageAssetSource,
+    materializeProjectImageAssets: materializeProjectImageAssets,
+    resolveProjectImageSource: resolveProjectImageSource,
     normalizeProjectImageAssets: normalizeProjectImageAssets,
     trimTransparentImageAssetSource: trimTransparentImageAssetSource,
     optimizeImageAssetSource: optimizeImageAssetSource,
