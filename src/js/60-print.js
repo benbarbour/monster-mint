@@ -60,7 +60,8 @@
         items.push({
           tokenId: entry.token.id,
           token: entry.token,
-          sequenceIndex: getSequenceStart(entry.selection) - 1 + copyIndex
+          sequenceIndex: getSequenceStart(entry.selection) - 1 + copyIndex,
+          remainingCopies: entry.selection.copies - copyIndex
         });
       }
     });
@@ -73,12 +74,28 @@
 
     items.forEach(function (item) {
       var footprint = item.token.diameterIn + project.settings.bleedIn * 2;
-      var placement = findPlacement(currentPage.items, footprint, marginIn, maxX, maxY);
+      var placement = findPlacement(
+        currentPage.items,
+        footprint,
+        marginIn,
+        maxX,
+        maxY,
+        project.settings.bleedIn,
+        item.remainingCopies
+      );
 
       if (!placement) {
         pages.push(currentPage);
         currentPage = createPage(pageWidthIn, pageHeightIn);
-        placement = findPlacement(currentPage.items, footprint, marginIn, maxX, maxY);
+        placement = findPlacement(
+          currentPage.items,
+          footprint,
+          marginIn,
+          maxX,
+          maxY,
+          project.settings.bleedIn,
+          item.remainingCopies
+        );
       }
 
       if (!placement) {
@@ -130,10 +147,11 @@
     return Math.max(0, Math.floor((Number(selection.sequenceStartIndex) || 0) + 1));
   }
 
-  function findPlacement(existingItems, cellSizeIn, marginIn, maxX, maxY) {
+  function findPlacement(existingItems, cellSizeIn, marginIn, maxX, maxY, bleedIn, remainingCopies) {
     var epsilon = 0.000001;
     var xCandidates = [marginIn];
     var yCandidates = [marginIn];
+    var candidates = [];
 
     existingItems.forEach(function (item) {
       xCandidates.push(item.cellXIn + item.cellSizeIn);
@@ -156,12 +174,38 @@
         }
 
         if (!overlapsExisting(existingItems, x, y, cellSizeIn, epsilon)) {
-          return { x: x, y: y };
+          candidates.push({
+            x: x,
+            y: y,
+            fitCount: getHorizontalFitCount(existingItems, x, y, cellSizeIn, maxX, epsilon)
+          });
         }
       }
     }
 
-    return null;
+    if (!candidates.length) {
+      return null;
+    }
+
+    candidates.sort(function (left, right) {
+      var sameBand = Math.abs(left.y - right.y) <= bleedIn * 2 + epsilon;
+      if (sameBand) {
+        var leftCoverage = Math.min(left.fitCount, remainingCopies || 1);
+        var rightCoverage = Math.min(right.fitCount, remainingCopies || 1);
+        if (leftCoverage !== rightCoverage) {
+          return rightCoverage - leftCoverage;
+        }
+      }
+      if (left.y !== right.y) {
+        return left.y - right.y;
+      }
+      if (left.x !== right.x) {
+        return left.x - right.x;
+      }
+      return 0;
+    });
+
+    return { x: candidates[0].x, y: candidates[0].y };
   }
 
   function uniqueSortedNumbers(values) {
@@ -186,6 +230,23 @@
         epsilon
       );
     });
+  }
+
+  function getHorizontalFitCount(existingItems, x, y, cellSizeIn, maxX, epsilon) {
+    var nextObstacleX = maxX;
+
+    existingItems.forEach(function (item) {
+      var verticalOverlap = y < item.cellYIn + item.cellSizeIn - epsilon &&
+        y + cellSizeIn > item.cellYIn + epsilon;
+      if (!verticalOverlap) {
+        return;
+      }
+      if (item.cellXIn >= x + cellSizeIn - epsilon && item.cellXIn < nextObstacleX) {
+        nextObstacleX = item.cellXIn;
+      }
+    });
+
+    return Math.max(1, Math.floor(((nextObstacleX - x) + epsilon) / cellSizeIn));
   }
 
   function rectanglesOverlap(ax, ay, aw, ah, bx, by, bw, bh, epsilon) {

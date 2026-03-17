@@ -711,6 +711,28 @@ test("print layout backfills smaller tokens beneath taller neighbors", () => {
   assert.equal(smallItems[4].cellYIn, 1.25);
 });
 
+test("print layout avoids starting a staggered mixed-size row in a one-token shelf", () => {
+  const project = Schema.createDefaultProject();
+  project.settings.pageOrientation = "landscape";
+  project.settings.bleedIn = 0.0625;
+  const ogre = Tokens.createTokenTemplate({ id: "token-ogre", name: "5 Ogre", diameterIn: 2 });
+  const bow = Tokens.createTokenTemplate({ id: "token-bow", name: "Bow", diameterIn: 1 });
+  const skull = Tokens.createTokenTemplate({ id: "token-skull", name: "Skull", diameterIn: 1 });
+
+  project.tokens.push(ogre, bow, skull);
+  project.printSelections = [
+    { tokenId: "token-ogre", copies: 2, sequenceStart: 5 },
+    { tokenId: "token-bow", copies: 12, sequenceStart: 1 },
+    { tokenId: "token-skull", copies: 7, sequenceStart: 0 }
+  ];
+
+  const layout = Print.layoutProject(project);
+  const skullItems = layout.pages[0].items.filter((item) => item.tokenId === "token-skull");
+
+  assert.deepEqual(skullItems.map((item) => item.cellYIn), [2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5]);
+  assert.equal(skullItems[0].cellXIn, 2.5);
+});
+
 test("print start 0 yields a first numeric value of 0", () => {
   const project = Schema.createDefaultProject();
   const token = Tokens.createTokenTemplate({
