@@ -9,12 +9,12 @@ The project is built as modular source code, but the distributable is one self-c
 [![CI](https://github.com/benbarbour/monster-mint/actions/workflows/ci.yml/badge.svg)](https://github.com/benbarbour/monster-mint/actions/workflows/ci.yml)
 [![Release](https://github.com/benbarbour/monster-mint/actions/workflows/release.yml/badge.svg)](https://github.com/benbarbour/monster-mint/actions/workflows/release.yml)
 
-- Live hosted copy: `https://benbabour.github.io/monster-mint/`
+- Live hosted copy: `https://benbarbour.github.io/monster-mint/`
 - Versioned release downloads: `https://github.com/benbarbour/monster-mint/releases`
 
 ## Disclaimer
 
-Everything in this repo, other than this Disclaimer (including the rest of this README) are AI generated. I am a software developer, so this is slightly embarrassing/worrying, but I wanted to try it out. I could have built this myself from scratch, but:
+Everything in this repo, other than this Disclaimer (including the rest of this README), is AI generated. I am a software developer, so this is slightly embarrassing/worrying, but I wanted to try it out. I could have built this myself from scratch, but:
 
 1. My main goal was just to gain experience using an "aseptic" AI, and see how it had improved since the last time I fiddled with it.
 2. I'm not a web developer and it would've taken me a lot of work that I find fiddly and annoying.
