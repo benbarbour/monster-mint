@@ -667,6 +667,28 @@ test("print layout creates at least one page with placed items", () => {
   assert.equal(layout.pages[0].items[1].xIn - layout.pages[0].items[0].xIn, 1.125);
 });
 
+test("print layout sorts token groups alphabetically by token name", () => {
+  const project = Schema.createDefaultProject();
+  const zulu = Tokens.createTokenTemplate({ id: "token-z", name: "Zulu" });
+  const alpha = Tokens.createTokenTemplate({ id: "token-a", name: "Alpha" });
+  const mint2 = Tokens.createTokenTemplate({ id: "token-m2", name: "Mint 2" });
+
+  project.tokens.push(zulu, alpha, mint2);
+  project.printSelections = [
+    { tokenId: "token-z", copies: 1, sequenceStart: 0 },
+    { tokenId: "token-m2", copies: 1, sequenceStart: 0 },
+    { tokenId: "token-a", copies: 1, sequenceStart: 0 }
+  ];
+
+  const layout = Print.layoutProject(project);
+
+  assert.deepEqual(layout.pages[0].items.map((item) => item.token.name), [
+    "Alpha",
+    "Mint 2",
+    "Zulu"
+  ]);
+});
+
 test("print start 0 yields a first numeric value of 0", () => {
   const project = Schema.createDefaultProject();
   const token = Tokens.createTokenTemplate({

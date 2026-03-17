@@ -3289,6 +3289,13 @@ button {
     module.exports = api;
   }
 })(typeof globalThis !== "undefined" ? globalThis : window, function (Schema) {
+  function naturalLabelCompare(left, right) {
+    return String(left || "").localeCompare(String(right || ""), undefined, {
+      numeric: true,
+      sensitivity: "base"
+    });
+  }
+
   function getSelectionMap(project) {
     var map = new Map();
     project.printSelections.forEach(function (selection) {
@@ -3332,19 +3339,12 @@ button {
     var availableHeight = pageHeightIn - project.settings.pageMarginIn * 2;
     var items = [];
 
-    project.printSelections.forEach(function (selection) {
-      var token = project.tokens.find(function (candidate) {
-        return candidate.id === selection.tokenId;
-      });
-      if (!token || selection.copies <= 0) {
-        return;
-      }
-
-      for (var copyIndex = 0; copyIndex < selection.copies; copyIndex += 1) {
+    getSortedPrintSelections(project).forEach(function (entry) {
+      for (var copyIndex = 0; copyIndex < entry.selection.copies; copyIndex += 1) {
         items.push({
-          tokenId: token.id,
-          token: token,
-          sequenceIndex: getSequenceStart(selection) - 1 + copyIndex
+          tokenId: entry.token.id,
+          token: entry.token,
+          sequenceIndex: getSequenceStart(entry.selection) - 1 + copyIndex
         });
       }
     });
@@ -3421,6 +3421,28 @@ button {
     }
 
     return Math.max(0, Math.floor((Number(selection.sequenceStartIndex) || 0) + 1));
+  }
+
+  function getSortedPrintSelections(project) {
+    return project.printSelections.map(function (selection) {
+      return {
+        selection: selection,
+        token: project.tokens.find(function (candidate) {
+          return candidate.id === selection.tokenId;
+        }) || null
+      };
+    }).filter(function (entry) {
+      return entry.token && entry.selection.copies > 0;
+    }).sort(function (left, right) {
+      var labelDelta = naturalLabelCompare(left.token.name, right.token.name);
+      if (labelDelta !== 0) {
+        return labelDelta;
+      }
+      if (left.token.diameterIn !== right.token.diameterIn) {
+        return Number(left.token.diameterIn) - Number(right.token.diameterIn);
+      }
+      return left.token.id.localeCompare(right.token.id);
+    });
   }
 
   return {
