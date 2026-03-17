@@ -1,17 +1,17 @@
 (function (global, factory) {
-  var api = factory(global.MonsterMintSchema, global.MonsterMintStorage);
+  var api = factory(global.MonsterMintSchema, global.MonsterMintStorage, global.MonsterMintUtils);
   global.MonsterMintState = api;
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
   }
-})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, Storage) {
+})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, Storage, Utils) {
   async function createStore(options) {
     var persistence = resolvePersistence(options);
     var listeners = [];
     var saveQueue = Promise.resolve();
     var saveRevision = 0;
     var state = {
-      project: await persistence.loadProject(),
+      project: materializeAssets(await persistence.loadProject()),
       ui: await persistence.loadUiState(),
       autosaveStatus: "Loaded",
       lastSavedAt: null,
@@ -85,7 +85,7 @@
       var shouldPersist = !options || options.persist !== false;
       var nextProject = Schema.clone(state.project);
       mutator(nextProject);
-      state.project = Schema.normalizeProject(nextProject);
+      state.project = materializeAssets(Schema.normalizeProject(nextProject));
       if (shouldPersist) {
         return save();
       }
@@ -98,7 +98,7 @@
 
     function replaceProject(project, options) {
       var shouldPersist = !options || options.persist !== false;
-      state.project = Schema.normalizeProject(project);
+      state.project = materializeAssets(Schema.normalizeProject(project));
       if (shouldPersist) {
         return save();
       }
@@ -153,6 +153,12 @@
       return Storage.createLocalStoragePersistence(options.storage);
     }
     return Storage.createMemoryPersistence();
+  }
+
+  function materializeAssets(project) {
+    return Utils && typeof Utils.materializeProjectImageAssets === "function"
+      ? Utils.materializeProjectImageAssets(project)
+      : project;
   }
 
   return {

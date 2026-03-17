@@ -97,6 +97,9 @@
         text: clone(BUILT_IN_TEXT_SEQUENCES),
         color: clone(BUILT_IN_COLOR_SEQUENCES)
       },
+      assets: {
+        images: []
+      },
       tokens: [],
       printSelections: []
     };
@@ -129,6 +132,9 @@
       sequences: {
         text: clone(BUILT_IN_TEXT_SEQUENCES),
         color: mergeBuiltInSequences(project.sequences && Array.isArray(project.sequences.color) ? project.sequences.color : [], BUILT_IN_COLOR_SEQUENCES)
+      },
+      assets: {
+        images: normalizeImageAssets(project.assets && project.assets.images)
       },
       tokens: Array.isArray(project.tokens) ? project.tokens.map(tokenApi.normalizeToken) : [],
       printSelections: Array.isArray(project.printSelections) ? project.printSelections : []
@@ -165,6 +171,24 @@
       });
     });
     return clone(builtIns).concat(customSequences);
+  }
+
+  function normalizeImageAssets(input) {
+    if (!Array.isArray(input)) {
+      return [];
+    }
+    return input.filter(function (asset) {
+      return asset &&
+        typeof asset.id === "string" &&
+        asset.id &&
+        typeof asset.source === "string" &&
+        asset.source;
+    }).map(function (asset) {
+      return {
+        id: asset.id,
+        source: asset.source
+      };
+    });
   }
 
   function normalizeTextDefaults(input, fallback) {

@@ -207,6 +207,10 @@
     return Sequences.resolveColorValue(sequence, index) || manualColor;
   }
 
+  function resolveImageSource(project, value) {
+    return Utils.resolveProjectImageSource(project, value);
+  }
+
   function collectBoundedSequenceLengths(token) {
     var lengths = [];
     var faces = [token.front];
@@ -536,6 +540,7 @@
     getImageDimensions: getImageDimensions,
     getTextValue: getTextValue,
     getColorValue: getColorValue,
+    resolveImageSource: resolveImageSource,
     normalizeFaceBackground: normalizeFaceBackground,
     collectBoundedSequenceLengths: collectBoundedSequenceLengths
   };
