@@ -405,6 +405,10 @@ test("built-in text modes and color sequences drive live print preview", async (
   await expect(page.locator('form[data-form="page-settings"]')).toHaveCount(0);
   await page.getByRole("button", { name: "Print Settings" }).click();
   await expect(page.locator('form[data-form="page-settings"]')).toBeVisible();
+  const cutlineGapInput = page.locator('form[data-form="page-settings"] input[name="cutlineGapMm"]');
+  await cutlineGapInput.fill("2.5");
+  await cutlineGapInput.blur();
+  await expect(cutlineGapInput).toHaveValue("2.5");
 
   const copiesInput = page.locator('input[name^="copies-"]').first();
   const startInput = page.locator('input[name^="start-"]').first();
@@ -430,6 +434,8 @@ test("built-in text modes and color sequences drive live print preview", async (
   expect(pageTabCount).toBeGreaterThan(1);
   await expect(page.getByRole("tab", { name: "Page 1", exact: true })).toBeVisible();
   await expect(page.locator(".preview-tab-list")).toHaveCSS("overflow-x", "auto");
+  await expect(page.locator('[data-cut-gap-fill="true"]').first()).toBeVisible();
+  expect(await page.locator('[data-cut-tick="true"]').count()).toBeGreaterThan(0);
 
   const pageWidths = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
