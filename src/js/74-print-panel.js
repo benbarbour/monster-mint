@@ -276,11 +276,13 @@
     var x = item.xIn * 100;
     var y = item.yIn * 100;
     var size = item.diameterIn * 100;
+    var cellFill = getPageCellFill(item.token.front, project.sequences.color, item.sequenceIndex);
     return Renderer.renderTokenSvg(item.token, project, {
       sequenceIndex: item.sequenceIndex,
       instanceId: "page-front-" + item.sequenceIndex + "-" + Math.round(x) + "-" + Math.round(y),
       interactive: false,
       outerSquareFill: "none",
+      tokenBaseFill: cellFill,
       svgAttributes: 'x="' + x + '" y="' + y + '" width="' + size + '" height="' + size + '"'
     });
   }
