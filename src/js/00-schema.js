@@ -88,7 +88,6 @@
         pagePresetId: "letter",
         pageOrientation: "portrait",
         pageMarginIn: 0.25,
-        bleedIn: 0.0625,
         imageTrimAlphaThreshold: 1,
         tokenDefaults: createDefaultTokenDefaults(),
         textDefaults: createDefaultTextDefaults()
@@ -118,7 +117,6 @@
         pagePresetId: project.settings && findPagePreset(project.settings.pagePresetId) ? project.settings.pagePresetId : defaults.settings.pagePresetId,
         pageOrientation: project.settings && project.settings.pageOrientation === "landscape" ? "landscape" : "portrait",
         pageMarginIn: asPositiveNumber(project.settings && project.settings.pageMarginIn, defaults.settings.pageMarginIn),
-        bleedIn: asNonNegativeNumber(project.settings && project.settings.bleedIn, defaults.settings.bleedIn),
         imageTrimAlphaThreshold: asAlphaThreshold(project.settings && project.settings.imageTrimAlphaThreshold, defaults.settings.imageTrimAlphaThreshold),
         tokenDefaults: normalizeTokenDefaults(
           project.settings && (project.settings.tokenDefaults || project.settings.backgroundDefaults),
@@ -147,10 +145,6 @@
 
   function asPositiveNumber(value, fallback) {
     return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
-  }
-
-  function asNonNegativeNumber(value, fallback) {
-    return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : fallback;
   }
 
   function asAlphaThreshold(value, fallback) {

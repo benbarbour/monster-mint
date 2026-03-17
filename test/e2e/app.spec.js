@@ -406,11 +406,6 @@ test("built-in text modes and color sequences drive live print preview", async (
   await page.getByRole("button", { name: "Print Settings" }).click();
   await expect(page.locator('form[data-form="page-settings"]')).toBeVisible();
 
-  const bleedInput = page.locator('form[data-form="page-settings"] input[name="bleedIn"]');
-  await bleedInput.fill("0");
-  await bleedInput.blur();
-  await expect(bleedInput).toHaveValue("0");
-
   const copiesInput = page.locator('input[name^="copies-"]').first();
   const startInput = page.locator('input[name^="start-"]').first();
   await expect(startInput).toHaveValue("1");

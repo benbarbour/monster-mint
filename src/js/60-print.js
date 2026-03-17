@@ -73,14 +73,13 @@
     var maxY = marginIn + availableHeight;
 
     items.forEach(function (item) {
-      var footprint = item.token.diameterIn + project.settings.bleedIn * 2;
+      var footprint = item.token.diameterIn;
       var placement = findPlacement(
         currentPage.items,
         footprint,
         marginIn,
         maxX,
         maxY,
-        project.settings.bleedIn,
         item.remainingCopies
       );
 
@@ -93,7 +92,6 @@
           marginIn,
           maxX,
           maxY,
-          project.settings.bleedIn,
           item.remainingCopies
         );
       }
@@ -102,7 +100,7 @@
         return;
       }
 
-      currentPage.items.push(createCellItem(item, placement.x, placement.y, footprint, project.settings.bleedIn));
+      currentPage.items.push(createCellItem(item, placement.x, placement.y, footprint));
     });
 
     if (currentPage.items.length || !pages.length) {
@@ -124,7 +122,7 @@
     };
   }
 
-  function createCellItem(item, cellXIn, cellYIn, footprintIn, bleedIn) {
+  function createCellItem(item, cellXIn, cellYIn, footprintIn) {
     return {
       tokenId: item.tokenId,
       token: item.token,
@@ -132,10 +130,9 @@
       cellXIn: cellXIn,
       cellYIn: cellYIn,
       cellSizeIn: footprintIn,
-      xIn: cellXIn + bleedIn,
-      yIn: cellYIn + bleedIn,
-      diameterIn: item.token.diameterIn,
-      bleedIn: bleedIn
+      xIn: cellXIn,
+      yIn: cellYIn,
+      diameterIn: item.token.diameterIn
     };
   }
 
@@ -147,11 +144,14 @@
     return Math.max(0, Math.floor((Number(selection.sequenceStartIndex) || 0) + 1));
   }
 
-  function findPlacement(existingItems, cellSizeIn, marginIn, maxX, maxY, bleedIn, remainingCopies) {
+  function findPlacement(existingItems, cellSizeIn, marginIn, maxX, maxY, remainingCopies) {
     var epsilon = 0.000001;
     var xCandidates = [marginIn];
     var yCandidates = [marginIn];
     var candidates = [];
+    var packingAroundLargerItems = existingItems.some(function (item) {
+      return item.cellSizeIn > cellSizeIn + epsilon;
+    });
 
     existingItems.forEach(function (item) {
       xCandidates.push(item.cellXIn + item.cellSizeIn);
@@ -177,7 +177,8 @@
           candidates.push({
             x: x,
             y: y,
-            fitCount: getHorizontalFitCount(existingItems, x, y, cellSizeIn, maxX, epsilon)
+            fitCount: getHorizontalFitCount(existingItems, x, y, cellSizeIn, maxX, epsilon),
+            regionCapacity: getRegionCapacity(existingItems, x, y, cellSizeIn, maxX, maxY, epsilon)
           });
         }
       }
@@ -188,12 +189,14 @@
     }
 
     candidates.sort(function (left, right) {
-      var sameBand = Math.abs(left.y - right.y) <= bleedIn * 2 + epsilon;
-      if (sameBand) {
-        var leftCoverage = Math.min(left.fitCount, remainingCopies || 1);
-        var rightCoverage = Math.min(right.fitCount, remainingCopies || 1);
+      if (packingAroundLargerItems) {
+        var leftCoverage = Math.min(left.regionCapacity, remainingCopies || 1);
+        var rightCoverage = Math.min(right.regionCapacity, remainingCopies || 1);
         if (leftCoverage !== rightCoverage) {
           return rightCoverage - leftCoverage;
+        }
+        if (left.fitCount !== right.fitCount) {
+          return right.fitCount - left.fitCount;
         }
       }
       if (left.y !== right.y) {
@@ -247,6 +250,37 @@
     });
 
     return Math.max(1, Math.floor(((nextObstacleX - x) + epsilon) / cellSizeIn));
+  }
+
+  function getRegionCapacity(existingItems, x, y, cellSizeIn, maxX, maxY, epsilon) {
+    var maxColumns = getHorizontalFitCount(existingItems, x, y, cellSizeIn, maxX, epsilon);
+    var bestCapacity = 1;
+
+    for (var columns = 1; columns <= maxColumns; columns += 1) {
+      var rows = 0;
+      var rowY = y;
+
+      while (rowY + cellSizeIn <= maxY + epsilon) {
+        if (!canFitRow(existingItems, x, rowY, cellSizeIn, columns, epsilon)) {
+          break;
+        }
+        rows += 1;
+        rowY += cellSizeIn;
+      }
+
+      bestCapacity = Math.max(bestCapacity, rows * columns);
+    }
+
+    return bestCapacity;
+  }
+
+  function canFitRow(existingItems, startX, y, cellSizeIn, columns, epsilon) {
+    for (var index = 0; index < columns; index += 1) {
+      if (overlapsExisting(existingItems, startX + cellSizeIn * index, y, cellSizeIn, epsilon)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   function rectanglesOverlap(ax, ay, aw, ah, bx, by, bw, bh, epsilon) {

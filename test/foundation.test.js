@@ -664,7 +664,7 @@ test("print layout creates at least one page with placed items", () => {
 
   assert.equal(layout.pages.length >= 1, true);
   assert.equal(layout.pages[0].items.length, 3);
-  assert.equal(layout.pages[0].items[1].xIn - layout.pages[0].items[0].xIn, 1.125);
+  assert.equal(layout.pages[0].items[1].xIn - layout.pages[0].items[0].xIn, 1);
 });
 
 test("print layout sorts token groups alphabetically by token name", () => {
@@ -691,7 +691,6 @@ test("print layout sorts token groups alphabetically by token name", () => {
 
 test("print layout backfills smaller tokens beneath taller neighbors", () => {
   const project = Schema.createDefaultProject();
-  project.settings.bleedIn = 0;
   const large = Tokens.createTokenTemplate({ id: "token-large", name: "Large", diameterIn: 2 });
   const small = Tokens.createTokenTemplate({ id: "token-small", name: "Small", diameterIn: 1 });
 
@@ -705,16 +704,15 @@ test("print layout backfills smaller tokens beneath taller neighbors", () => {
   const smallItems = layout.pages[0].items.filter((item) => item.tokenId === "token-small");
 
   assert.equal(smallItems.length, 7);
-  assert.equal(smallItems[0].cellXIn, 4.25);
-  assert.equal(smallItems[0].cellYIn, 0.25);
-  assert.equal(smallItems[4].cellXIn, 4.25);
-  assert.equal(smallItems[4].cellYIn, 1.25);
+  assert.equal(smallItems[0].cellXIn, 0.25);
+  assert.equal(smallItems[0].cellYIn, 2.25);
+  assert.equal(smallItems[4].cellXIn, 0.25);
+  assert.equal(smallItems[4].cellYIn, 6.25);
 });
 
 test("print layout avoids starting a staggered mixed-size row in a one-token shelf", () => {
   const project = Schema.createDefaultProject();
   project.settings.pageOrientation = "landscape";
-  project.settings.bleedIn = 0.0625;
   const ogre = Tokens.createTokenTemplate({ id: "token-ogre", name: "5 Ogre", diameterIn: 2 });
   const bow = Tokens.createTokenTemplate({ id: "token-bow", name: "Bow", diameterIn: 1 });
   const skull = Tokens.createTokenTemplate({ id: "token-skull", name: "Skull", diameterIn: 1 });
@@ -729,8 +727,39 @@ test("print layout avoids starting a staggered mixed-size row in a one-token she
   const layout = Print.layoutProject(project);
   const skullItems = layout.pages[0].items.filter((item) => item.tokenId === "token-skull");
 
-  assert.deepEqual(skullItems.map((item) => item.cellYIn), [2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5]);
-  assert.equal(skullItems[0].cellXIn, 2.5);
+  assert.equal(skullItems.length, 7);
+  assert.equal(skullItems.some((item) => item.cellYIn % 1 !== 0.25), false);
+  assert.equal(skullItems.some((item) => item.cellXIn % 1 !== 0.25), false);
+  assert.equal(skullItems[0].cellXIn, 2.25);
+  assert.equal(skullItems[0].cellYIn, 2.25);
+});
+
+test("print layout prefers broad rows over narrow vertical shelves for repeated smaller tokens", () => {
+  const project = Schema.createDefaultProject();
+  project.settings.pageOrientation = "landscape";
+  const hulk = Tokens.createTokenTemplate({ id: "token-hulk", name: "A Hulk", diameterIn: 2 });
+  const bow = Tokens.createTokenTemplate({ id: "token-bow", name: "Bow", diameterIn: 1 });
+  const skull = Tokens.createTokenTemplate({ id: "token-skull", name: "Skull", diameterIn: 1 });
+
+  project.tokens.push(hulk, bow, skull);
+  project.printSelections = [
+    { tokenId: "token-hulk", copies: 6, sequenceStart: 1 },
+    { tokenId: "token-bow", copies: 12, sequenceStart: 1 },
+    { tokenId: "token-skull", copies: 12, sequenceStart: 1 }
+  ];
+
+  const layout = Print.layoutProject(project);
+  const bowItems = layout.pages[0].items.filter((item) => item.tokenId === "token-bow");
+  const skullItems = layout.pages[0].items.filter((item) => item.tokenId === "token-skull");
+
+  assert.equal(bowItems.some((item) => item.cellYIn % 1 !== 0.25), false);
+  assert.equal(bowItems.some((item) => item.cellXIn % 1 !== 0.25), false);
+  assert.equal(skullItems.some((item) => item.cellYIn % 1 !== 0.25), false);
+  assert.equal(skullItems.some((item) => item.cellXIn % 1 !== 0.25), false);
+  assert.equal(bowItems[0].cellXIn, 0.25);
+  assert.equal(bowItems[0].cellYIn, 4.25);
+  assert.equal(skullItems[0].cellXIn, 2.25);
+  assert.equal(skullItems[0].cellYIn, 6.25);
 });
 
 test("print start 0 yields a first numeric value of 0", () => {

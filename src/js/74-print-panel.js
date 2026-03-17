@@ -83,7 +83,6 @@
           project.settings.pagePresetId = String(formData.get("pagePresetId"));
           project.settings.pageOrientation = String(formData.get("pageOrientation"));
           project.settings.pageMarginIn = helpers.toNonNegativeNumberOrDefault(formData.get("pageMarginIn"), project.settings.pageMarginIn);
-          project.settings.bleedIn = helpers.toNonNegativeNumberOrDefault(formData.get("bleedIn"), project.settings.bleedIn);
         });
       });
     }
@@ -155,7 +154,6 @@
       "  </div>",
       '  <div class="field-row two-up">',
       '    <label class="field">Margin (in)<input type="number" min="0.05" step="0.05" name="pageMarginIn" value="' + settings.pageMarginIn + '"></label>',
-      '    <label class="field">Bleed (in)<input type="number" min="0" step="0.01" name="bleedIn" value="' + settings.bleedIn + '"></label>',
       "  </div>",
       '  <p class="field-help">Changes save automatically.</p>',
       "</form>"
