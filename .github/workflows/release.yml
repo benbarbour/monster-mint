@@ -47,9 +47,6 @@ jobs:
       - name: Run browser tests
         run: npm run test:e2e
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-
       - name: Prepare release assets
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
@@ -107,6 +104,9 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
       - name: Deploy GitHub Pages site
         id: deployment
         uses: actions/deploy-pages@v4
