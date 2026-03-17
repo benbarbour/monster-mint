@@ -432,7 +432,8 @@
           x: interaction.startRect.x,
           y: interaction.startRect.y,
           width: nextWidth,
-          height: nextHeight
+          height: nextHeight,
+          rotationDeg: interaction.startRect.rotationDeg
         };
       }
       return state;
@@ -470,7 +471,8 @@
       x: interaction.startRect.x + deltaX,
       y: interaction.startRect.y + deltaY,
       width: interaction.startRect.width,
-      height: interaction.startRect.height
+      height: interaction.startRect.height,
+      rotationDeg: interaction.startRect.rotationDeg
     };
     return state;
   }
@@ -595,12 +597,12 @@
       setFormFieldValue(form, "scale", preview.componentState.scale, 2);
       setFormFieldValue(form, "rotationDeg", Math.round(Number(preview.componentState.rotationDeg || 0)));
       setRangeHelpText(form, "scale", Math.round(preview.componentState.scale * 100) + "% of max circle diameter");
-      setRangeHelpText(form, "rotationDeg", Math.round(Number(preview.componentState.rotationDeg || 0)) + "° clockwise");
       return;
     }
 
     setFormFieldValue(form, "width", preview.componentState.width, 2);
     setFormFieldValue(form, "height", preview.componentState.height, 2);
+    setFormFieldValue(form, "rotationDeg", Math.round(Number(preview.componentState.rotationDeg || 0)));
   }
 
   function setFormFieldValue(form, name, value, fixedDigits, skipName) {
@@ -651,7 +653,6 @@
       setFormFieldValue(imageForm, "scale", component.scale, 2);
       setFormFieldValue(imageForm, "rotationDeg", Math.round(Number(component.rotationDeg || 0)));
       setRangeHelpText(imageForm, "scale", Math.round(component.scale * 100) + "% of max circle diameter");
-      setRangeHelpText(imageForm, "rotationDeg", Math.round(Number(component.rotationDeg || 0)) + "° clockwise");
       return;
     }
 
@@ -663,6 +664,7 @@
     setFormFieldValue(textForm, "y", toDisplayCenterY(component.y), 2);
     setFormFieldValue(textForm, "width", component.width, 2);
     setFormFieldValue(textForm, "height", component.height, 2);
+    setFormFieldValue(textForm, "rotationDeg", Math.round(Number(component.rotationDeg || 0)));
     setFormFieldValue(textForm, "sequenceStart", component.sequenceStart);
     if (textForm.querySelector('[name="sequencePad"]')) {
       setFormFieldValue(textForm, "sequencePad", component.sequencePad);

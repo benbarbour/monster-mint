@@ -195,6 +195,7 @@
       '    <label class="field">Font family<select name="fontFamily">' + helpers.renderFontFamilyOptions(component.fontFamily) + "</select></label>",
       '    <label class="field">Font weight<select name="fontWeight">' + helpers.renderFontWeightOptions(component.fontWeight) + "</select></label>",
       "  </div>",
+      '  <label class="field">Rotation<input type="number" min="0" max="360" step="1" name="rotationDeg" value="' + Math.round(Number(component.rotationDeg || 0)) + '"><span class="field-help">Degrees clockwise.</span></label>',
       helpers.renderColorPicker({
         label: "Text color",
         sourceName: "colorSource",
@@ -218,7 +219,7 @@
       renderZOrderControls(component, selection),
       renderPositionFields(component),
       '  <label class="field">Scale<input type="range" min="0.05" max="2" step="0.01" name="scale" value="' + component.scale.toFixed(2) + '"><span class="field-help">' + Math.round(component.scale * 100) + '% of max circle diameter</span></label>',
-      '  <label class="field">Rotation<input type="range" min="0" max="360" step="1" name="rotationDeg" value="' + Math.round(Number(component.rotationDeg || 0)) + '"><span class="field-help">' + Math.round(Number(component.rotationDeg || 0)) + '&deg; clockwise</span></label>',
+      '  <label class="field">Rotation<input type="number" min="0" max="360" step="1" name="rotationDeg" value="' + Math.round(Number(component.rotationDeg || 0)) + '"><span class="field-help">Degrees clockwise.</span></label>',
       '  <div class="field-row two-up">',
       '    <label class="field checkbox-field"><input type="checkbox" name="mirrorX"' + (component.mirrorX ? " checked" : "") + '>Mirror horizontally</label>',
       '    <label class="field checkbox-field"><input type="checkbox" name="mirrorY"' + (component.mirrorY ? " checked" : "") + '>Mirror vertically</label>',
@@ -439,6 +440,7 @@
           component.colorMode = textColorSelection.mode;
           component.color = String(formData.get("color") || component.color);
           component.colorSequenceRef = textColorSelection.sequenceRef;
+          component.rotationDeg = helpers.toNumberOrDefault(formData.get("rotationDeg"), component.rotationDeg);
           helpers.applyBoundsFromForm(component, formData);
           component.textBorder.width = helpers.toNumberOrDefault(formData.get("textBorderWidth"), component.textBorder.width);
           component.textBorder.colorMode = textBorderColorSelection.mode;

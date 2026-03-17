@@ -2322,6 +2322,7 @@ button {
       colorMode: payload.colorMode === "sequence" ? "sequence" : "manual",
       color: payload.color || "#111111",
       colorSequenceRef: payload.colorSequenceRef || null,
+      rotationDeg: asRotation(payload.rotationDeg, 0),
       zIndex: asComponentZ(payload.zIndex != null ? payload.zIndex : payload.z, 1),
       textBorder: normalizeTextBorder(payload.textBorder || payload.shadow)
     };
@@ -2779,6 +2780,7 @@ button {
           colorMode: component.colorMode,
           color: component.color,
           colorSequenceRef: component.colorSequenceRef,
+          rotationDeg: component.rotationDeg,
           zIndex: component.zIndex,
           textBorder: {
             width: component.textBorder.width,
@@ -2965,6 +2967,8 @@ button {
       var fontSize = fitFontSize(value, component.fontFamily, component.fontWeight, box.width, box.height, borderWidth);
       var textBounds = getTextMetrics(value, component.fontFamily, component.fontWeight, fontSize, borderWidth);
       var baselineY = box.y + box.height / 2 - (textBounds.y + textBounds.height / 2);
+      var centerX = box.x + box.width / 2;
+      var centerY = box.y + box.height / 2;
       var borderColor = component.textBorder
         ? Tokens.getColorValue(
           component.textBorder.colorMode,
@@ -2978,7 +2982,7 @@ button {
       return [
         '<g clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="text"' + (isSelected ? ' data-drag-mode="move" cursor="default"' : "") + '>',
         '  <g clip-path="url(#text-clip-' + tokenSlug + "-" + component.id + ')">',
-        '    <text x="' + (box.x + box.width / 2) + '" y="' + baselineY + '" fill="' + escapeAttr(color) + '" stroke="' + (borderWidth > 0 ? escapeAttr(borderColor) : "none") + '" stroke-width="' + borderWidth + '" paint-order="stroke fill" stroke-linejoin="round" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-style="normal" font-size="' + fontSize + '" text-anchor="middle">' + escapeText(value) + "</text>",
+        '    <text x="' + centerX + '" y="' + baselineY + '" fill="' + escapeAttr(color) + '" stroke="' + (borderWidth > 0 ? escapeAttr(borderColor) : "none") + '" stroke-width="' + borderWidth + '" paint-order="stroke fill" stroke-linejoin="round" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-style="normal" font-size="' + fontSize + '" text-anchor="middle"' + (Number(component.rotationDeg || 0) ? ' transform="rotate(' + Number(component.rotationDeg || 0) + " " + centerX + " " + centerY + ')"' : "") + '>' + escapeText(value) + "</text>",
         "  </g>",
         "</g>"
       ].join("");
@@ -4476,6 +4480,7 @@ button {
       '    <label class="field">Font family<select name="fontFamily">' + helpers.renderFontFamilyOptions(component.fontFamily) + "</select></label>",
       '    <label class="field">Font weight<select name="fontWeight">' + helpers.renderFontWeightOptions(component.fontWeight) + "</select></label>",
       "  </div>",
+      '  <label class="field">Rotation<input type="number" min="0" max="360" step="1" name="rotationDeg" value="' + Math.round(Number(component.rotationDeg || 0)) + '"><span class="field-help">Degrees clockwise.</span></label>',
       helpers.renderColorPicker({
         label: "Text color",
         sourceName: "colorSource",
@@ -4499,7 +4504,7 @@ button {
       renderZOrderControls(component, selection),
       renderPositionFields(component),
       '  <label class="field">Scale<input type="range" min="0.05" max="2" step="0.01" name="scale" value="' + component.scale.toFixed(2) + '"><span class="field-help">' + Math.round(component.scale * 100) + '% of max circle diameter</span></label>',
-      '  <label class="field">Rotation<input type="range" min="0" max="360" step="1" name="rotationDeg" value="' + Math.round(Number(component.rotationDeg || 0)) + '"><span class="field-help">' + Math.round(Number(component.rotationDeg || 0)) + '&deg; clockwise</span></label>',
+      '  <label class="field">Rotation<input type="number" min="0" max="360" step="1" name="rotationDeg" value="' + Math.round(Number(component.rotationDeg || 0)) + '"><span class="field-help">Degrees clockwise.</span></label>',
       '  <div class="field-row two-up">',
       '    <label class="field checkbox-field"><input type="checkbox" name="mirrorX"' + (component.mirrorX ? " checked" : "") + '>Mirror horizontally</label>',
       '    <label class="field checkbox-field"><input type="checkbox" name="mirrorY"' + (component.mirrorY ? " checked" : "") + '>Mirror vertically</label>',
@@ -4720,6 +4725,7 @@ button {
           component.colorMode = textColorSelection.mode;
           component.color = String(formData.get("color") || component.color);
           component.colorSequenceRef = textColorSelection.sequenceRef;
+          component.rotationDeg = helpers.toNumberOrDefault(formData.get("rotationDeg"), component.rotationDeg);
           helpers.applyBoundsFromForm(component, formData);
           component.textBorder.width = helpers.toNumberOrDefault(formData.get("textBorderWidth"), component.textBorder.width);
           component.textBorder.colorMode = textBorderColorSelection.mode;
@@ -5626,7 +5632,8 @@ button {
           x: interaction.startRect.x,
           y: interaction.startRect.y,
           width: nextWidth,
-          height: nextHeight
+          height: nextHeight,
+          rotationDeg: interaction.startRect.rotationDeg
         };
       }
       return state;
@@ -5664,7 +5671,8 @@ button {
       x: interaction.startRect.x + deltaX,
       y: interaction.startRect.y + deltaY,
       width: interaction.startRect.width,
-      height: interaction.startRect.height
+      height: interaction.startRect.height,
+      rotationDeg: interaction.startRect.rotationDeg
     };
     return state;
   }
@@ -5789,12 +5797,12 @@ button {
       setFormFieldValue(form, "scale", preview.componentState.scale, 2);
       setFormFieldValue(form, "rotationDeg", Math.round(Number(preview.componentState.rotationDeg || 0)));
       setRangeHelpText(form, "scale", Math.round(preview.componentState.scale * 100) + "% of max circle diameter");
-      setRangeHelpText(form, "rotationDeg", Math.round(Number(preview.componentState.rotationDeg || 0)) + "° clockwise");
       return;
     }
 
     setFormFieldValue(form, "width", preview.componentState.width, 2);
     setFormFieldValue(form, "height", preview.componentState.height, 2);
+    setFormFieldValue(form, "rotationDeg", Math.round(Number(preview.componentState.rotationDeg || 0)));
   }
 
   function setFormFieldValue(form, name, value, fixedDigits, skipName) {
@@ -5845,7 +5853,6 @@ button {
       setFormFieldValue(imageForm, "scale", component.scale, 2);
       setFormFieldValue(imageForm, "rotationDeg", Math.round(Number(component.rotationDeg || 0)));
       setRangeHelpText(imageForm, "scale", Math.round(component.scale * 100) + "% of max circle diameter");
-      setRangeHelpText(imageForm, "rotationDeg", Math.round(Number(component.rotationDeg || 0)) + "° clockwise");
       return;
     }
 
@@ -5857,6 +5864,7 @@ button {
     setFormFieldValue(textForm, "y", toDisplayCenterY(component.y), 2);
     setFormFieldValue(textForm, "width", component.width, 2);
     setFormFieldValue(textForm, "height", component.height, 2);
+    setFormFieldValue(textForm, "rotationDeg", Math.round(Number(component.rotationDeg || 0)));
     setFormFieldValue(textForm, "sequenceStart", component.sequenceStart);
     if (textForm.querySelector('[name="sequencePad"]')) {
       setFormFieldValue(textForm, "sequencePad", component.sequencePad);

@@ -42,6 +42,7 @@
       colorMode: payload.colorMode === "sequence" ? "sequence" : "manual",
       color: payload.color || "#111111",
       colorSequenceRef: payload.colorSequenceRef || null,
+      rotationDeg: asRotation(payload.rotationDeg, 0),
       zIndex: asComponentZ(payload.zIndex != null ? payload.zIndex : payload.z, 1),
       textBorder: normalizeTextBorder(payload.textBorder || payload.shadow)
     };
@@ -499,6 +500,7 @@
           colorMode: component.colorMode,
           color: component.color,
           colorSequenceRef: component.colorSequenceRef,
+          rotationDeg: component.rotationDeg,
           zIndex: component.zIndex,
           textBorder: {
             width: component.textBorder.width,

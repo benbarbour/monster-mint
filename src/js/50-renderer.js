@@ -143,6 +143,8 @@
       var fontSize = fitFontSize(value, component.fontFamily, component.fontWeight, box.width, box.height, borderWidth);
       var textBounds = getTextMetrics(value, component.fontFamily, component.fontWeight, fontSize, borderWidth);
       var baselineY = box.y + box.height / 2 - (textBounds.y + textBounds.height / 2);
+      var centerX = box.x + box.width / 2;
+      var centerY = box.y + box.height / 2;
       var borderColor = component.textBorder
         ? Tokens.getColorValue(
           component.textBorder.colorMode,
@@ -156,7 +158,7 @@
       return [
         '<g clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="text"' + (isSelected ? ' data-drag-mode="move" cursor="default"' : "") + '>',
         '  <g clip-path="url(#text-clip-' + tokenSlug + "-" + component.id + ')">',
-        '    <text x="' + (box.x + box.width / 2) + '" y="' + baselineY + '" fill="' + escapeAttr(color) + '" stroke="' + (borderWidth > 0 ? escapeAttr(borderColor) : "none") + '" stroke-width="' + borderWidth + '" paint-order="stroke fill" stroke-linejoin="round" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-style="normal" font-size="' + fontSize + '" text-anchor="middle">' + escapeText(value) + "</text>",
+        '    <text x="' + centerX + '" y="' + baselineY + '" fill="' + escapeAttr(color) + '" stroke="' + (borderWidth > 0 ? escapeAttr(borderColor) : "none") + '" stroke-width="' + borderWidth + '" paint-order="stroke fill" stroke-linejoin="round" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-style="normal" font-size="' + fontSize + '" text-anchor="middle"' + (Number(component.rotationDeg || 0) ? ' transform="rotate(' + Number(component.rotationDeg || 0) + " " + centerX + " " + centerY + ')"' : "") + '>' + escapeText(value) + "</text>",
         "  </g>",
         "</g>"
       ].join("");
