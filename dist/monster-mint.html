@@ -5252,18 +5252,20 @@ button {
   }
 
   function renderCutlineTicks(cellX, cellY, cellSize, tokenX, tokenY, tokenSize, inset, color) {
-    var centerX = cellX + cellSize / 2;
-    var centerY = cellY + cellSize / 2;
     var lineWidth = 1;
-    var topEnd = tokenY - inset;
-    var bottomStart = tokenY + tokenSize + inset;
-    var leftEnd = tokenX - inset;
-    var rightStart = tokenX + tokenSize + inset;
+    var leftX = tokenX;
+    var rightX = tokenX + tokenSize;
+    var topY = tokenY;
+    var bottomY = tokenY + tokenSize;
     return [
-      renderCutlineTick(centerX, cellY, centerX, topEnd, color, lineWidth),
-      renderCutlineTick(centerX, bottomStart, centerX, cellY + cellSize, color, lineWidth),
-      renderCutlineTick(cellX, centerY, leftEnd, centerY, color, lineWidth),
-      renderCutlineTick(rightStart, centerY, cellX + cellSize, centerY, color, lineWidth)
+      renderCutlineTick(leftX, cellY, leftX, cellY + inset, color, lineWidth),
+      renderCutlineTick(rightX, cellY, rightX, cellY + inset, color, lineWidth),
+      renderCutlineTick(leftX, cellY + cellSize - inset, leftX, cellY + cellSize, color, lineWidth),
+      renderCutlineTick(rightX, cellY + cellSize - inset, rightX, cellY + cellSize, color, lineWidth),
+      renderCutlineTick(cellX, topY, cellX + inset, topY, color, lineWidth),
+      renderCutlineTick(cellX, bottomY, cellX + inset, bottomY, color, lineWidth),
+      renderCutlineTick(cellX + cellSize - inset, topY, cellX + cellSize, topY, color, lineWidth),
+      renderCutlineTick(cellX + cellSize - inset, bottomY, cellX + cellSize, bottomY, color, lineWidth)
     ].join("");
   }
 
