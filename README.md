@@ -2,7 +2,7 @@
 
 Monster Mint is a single-page token designer for tabletop play. It lets you build circular token templates with images, text, borders, colors, and sequences, then lay those tokens out on printable pages with cut guides so they can be punched or cut out and glued to physical backing.
 
-The project is built as modular source code, but the distributable is one self-contained HTML file: [dist/monster-mint.html](/home/ben/code/monster-mint/dist/monster-mint.html).
+The project is built as modular source code, but the distributable is one self-contained HTML file at `dist/monster-mint.html`.
 
 ## GitHub
 
@@ -73,11 +73,11 @@ Or with Task:
 task build
 ```
 
-The build output is [dist/monster-mint.html](/home/ben/code/monster-mint/dist/monster-mint.html).
+The build output is `dist/monster-mint.html`.
 
 ## Run
 
-For normal use, just open [dist/monster-mint.html](/home/ben/code/monster-mint/dist/monster-mint.html) in a browser.
+For normal use, just open `dist/monster-mint.html` in a browser.
 
 If you prefer serving it over HTTP during development, you can also run:
 
