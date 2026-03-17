@@ -390,6 +390,124 @@ test("normalizeProjectImageAssets updates imported token images and backgrounds"
   assert.equal(normalized.tokens[0].front.images[1].source, "https://example.com/external.png");
 });
 
+test("compactProjectImageAssets replaces repeated embedded images with asset refs", () => {
+  const sharedSource = makeDataUrl("image/png", 128);
+  const project = Schema.createDefaultProject();
+  project.settings.tokenDefaults.backgroundImageSource = sharedSource;
+  project.tokens.push(Tokens.createTokenTemplate({
+    id: "token-1",
+    front: {
+      backgroundMode: "image",
+      backgroundImageSource: sharedSource,
+      images: [
+        Tokens.createImageComponent({
+          id: "image-1",
+          source: sharedSource
+        })
+      ]
+    }
+  }));
+
+  const compacted = Utils.compactProjectImageAssets(project);
+
+  assert.equal(compacted.assets.images.length, 1);
+  assert.deepEqual(compacted.assets.images[0], {
+    id: "image_1",
+    source: sharedSource
+  });
+  assert.deepEqual(compacted.settings.tokenDefaults.backgroundImageSource, { assetRef: "image_1" });
+  assert.deepEqual(compacted.tokens[0].front.backgroundImageSource, { assetRef: "image_1" });
+  assert.deepEqual(compacted.tokens[0].front.images[0].source, { assetRef: "image_1" });
+});
+
+test("hydrateProjectImageAssets restores embedded image refs before normalization", () => {
+  const sharedSource = makeDataUrl("image/png", 128);
+  const compacted = {
+    version: 1,
+    meta: {
+      name: "Hydrated",
+      updatedAt: "2026-03-17T00:00:00.000Z"
+    },
+    settings: {
+      pagePresetId: "letter",
+      pageOrientation: "portrait",
+      pageMarginIn: 0.25,
+      cutlineGapMm: 0,
+      imageTrimAlphaThreshold: 1,
+      tokenDefaults: {
+        diameterIn: 1,
+        backgroundMode: "image",
+        backgroundColorMode: "manual",
+        backgroundColor: "#f3e7c9",
+        backgroundColorSequenceRef: null,
+        backgroundImageSource: { assetRef: "image_1" },
+        borderWidthRatio: 0.03,
+        borderColorMode: "manual",
+        borderColor: "#000000",
+        borderColorSequenceRef: null
+      },
+      textDefaults: Schema.createDefaultTextDefaults()
+    },
+    sequences: {
+      text: [],
+      color: []
+    },
+    tokens: [
+      {
+        id: "token-1",
+        name: "Token",
+        diameterIn: 1,
+        front: {
+          backgroundMode: "image",
+          backgroundColorMode: "manual",
+          backgroundColor: "#ffffff",
+          backgroundColorSequenceRef: null,
+          backgroundImageSource: { assetRef: "image_1" },
+          border: {
+            enabled: true,
+            widthRatio: 0.03,
+            colorMode: "manual",
+            color: "#000000",
+            colorSequenceRef: null
+          },
+          images: [
+            {
+              id: "image-1",
+              name: "image.png",
+              source: { assetRef: "image_1" },
+              aspectRatio: 1,
+              x: 0,
+              y: 0,
+              scale: 0.5,
+              rotationDeg: 0,
+              mirrorX: false,
+              mirrorY: false,
+              zIndex: 1
+            }
+          ],
+          texts: []
+        }
+      }
+    ],
+    printSelections: [],
+    assets: {
+      images: [
+        {
+          id: "image_1",
+          source: sharedSource
+        }
+      ]
+    }
+  };
+
+  const hydrated = Utils.hydrateProjectImageAssets(compacted);
+
+  assert.equal(hydrated.settings.tokenDefaults.backgroundImageSource, sharedSource);
+  assert.equal(hydrated.tokens[0].front.backgroundImageSource, sharedSource);
+  assert.equal(hydrated.tokens[0].front.images[0].source, sharedSource);
+  assert.equal("assets" in hydrated, false);
+});
+
 test("optimizeImageAssetSource leaves small images unchanged", async () => {
   const source = makeDataUrl("image/png", 768);
   let loadCount = 0;

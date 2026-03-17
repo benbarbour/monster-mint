@@ -1167,7 +1167,8 @@
     var safeName = state.project.meta && state.project.meta.name && state.project.meta.name !== "Untitled Project"
       ? state.project.meta.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
       : "monster-mint";
-    Utils.downloadTextFile((safeName || "monster-mint") + ".json", JSON.stringify(state.project, null, 2));
+    var exportProjectData = Utils.compactProjectImageAssets(state.project);
+    Utils.downloadTextFile((safeName || "monster-mint") + ".json", JSON.stringify(exportProjectData, null, 2));
   }
 
   function createColorSequence() {

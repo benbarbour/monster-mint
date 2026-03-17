@@ -212,7 +212,8 @@
       try {
         var contents = await Utils.readTextFile(file);
         var parsed = JSON.parse(contents);
-        var projectWithDefaults = Schema.normalizeProject(parsed);
+        var hydratedProject = Utils.hydrateProjectImageAssets(parsed);
+        var projectWithDefaults = Schema.normalizeProject(hydratedProject);
         var normalizedProject = await Utils.normalizeProjectImageAssets(projectWithDefaults, helpers.getImageImportOptions(projectWithDefaults));
         await store.replaceProject(normalizedProject);
         await store.updateUi(function (ui) {

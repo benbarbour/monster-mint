@@ -556,6 +556,114 @@ test("json import normalizes embedded image assets", async ({ page }) => {
   await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toHaveValue("Imported Token");
 });
 
+test("json import accepts compact asset references", async ({ page }) => {
+  const paddedSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300">' +
+    '<rect x="120" y="40" width="60" height="220" fill="red"/>' +
+    '</svg>';
+  const sharedSource = "data:image/svg+xml;base64," + Buffer.from(paddedSvg).toString("base64");
+  const compactProject = {
+    version: 1,
+    meta: {
+      name: "Imported Compact",
+      updatedAt: "2026-03-17T00:00:00.000Z"
+    },
+    settings: {
+      pagePresetId: "letter",
+      pageOrientation: "portrait",
+      pageMarginIn: 0.25,
+      cutlineGapMm: 0,
+      tokenDefaults: {
+        diameterIn: 1,
+        backgroundMode: "image",
+        backgroundColorMode: "manual",
+        backgroundColor: "#f3e7c9",
+        backgroundColorSequenceRef: null,
+        backgroundImageSource: { assetRef: "image_1" },
+        borderWidthRatio: 0.03,
+        borderColorMode: "manual",
+        borderColor: "#000000",
+        borderColorSequenceRef: null
+      },
+      textDefaults: {
+        fontFamily: "Times New Roman",
+        fontWeight: "700",
+        colorMode: "manual",
+        color: "#ffffff",
+        colorSequenceRef: null,
+        textBorder: {
+          width: 3,
+          colorMode: "manual",
+          color: "#000000",
+          colorSequenceRef: null
+        }
+      }
+    },
+    sequences: {
+      text: [],
+      color: []
+    },
+    tokens: [
+      {
+        id: "token_compact",
+        name: "Imported Compact Token",
+        diameterIn: 1,
+        front: {
+          backgroundMode: "image",
+          backgroundColorMode: "manual",
+          backgroundColor: "#ffffff",
+          backgroundColorSequenceRef: null,
+          backgroundImageSource: { assetRef: "image_1" },
+          border: {
+            enabled: true,
+            widthRatio: 0.03,
+            colorMode: "manual",
+            color: "#000000",
+            colorSequenceRef: null
+          },
+          images: [
+            {
+              id: "image_imported_compact",
+              name: "shared.svg",
+              x: 0,
+              y: 0,
+              scale: 0.5,
+              aspectRatio: 1,
+              rotationDeg: 0,
+              mirrorX: false,
+              mirrorY: false,
+              zIndex: 1,
+              source: { assetRef: "image_1" }
+            }
+          ],
+          texts: []
+        }
+      }
+    ],
+    printSelections: [],
+    assets: {
+      images: [
+        {
+          id: "image_1",
+          source: sharedSource
+        }
+      ]
+    }
+  };
+
+  await page.locator("[data-import-input]").setInputFiles({
+    name: "imported-compact.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(compactProject))
+  });
+
+  await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toHaveValue("Imported Compact Token");
+  await page.locator('select[name="selectedComponentKey"]').selectOption({ label: "shared.svg" });
+  const importedImage = page.locator('[data-preview-stage] svg g[data-component-type="image"] image').first();
+  await expect(importedImage).toHaveAttribute("href", /data:image\/(png|webp);base64,/);
+  const importedBackground = page.locator('[data-preview-stage] svg image[data-background-image="true"]').first();
+  await expect(importedBackground).toHaveAttribute("href", /data:image\/(png|webp);base64,/);
+});
+
 test("save failures are surfaced in the header", async ({ page }) => {
   await page.evaluate(() => {
     const originalPut = IDBObjectStore.prototype.put;

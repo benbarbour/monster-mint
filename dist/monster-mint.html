@@ -1471,6 +1471,136 @@ button {
     return nextProject;
   }
 
+  function compactProjectImageAssets(project) {
+    if (!project || typeof project !== "object") {
+      return project;
+    }
+
+    var nextProject = JSON.parse(JSON.stringify(project));
+    var sourceCounts = new Map();
+    collectProjectImageSources(nextProject).forEach(function (source) {
+      sourceCounts.set(source, (sourceCounts.get(source) || 0) + 1);
+    });
+
+    var sharedSources = Array.from(sourceCounts.entries()).filter(function (entry) {
+      return entry[1] > 1;
+    });
+    if (!sharedSources.length) {
+      return nextProject;
+    }
+
+    var assets = [];
+    var assetIdsBySource = new Map();
+    sharedSources.forEach(function (entry, index) {
+      var assetId = "image_" + (index + 1);
+      assetIdsBySource.set(entry[0], assetId);
+      assets.push({
+        id: assetId,
+        source: entry[0]
+      });
+    });
+
+    rewriteProjectImageSources(nextProject, function (source) {
+      var assetId = assetIdsBySource.get(source);
+      return assetId ? { assetRef: assetId } : source;
+    });
+
+    nextProject.assets = nextProject.assets && typeof nextProject.assets === "object" ? nextProject.assets : {};
+    nextProject.assets.images = assets;
+    return nextProject;
+  }
+
+  function hydrateProjectImageAssets(project) {
+    if (!project || typeof project !== "object") {
+      return project;
+    }
+
+    var nextProject = JSON.parse(JSON.stringify(project));
+    var imageAssets = nextProject.assets && Array.isArray(nextProject.assets.images)
+      ? nextProject.assets.images
+      : [];
+    if (!imageAssets.length) {
+      return nextProject;
+    }
+
+    var sourceByAssetId = new Map();
+    imageAssets.forEach(function (asset) {
+      if (asset && typeof asset.id === "string" && typeof asset.source === "string") {
+        sourceByAssetId.set(asset.id, asset.source);
+      }
+    });
+
+    rewriteProjectImageSources(nextProject, function (value) {
+      if (!value || typeof value !== "object" || typeof value.assetRef !== "string") {
+        return value;
+      }
+      return sourceByAssetId.get(value.assetRef) || "";
+    });
+
+    if (nextProject.assets && typeof nextProject.assets === "object") {
+      delete nextProject.assets.images;
+      if (!Object.keys(nextProject.assets).length) {
+        delete nextProject.assets;
+      }
+    }
+
+    return nextProject;
+  }
+
+  function collectProjectImageSources(project) {
+    var sources = [];
+    visitProjectImageSources(project, function (source) {
+      if (isImageDataUrl(source)) {
+        sources.push(source);
+      }
+    });
+    return sources;
+  }
+
+  function rewriteProjectImageSources(project, rewriteValue) {
+    visitProjectImageSources(project, function (value, setValue) {
+      setValue(rewriteValue(value));
+    });
+  }
+
+  function visitProjectImageSources(project, visitor) {
+    if (!project || typeof project !== "object") {
+      return;
+    }
+
+    if (project.settings && project.settings.tokenDefaults) {
+      visitImageField(project.settings.tokenDefaults, "backgroundImageSource", visitor);
+    }
+
+    if (!Array.isArray(project.tokens)) {
+      return;
+    }
+
+    project.tokens.forEach(function (token) {
+      if (!token || !token.front) {
+        return;
+      }
+
+      visitImageField(token.front, "backgroundImageSource", visitor);
+      if (!Array.isArray(token.front.images)) {
+        return;
+      }
+
+      token.front.images.forEach(function (image) {
+        visitImageField(image, "source", visitor);
+      });
+    });
+  }
+
+  function visitImageField(owner, key, visitor) {
+    if (!owner || !(key in owner)) {
+      return;
+    }
+    visitor(owner[key], function (nextValue) {
+      owner[key] = nextValue;
+    });
+  }
+
   function normalizeImageOptimizationOptions(options) {
     var settings = options && typeof options === "object" ? options : {};
     return {
@@ -1681,6 +1811,8 @@ button {
     loadImageDimensions: loadImageDimensions,
     findOpaqueBounds: findOpaqueBounds,
     estimateDataUrlBytes: estimateDataUrlBytes,
+    compactProjectImageAssets: compactProjectImageAssets,
+    hydrateProjectImageAssets: hydrateProjectImageAssets,
     normalizeEmbeddedImageAssetSource: normalizeEmbeddedImageAssetSource,
     normalizeProjectImageAssets: normalizeProjectImageAssets,
     trimTransparentImageAssetSource: trimTransparentImageAssetSource,
@@ -4422,7 +4554,8 @@ button {
       try {
         var contents = await Utils.readTextFile(file);
         var parsed = JSON.parse(contents);
-        var projectWithDefaults = Schema.normalizeProject(parsed);
+        var hydratedProject = Utils.hydrateProjectImageAssets(parsed);
+        var projectWithDefaults = Schema.normalizeProject(hydratedProject);
         var normalizedProject = await Utils.normalizeProjectImageAssets(projectWithDefaults, helpers.getImageImportOptions(projectWithDefaults));
         await store.replaceProject(normalizedProject);
         await store.updateUi(function (ui) {
@@ -6617,7 +6750,8 @@ button {
     var safeName = state.project.meta && state.project.meta.name && state.project.meta.name !== "Untitled Project"
       ? state.project.meta.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
       : "monster-mint";
-    Utils.downloadTextFile((safeName || "monster-mint") + ".json", JSON.stringify(state.project, null, 2));
+    var exportProjectData = Utils.compactProjectImageAssets(state.project);
+    Utils.downloadTextFile((safeName || "monster-mint") + ".json", JSON.stringify(exportProjectData, null, 2));
   }
 
   function createColorSequence() {
