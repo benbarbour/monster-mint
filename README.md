@@ -4,6 +4,14 @@ Monster Mint is a single-page token designer for tabletop play. It lets you buil
 
 The project is built as modular source code, but the distributable is one self-contained HTML file: [dist/monster-mint.html](/home/ben/code/monster-mint/dist/monster-mint.html).
 
+## GitHub
+
+[![CI](https://github.com/benbarbour/monster-mint/actions/workflows/ci.yml/badge.svg)](https://github.com/benbarbour/monster-mint/actions/workflows/ci.yml)
+[![Release](https://github.com/benbarbour/monster-mint/actions/workflows/release.yml/badge.svg)](https://github.com/benbarbour/monster-mint/actions/workflows/release.yml)
+
+- Live hosted copy: `https://benbabour.github.io/monster-mint/`
+- Versioned release downloads: `https://github.com/benbarbour/monster-mint/releases`
+
 ## Disclaimer
 
 Everything in this repo, other than this Disclaimer (including the rest of this README) are AI generated. I am a software developer, so this is slightly embarrassing/worrying, but I wanted to try it out. I could have built this myself from scratch, but:
