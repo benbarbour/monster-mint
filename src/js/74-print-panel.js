@@ -11,7 +11,6 @@
   var runtimeGlobal = typeof globalThis !== "undefined" ? globalThis : window;
   var escapeHtml = Ui.escapeHtml;
   var activePrintFrame = null;
-  var printSelectionSyncTimer = null;
 
   function naturalLabelCompare(left, right) {
     return String(left || "").localeCompare(String(right || ""), undefined, {
@@ -111,26 +110,17 @@
           ? String(matched.copies)
           : String(matched.sequenceStart);
       };
-      var syncPrintSelections = function () {
-        if (printSelectionSyncTimer) {
-          runtimeGlobal.clearTimeout(printSelectionSyncTimer);
-        }
-        printSelectionSyncTimer = runtimeGlobal.setTimeout(function () {
-          printSelectionSyncTimer = null;
-          commitPrintSelections();
-        }, 180);
-      };
       var flushPrintSelections = function (event) {
-        if (printSelectionSyncTimer) {
-          runtimeGlobal.clearTimeout(printSelectionSyncTimer);
-          printSelectionSyncTimer = null;
-        }
         commitPrintSelections();
         normalizeCommittedField(event && event.target);
       };
 
-      printForm.addEventListener("input", syncPrintSelections);
       printForm.addEventListener("change", flushPrintSelections);
+      printForm.addEventListener("focusout", function (event) {
+        if (event.target && event.target.name) {
+          flushPrintSelections(event);
+        }
+      });
     }
   }
 
@@ -192,7 +182,7 @@
       }).join(""),
       "    </tbody>",
       "  </table>",
-      '  <p class="field-help">Changes update the preview automatically. Color sequences repeat when copies exceed their length.</p>',
+      '  <p class="field-help">Changes update the preview when you finish editing a field. Color sequences repeat when copies exceed their length.</p>',
       "</form>"
     ].join("");
   }

@@ -395,19 +395,22 @@ test("built-in text modes and color sequences drive live print preview", async (
 
   await copiesInput.click();
   await copiesInput.press("ControlOrMeta+A");
-  await page.keyboard.press("1");
-  await page.keyboard.press("0");
-  await expect(copiesInput).toHaveValue("10");
+  await page.keyboard.press("2");
+  await page.waitForTimeout(250);
+  await page.keyboard.press("4");
+  await expect(copiesInput).toHaveValue("24");
+  await startInput.click();
+  await expect(copiesInput).toHaveValue("24");
   await startInput.fill("0");
   await startInput.blur();
-  await expect(copiesInput).toHaveValue("10");
+  await expect(copiesInput).toHaveValue("24");
   await expect(page.getByRole("button", { name: "Print", exact: true })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Page 2" })).toBeVisible();
-  await expect(page.locator(".panel-toggle-meta").filter({ hasText: "10 tokens" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Page 5", exact: true })).toBeVisible();
+  await expect(page.locator(".panel-toggle-meta").filter({ hasText: "24 tokens" })).toBeVisible();
   await expect(page.locator(".panel-toggle-meta").filter({ hasText: "page" })).toBeVisible();
   const pageTabCount = await page.locator('[data-action="select-preview-page"]').count();
   expect(pageTabCount).toBeGreaterThan(1);
-  await expect(page.getByRole("tab", { name: "Page 1" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Page 1", exact: true })).toBeVisible();
   await expect(page.locator(".preview-tab-list")).toHaveCSS("overflow-x", "auto");
 
   const pageWidths = await page.evaluate(() => ({
