@@ -68,7 +68,7 @@
       "    </div>",
       '    <button class="button" type="button" data-action="close-settings-drawer">Close</button>',
       "  </div>",
-      '  <div class="drawer-body">',
+      '  <div class="drawer-body" data-preserve-scroll="y">',
       helpers.renderColorSequenceForm(drawer.sequence),
       '    <div class="button-row drawer-actions">',
       '      <button class="button" type="button" data-action="delete-selected-' + drawer.kind + '-sequence" data-sequence-id="' + drawer.sequence.id + '">Delete Sequence</button>',

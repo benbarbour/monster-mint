@@ -3030,7 +3030,7 @@ button {
       '<g data-component-id="' + component.id + '" data-component-type="' + type + '"' + transform + '>',
       renderSelectionBox(box),
       type === "image" ? renderImageResizeHandles(box, component) : renderTextResizeHandles(box),
-      type === "image"
+      (type === "image" || type === "text")
         ? '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#ffffff" stroke-width="0.9"></line>' +
           '  <line x1="' + (box.x + box.width / 2) + '" y1="' + box.y + '" x2="' + rotateHandleX + '" y2="' + rotateHandleY + '" stroke="#111111" stroke-width="0.45" stroke-dasharray="2 2" stroke-dashoffset="2"></line>' +
           '  <circle cx="' + rotateHandleX + '" cy="' + rotateHandleY + '" r="3.5" fill="#ffffff" stroke="#111111" stroke-width="0.6" data-drag-mode="rotate" cursor="crosshair"></circle>'
@@ -4111,7 +4111,7 @@ button {
       "    </div>",
       '    <button class="button" type="button" data-action="close-settings-drawer">Close</button>',
       "  </div>",
-      '  <div class="drawer-body">',
+      '  <div class="drawer-body" data-preserve-scroll="y">',
       helpers.renderColorSequenceForm(drawer.sequence),
       '    <div class="button-row drawer-actions">',
       '      <button class="button" type="button" data-action="delete-selected-' + drawer.kind + '-sequence" data-sequence-id="' + drawer.sequence.id + '">Delete Sequence</button>',
@@ -4365,7 +4365,7 @@ button {
       '        <h2>' + escapeHtml(token.name) + "</h2>",
       "      </div>",
       "    </div>",
-      '    <div class="drawer-body">',
+      '    <div class="drawer-body" data-preserve-scroll="y">',
       '      <section class="drawer-section">',
       "        <h3>" + (selectedComponent ? "Selected Component" : "Token") + "</h3>",
       (selectedComponent ? renderSelectedComponentForm(selectedComponent, selection, state.project, helpers) : renderTokenForm(token, state.project, helpers)),
@@ -5321,6 +5321,7 @@ button {
   function render(appView, store) {
     var appElement = appView.appElement;
     var focusState = captureFocusState(appElement);
+    var scrollState = captureScrollState(appView);
     var state = store.getState();
     var activeTab = state.ui.activeTab;
     updateShellState(appView, state.ui);
@@ -5330,7 +5331,56 @@ button {
     syncDesignerDrawerHeight(appElement);
     renderDesignerTransientPreview(appElement);
     syncRenderedFormState(appElement, state);
+    restoreScrollState(appView, scrollState);
     restoreFocusState(appElement, focusState);
+  }
+
+  function captureScrollState(appView) {
+    var state = {};
+    Object.keys(appView.panels).forEach(function (tabId) {
+      var panel = appView.panels[tabId];
+      if (!panel) {
+        return;
+      }
+      var scrollables = panel.querySelectorAll("[data-preserve-scroll]");
+      if (!scrollables.length) {
+        return;
+      }
+      state[tabId] = Array.prototype.map.call(scrollables, function (element) {
+        return {
+          axis: element.getAttribute("data-preserve-scroll") || "y",
+          top: element.scrollTop,
+          left: element.scrollLeft
+        };
+      });
+    });
+    return state;
+  }
+
+  function restoreScrollState(appView, scrollState) {
+    if (!scrollState) {
+      return;
+    }
+
+    Object.keys(scrollState).forEach(function (tabId) {
+      var panel = appView.panels[tabId];
+      if (!panel) {
+        return;
+      }
+      var scrollables = panel.querySelectorAll("[data-preserve-scroll]");
+      Array.prototype.forEach.call(scrollables, function (element, index) {
+        var saved = scrollState[tabId] && scrollState[tabId][index];
+        if (!saved) {
+          return;
+        }
+        if (saved.axis.indexOf("x") !== -1) {
+          element.scrollLeft = saved.left;
+        }
+        if (saved.axis.indexOf("y") !== -1) {
+          element.scrollTop = saved.top;
+        }
+      });
+    });
   }
 
   function syncDesignerDrawerHeight(appElement) {
@@ -5639,7 +5689,7 @@ button {
       return state;
     }
 
-    if (interaction.mode === "rotate" && interaction.componentType === "image") {
+    if (interaction.mode === "rotate") {
       var startAngle = Math.atan2(
         interaction.startClientY - interaction.centerClientY,
         interaction.startClientX - interaction.centerClientX
@@ -5648,12 +5698,20 @@ button {
         event.clientY - interaction.centerClientY,
         event.clientX - interaction.centerClientX
       );
-      state.componentState = {
-        x: interaction.startRect.x,
-        y: interaction.startRect.y,
-        scale: interaction.startRect.scale,
-        rotationDeg: interaction.startRect.rotationDeg + (nextAngle - startAngle) * 180 / Math.PI
-      };
+      state.componentState = interaction.componentType === "image"
+        ? {
+          x: interaction.startRect.x,
+          y: interaction.startRect.y,
+          scale: interaction.startRect.scale,
+          rotationDeg: interaction.startRect.rotationDeg + (nextAngle - startAngle) * 180 / Math.PI
+        }
+        : {
+          x: interaction.startRect.x,
+          y: interaction.startRect.y,
+          width: interaction.startRect.width,
+          height: interaction.startRect.height,
+          rotationDeg: interaction.startRect.rotationDeg + (nextAngle - startAngle) * 180 / Math.PI
+        };
       return state;
     }
 
@@ -5698,7 +5756,8 @@ button {
       x: component.x,
       y: component.y,
       width: component.width * factor,
-      height: component.height * factor
+      height: component.height * factor,
+      rotationDeg: component.rotationDeg
     };
     return state;
   }
@@ -5778,6 +5837,7 @@ button {
     }
 
     Tokens.updateComponentRect(component, preview.componentState);
+    component.rotationDeg = toNumberOrDefault(preview.componentState.rotationDeg, component.rotationDeg);
     return true;
   }
 

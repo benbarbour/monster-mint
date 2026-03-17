@@ -80,7 +80,7 @@
       '        <h2>' + escapeHtml(token.name) + "</h2>",
       "      </div>",
       "    </div>",
-      '    <div class="drawer-body">',
+      '    <div class="drawer-body" data-preserve-scroll="y">',
       '      <section class="drawer-section">',
       "        <h3>" + (selectedComponent ? "Selected Component" : "Token") + "</h3>",
       (selectedComponent ? renderSelectedComponentForm(selectedComponent, selection, state.project, helpers) : renderTokenForm(token, state.project, helpers)),

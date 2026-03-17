@@ -38,12 +38,23 @@ test("can create and manipulate a token template", async ({ page }) => {
   await expect(page.locator('form[data-form="text-component-settings"] input[name="sequenceStart"]')).toBeVisible();
   await expect(page.locator('form[data-form="text-component-settings"] input[name="sequencePad"]')).toBeVisible();
   await expect(page.locator('form[data-form="text-component-settings"] input[name="rotationDeg"]')).toHaveAttribute("type", "number");
+  await expect(page.locator('[data-component-type="text"] [data-drag-mode="rotate"]').first()).toBeVisible();
   await expect(page.locator('[data-component-type="text"][data-drag-mode="move"]').first()).toHaveAttribute("cursor", "default");
   const textNode = page.locator('[data-preview-stage] svg text').first();
   const initialFontSize = Number(await textNode.getAttribute("font-size"));
   await page.locator('form[data-form="text-component-settings"] input[name="rotationDeg"]').fill("15");
   await page.locator('form[data-form="text-component-settings"] input[name="rotationDeg"]').blur();
   await expect(textNode).toHaveAttribute("transform", /rotate\(15 /);
+  const textRotateHandle = page.locator('[data-component-type="text"] [data-drag-mode="rotate"]').first();
+  const textRotateBox = await textRotateHandle.boundingBox();
+  if (!textRotateBox) {
+    throw new Error("Missing text rotate handle");
+  }
+  await page.mouse.move(textRotateBox.x + textRotateBox.width / 2, textRotateBox.y + textRotateBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(textRotateBox.x + textRotateBox.width / 2 + 30, textRotateBox.y + textRotateBox.height / 2 + 20, { steps: 10 });
+  await page.mouse.up();
+  await expect(page.locator('form[data-form="text-component-settings"] input[name="rotationDeg"]')).not.toHaveValue("15");
   await page.locator('form[data-form="text-component-settings"] input[name="textBorderWidth"]').fill("6");
   await page.locator('form[data-form="text-component-settings"] input[name="textBorderWidth"]').blur();
   await expect(textNode).toHaveAttribute("stroke-width", "6");
@@ -63,6 +74,11 @@ test("can create and manipulate a token template", async ({ page }) => {
     };
   });
   expect(designerHeights.drawerHeight).toBeLessThanOrEqual(designerHeights.mainHeight + 1);
+  await page.locator(".designer-drawer .drawer-body").evaluate((element) => {
+    element.scrollTop = 240;
+  });
+  const scrollBeforeEdit = await page.locator(".designer-drawer .drawer-body").evaluate((element) => element.scrollTop);
+  expect(scrollBeforeEdit).toBeGreaterThan(0);
 
   const xInput = page.locator('form[data-form="text-component-settings"] input[name="x"]');
   const yInput = page.locator('form[data-form="text-component-settings"] input[name="y"]');
@@ -74,6 +90,8 @@ test("can create and manipulate a token template", async ({ page }) => {
   await yInput.fill("0.10");
   await yInput.blur();
   await expect(yInput).toHaveValue("0.10");
+  const scrollAfterEdit = await page.locator(".designer-drawer .drawer-body").evaluate((element) => element.scrollTop);
+  expect(scrollAfterEdit).toBeGreaterThan(0);
   const raisedHandleY = (await moveHandle.boundingBox()).y;
   expect(raisedHandleY).toBeLessThan(initialHandleY);
   await yInput.fill("0");

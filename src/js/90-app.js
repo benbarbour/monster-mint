@@ -121,6 +121,7 @@
   function render(appView, store) {
     var appElement = appView.appElement;
     var focusState = captureFocusState(appElement);
+    var scrollState = captureScrollState(appView);
     var state = store.getState();
     var activeTab = state.ui.activeTab;
     updateShellState(appView, state.ui);
@@ -130,7 +131,56 @@
     syncDesignerDrawerHeight(appElement);
     renderDesignerTransientPreview(appElement);
     syncRenderedFormState(appElement, state);
+    restoreScrollState(appView, scrollState);
     restoreFocusState(appElement, focusState);
+  }
+
+  function captureScrollState(appView) {
+    var state = {};
+    Object.keys(appView.panels).forEach(function (tabId) {
+      var panel = appView.panels[tabId];
+      if (!panel) {
+        return;
+      }
+      var scrollables = panel.querySelectorAll("[data-preserve-scroll]");
+      if (!scrollables.length) {
+        return;
+      }
+      state[tabId] = Array.prototype.map.call(scrollables, function (element) {
+        return {
+          axis: element.getAttribute("data-preserve-scroll") || "y",
+          top: element.scrollTop,
+          left: element.scrollLeft
+        };
+      });
+    });
+    return state;
+  }
+
+  function restoreScrollState(appView, scrollState) {
+    if (!scrollState) {
+      return;
+    }
+
+    Object.keys(scrollState).forEach(function (tabId) {
+      var panel = appView.panels[tabId];
+      if (!panel) {
+        return;
+      }
+      var scrollables = panel.querySelectorAll("[data-preserve-scroll]");
+      Array.prototype.forEach.call(scrollables, function (element, index) {
+        var saved = scrollState[tabId] && scrollState[tabId][index];
+        if (!saved) {
+          return;
+        }
+        if (saved.axis.indexOf("x") !== -1) {
+          element.scrollLeft = saved.left;
+        }
+        if (saved.axis.indexOf("y") !== -1) {
+          element.scrollTop = saved.top;
+        }
+      });
+    });
   }
 
   function syncDesignerDrawerHeight(appElement) {
@@ -439,7 +489,7 @@
       return state;
     }
 
-    if (interaction.mode === "rotate" && interaction.componentType === "image") {
+    if (interaction.mode === "rotate") {
       var startAngle = Math.atan2(
         interaction.startClientY - interaction.centerClientY,
         interaction.startClientX - interaction.centerClientX
@@ -448,12 +498,20 @@
         event.clientY - interaction.centerClientY,
         event.clientX - interaction.centerClientX
       );
-      state.componentState = {
-        x: interaction.startRect.x,
-        y: interaction.startRect.y,
-        scale: interaction.startRect.scale,
-        rotationDeg: interaction.startRect.rotationDeg + (nextAngle - startAngle) * 180 / Math.PI
-      };
+      state.componentState = interaction.componentType === "image"
+        ? {
+          x: interaction.startRect.x,
+          y: interaction.startRect.y,
+          scale: interaction.startRect.scale,
+          rotationDeg: interaction.startRect.rotationDeg + (nextAngle - startAngle) * 180 / Math.PI
+        }
+        : {
+          x: interaction.startRect.x,
+          y: interaction.startRect.y,
+          width: interaction.startRect.width,
+          height: interaction.startRect.height,
+          rotationDeg: interaction.startRect.rotationDeg + (nextAngle - startAngle) * 180 / Math.PI
+        };
       return state;
     }
 
@@ -498,7 +556,8 @@
       x: component.x,
       y: component.y,
       width: component.width * factor,
-      height: component.height * factor
+      height: component.height * factor,
+      rotationDeg: component.rotationDeg
     };
     return state;
   }
@@ -578,6 +637,7 @@
     }
 
     Tokens.updateComponentRect(component, preview.componentState);
+    component.rotationDeg = toNumberOrDefault(preview.componentState.rotationDeg, component.rotationDeg);
     return true;
   }
 
