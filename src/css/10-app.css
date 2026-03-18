@@ -81,7 +81,8 @@
   color: #fff8f0;
 }
 
-.menu-button {
+.menu-button,
+.menu-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -93,12 +94,27 @@
   box-shadow: 0 8px 18px rgba(96, 73, 33, 0.12);
   color: var(--ink);
   font-size: 1.1rem;
+  text-decoration: none;
 }
 
 .menu-button.is-active {
   background: var(--panel);
   border-color: var(--accent);
   color: var(--accent-strong);
+}
+
+.menu-link:hover,
+.menu-link:focus-visible,
+.menu-button:hover,
+.menu-button:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  outline: none;
+}
+
+.menu-icon {
+  width: 1.2rem;
+  height: 1.2rem;
 }
 
 .tabs {
