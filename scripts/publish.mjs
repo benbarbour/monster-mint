@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 
 const rootDir = process.cwd();
 const packageJsonPath = path.join(rootDir, "package.json");
+const packageLockPath = path.join(rootDir, "package-lock.json");
 const dryRun = process.argv.includes("--dry-run");
 
 async function main() {
@@ -13,9 +14,22 @@ async function main() {
   ensureGhAuthenticated();
 
   const packageJson = JSON.parse(await fs.readFile(packageJsonPath, "utf8"));
+  const packageLock = JSON.parse(await fs.readFile(packageLockPath, "utf8"));
   const currentVersion = String(packageJson.version || "").trim();
   if (!isValidVersion(currentVersion)) {
     throw new Error(`package.json has an invalid version: ${currentVersion || "<empty>"}`);
+  }
+  const lockfileVersion = getLockfileVersion(packageLock);
+  if (!isValidVersion(lockfileVersion)) {
+    throw new Error(`package-lock.json has an invalid version: ${lockfileVersion || "<empty>"}`);
+  }
+  if (lockfileVersion !== currentVersion) {
+    throw new Error(`package.json (${currentVersion}) and package-lock.json (${lockfileVersion}) are out of sync.`);
+  }
+
+  const latestTagVersion = getLatestVersionTag();
+  if (latestTagVersion && latestTagVersion !== currentVersion) {
+    throw new Error(`package version (${currentVersion}) does not match the latest git tag (${latestTagVersion}).`);
   }
 
   const releasePlan = await promptForReleasePlan(currentVersion);
@@ -26,7 +40,9 @@ async function main() {
 
   if (releasePlan.bumped && !dryRun) {
     packageJson.version = nextVersion;
+    applyVersionToLockfile(packageLock, nextVersion);
     await fs.writeFile(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`, "utf8");
+    await fs.writeFile(packageLockPath, `${JSON.stringify(packageLock, null, 2)}\n`, "utf8");
   }
 
   logStep(`Preparing release ${tagName}${dryRun ? " (dry run)" : ""}`);
@@ -36,7 +52,7 @@ async function main() {
   run("npm", ["run", "test:e2e"]);
 
   if (releasePlan.bumped) {
-    run("git", ["add", "package.json"]);
+    run("git", ["add", "package.json", "package-lock.json"]);
     run("git", ["commit", "-m", `Bump version to ${nextVersion}`]);
   }
 
@@ -68,8 +84,19 @@ function ensureGhAuthenticated() {
 function ensureTagDoesNotExist(tagName) {
   const localTag = capture("git", ["tag", "--list", tagName]).stdout.trim();
   if (localTag === tagName) {
-    throw new Error(`Tag ${tagName} already exists locally.`);
+    throw new Error(`Tag ${tagName} already exists locally. Choose a version bump or custom version.`);
   }
+}
+
+function getLatestVersionTag() {
+  const latestTag = capture("git", ["tag", "--list", "v*", "--sort=-version:refname"]).stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean);
+  if (!latestTag) {
+    return "";
+  }
+  return latestTag.replace(/^v/, "");
 }
 
 async function promptForReleasePlan(currentVersion) {
@@ -142,6 +169,29 @@ function bumpVersion(version, kind) {
 
 function isValidVersion(version) {
   return /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version);
+}
+
+function getLockfileVersion(packageLock) {
+  if (packageLock && typeof packageLock.version === "string" && packageLock.version.trim()) {
+    return packageLock.version.trim();
+  }
+  if (
+    packageLock &&
+    packageLock.packages &&
+    packageLock.packages[""] &&
+    typeof packageLock.packages[""].version === "string" &&
+    packageLock.packages[""].version.trim()
+  ) {
+    return packageLock.packages[""].version.trim();
+  }
+  return "";
+}
+
+function applyVersionToLockfile(packageLock, version) {
+  packageLock.version = version;
+  if (packageLock.packages && packageLock.packages[""]) {
+    packageLock.packages[""].version = version;
+  }
 }
 
 function run(command, args, options = {}) {
