@@ -36,7 +36,9 @@ async function main() {
   const nextVersion = releasePlan.version;
   const tagName = `v${nextVersion}`;
 
-  ensureTagDoesNotExist(tagName);
+  if (!releasePlan.overwrite) {
+    ensureTagDoesNotExist(tagName);
+  }
 
   if (releasePlan.bumped && !dryRun) {
     packageJson.version = nextVersion;
@@ -57,8 +59,14 @@ async function main() {
   }
 
   run("git", ["push", "origin", "main"]);
-  run("git", ["tag", tagName]);
-  run("git", ["push", "origin", `refs/tags/${tagName}`]);
+  if (releasePlan.overwrite) {
+    run("git", ["tag", "-f", tagName]);
+    run("git", ["push", "origin", `refs/tags/${tagName}`, "--force"]);
+    run("gh", ["release", "delete", tagName, "--yes"]);
+  } else {
+    run("git", ["tag", tagName]);
+    run("git", ["push", "origin", `refs/tags/${tagName}`]);
+  }
   run("gh", ["release", "create", tagName, "--generate-notes"]);
 
   output.write(`\n${dryRun ? "Dry run complete for" : "Published"} ${tagName}.\n`);
@@ -116,8 +124,10 @@ async function promptForReleasePlan(currentVersion) {
     }
 
     if (selection === "1") {
+      const overwrite = await confirmOverwriteCurrentVersion(rl, currentVersion);
       return {
         bumped: false,
+        overwrite: overwrite,
         version: currentVersion
       };
     }
@@ -127,8 +137,12 @@ async function promptForReleasePlan(currentVersion) {
       if (!isValidVersion(customVersion)) {
         throw new Error(`Invalid version: ${customVersion}`);
       }
+      const overwrite = customVersion === currentVersion
+        ? await confirmOverwriteCurrentVersion(rl, currentVersion)
+        : false;
       return {
         bumped: customVersion !== currentVersion,
+        overwrite: overwrite,
         version: customVersion
       };
     }
@@ -136,11 +150,22 @@ async function promptForReleasePlan(currentVersion) {
     const bumpKind = selection === "2" ? "patch" : selection === "3" ? "minor" : "major";
     return {
       bumped: true,
+      overwrite: false,
       version: bumpVersion(currentVersion, bumpKind)
     };
   } finally {
     rl.close();
   }
+}
+
+async function confirmOverwriteCurrentVersion(rl, currentVersion) {
+  const confirmation = (await rl.question(
+    `Overwrite the existing ${currentVersion} release and retag it to the current commit? [y/N]: `
+  )).trim().toLowerCase();
+  if (!["y", "yes"].includes(confirmation)) {
+    throw new Error("Release overwrite cancelled.");
+  }
+  return true;
 }
 
 function bumpVersion(version, kind) {
