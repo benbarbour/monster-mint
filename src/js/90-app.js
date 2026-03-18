@@ -18,6 +18,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, Storage, State, Sequences, Utils, Tokens, Renderer, Print, Ui, AppHelpers, SettingsPanel, DesignerPanel, PrintPanel) {
   var runtimeGlobal = typeof globalThis !== "undefined" ? globalThis : window;
   var GITHUB_REPO_URL = "https://github.com/benbarbour/monster-mint";
+  var APP_VERSION = runtimeGlobal.MONSTER_MINT_APP_VERSION || "0.0.0";
   var TAB_CONFIG = [
     { id: "designer", label: "Designer" },
     { id: "print", label: "Print" }
@@ -44,6 +45,7 @@
   var renderConditionalField = Ui.renderConditionalField;
   var renderConditionalBlock = Ui.renderConditionalBlock;
   var syncConditionalFields = Ui.syncConditionalFields;
+  var escapeHtml = Ui.escapeHtml;
   var parseColorSourceValue = Ui.parseColorSourceValue;
   var toNumberOrDefault = Ui.toNumberOrDefault;
   var toIntegerOrDefault = Ui.toIntegerOrDefault;
@@ -289,6 +291,7 @@
       '      <button class="button" type="button" data-action="close-help">Close</button>',
       "    </div>",
       '    <div class="help-dialog-body">',
+      '      <p class="field-help"><strong>Version:</strong> ' + escapeHtml(APP_VERSION) + "</p>",
       '      <h3>Hotkeys</h3>',
       '      <dl class="hotkey-list">',
       '        <div><dt><kbd>?</kbd></dt><dd>Open or close this help.</dd></div>',
