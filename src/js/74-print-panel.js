@@ -4,10 +4,11 @@
     global.MonsterMintTokens,
     global.MonsterMintRenderer,
     global.MonsterMintPrint,
+    global.MonsterMintUtils,
     global.MonsterMintUi
   );
   global.MonsterMintAppPrintPanel = api;
-})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, Tokens, Renderer, Print, Ui) {
+})(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, Tokens, Renderer, Print, Utils, Ui) {
   var runtimeGlobal = typeof globalThis !== "undefined" ? globalThis : window;
   var escapeHtml = Ui.escapeHtml;
   var activePrintFrame = null;
@@ -47,7 +48,12 @@
         title: "Preview",
         metaText: formatPreviewSummary(previewItemCount, layout.pages.length),
         isOpen: printPanels.preview !== false,
-        actions: '<button class="button button-primary" type="button" data-action="print-layout">Print</button>',
+        actions: [
+          '<div class="button-row">',
+          '<button class="button" type="button" data-action="export-images"' + (previewItemCount ? "" : " disabled") + ">Export Images</button>",
+          '<button class="button button-primary" type="button" data-action="print-layout"' + (previewItemCount ? "" : " disabled") + ">Print</button>",
+          "</div>"
+        ].join(""),
         content: layout.pages.length && layout.pages[0].items.length
           ? renderPreviewTabs(layout, state.project, activePreviewPage)
           : '<div class="empty-state">Choose at least one token copy to generate pages.</div>'
@@ -131,6 +137,39 @@
     if (layout.pages.length && layout.pages[0].items.length) {
       openPrintWindow(layout, state.project);
     }
+  }
+
+  async function exportCurrentLayout(store) {
+    var state = store.getState();
+    var layout = Print.layoutProject(state.project);
+    var previewItems = flattenPreviewItems(layout);
+    if (!previewItems.length) {
+      return;
+    }
+
+    var filenames = buildExportFilenames(previewItems, state.project);
+    var zipEntries = [];
+
+    for (var index = 0; index < previewItems.length; index += 1) {
+      var item = previewItems[index];
+      var pixelSize = Utils.getTokenExportSizePx(item.diameterIn, 300);
+      var svgMarkup = Renderer.renderTokenSvg(item.token, state.project, {
+        sequenceIndex: item.sequenceIndex,
+        instanceId: "export-" + index,
+        interactive: false,
+        outerSquareFill: "rgba(0,0,0,0)",
+        svgAttributes: 'width="' + pixelSize + '" height="' + pixelSize + '"'
+      });
+      zipEntries.push({
+        name: filenames[index],
+        data: await Utils.rasterizeSvgToWebp(svgMarkup, pixelSize, pixelSize, 0.95)
+      });
+    }
+
+    Utils.downloadBlobFile(
+      getExportArchiveName(state.project),
+      new Blob([Utils.createStoredZip(zipEntries)], { type: "application/zip" })
+    );
   }
 
   function renderPageSettingsForm(settings) {
@@ -408,6 +447,61 @@
     );
   }
 
+  function flattenPreviewItems(layout) {
+    return layout.pages.reduce(function (items, page) {
+      page.items.forEach(function (item) {
+        items.push(item);
+      });
+      return items;
+    }, []);
+  }
+
+  function buildExportFilenames(items, project) {
+    var usedNames = new Set();
+    var perTokenCounters = new Map();
+
+    return items.map(function (item) {
+      var tokenKey = item.token.id;
+      var nextCounter = (perTokenCounters.get(tokenKey) || 0) + 1;
+      perTokenCounters.set(tokenKey, nextCounter);
+
+      var tokenName = Utils.sanitizeFilenamePart(item.token.name, "token");
+      var sequenceSuffix = getItemSequenceSuffix(item, project);
+      var baseName = tokenName + "-" + (sequenceSuffix || String(nextCounter));
+      var candidate = baseName;
+      var duplicateIndex = 2;
+
+      while (usedNames.has(candidate.toLowerCase())) {
+        candidate = baseName + "-" + duplicateIndex;
+        duplicateIndex += 1;
+      }
+
+      usedNames.add(candidate.toLowerCase());
+      return candidate + ".webp";
+    });
+  }
+
+  function getItemSequenceSuffix(item, project) {
+    var sequenceComponent = item.token.front.texts.find(function (component) {
+      return component.contentMode === "numeric" || component.contentMode === "alphabetic";
+    });
+    if (!sequenceComponent) {
+      return "";
+    }
+
+    return Utils.sanitizeFilenamePart(
+      Tokens.getTextValue(sequenceComponent, project.sequences.text, item.sequenceIndex),
+      ""
+    );
+  }
+
+  function getExportArchiveName(project) {
+    var rawName = project.meta && project.meta.name && project.meta.name !== "Untitled Project"
+      ? project.meta.name
+      : "monster-mint";
+    return Utils.sanitizeFilenamePart(rawName, "monster-mint") + "-images.zip";
+  }
+
   function openPrintWindow(layout, project) {
     if (!runtimeGlobal.document || !runtimeGlobal.document.body) {
       return;
@@ -478,6 +572,7 @@
   return {
     renderPanel: renderPanel,
     bindForms: bindForms,
-    printCurrentLayout: printCurrentLayout
+    printCurrentLayout: printCurrentLayout,
+    exportCurrentLayout: exportCurrentLayout
   };
 });

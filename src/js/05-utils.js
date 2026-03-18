@@ -5,6 +5,7 @@
     module.exports = api;
   }
 })(typeof globalThis !== "undefined" ? globalThis : window, function () {
+  var runtimeGlobal = typeof globalThis !== "undefined" ? globalThis : window;
   var uidCounter = 0;
   var IMAGE_MAX_BYTES = 1024 * 1024;
   var IMAGE_MAX_LONGEST_EDGE = 2048;
@@ -28,6 +29,10 @@
 
   function downloadTextFile(filename, contents) {
     var blob = new Blob([contents], { type: "application/json" });
+    downloadBlobFile(filename, blob);
+  }
+
+  function downloadBlobFile(filename, blob) {
     var url = URL.createObjectURL(blob);
     var link = document.createElement("a");
     link.href = url;
@@ -71,6 +76,228 @@
       image.onerror = reject;
       image.src = source;
     });
+  }
+
+  function rasterizeSvgToWebp(svgMarkup, width, height, quality) {
+    return new Promise(function (resolve, reject) {
+      if (typeof Blob === "undefined" || typeof URL === "undefined" || typeof document === "undefined") {
+        reject(new Error("SVG rasterization is not available in this environment."));
+        return;
+      }
+
+      var svgBlob = new Blob([svgMarkup], { type: "image/svg+xml;charset=utf-8" });
+      var svgUrl = URL.createObjectURL(svgBlob);
+      loadImage(svgUrl).then(function (image) {
+        var canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        var context = canvas.getContext("2d");
+        if (!context) {
+          URL.revokeObjectURL(svgUrl);
+          reject(new Error("Canvas 2D context is unavailable."));
+          return;
+        }
+        context.clearRect(0, 0, width, height);
+        context.drawImage(image, 0, 0, width, height);
+        canvas.toBlob(function (blob) {
+          URL.revokeObjectURL(svgUrl);
+          if (!blob) {
+            reject(new Error("Encoding token image failed."));
+            return;
+          }
+          if (blob.type !== "image/webp") {
+            reject(new Error("This browser could not encode transparent WebP images."));
+            return;
+          }
+          blob.arrayBuffer().then(function (buffer) {
+            resolve(new Uint8Array(buffer));
+          }, reject);
+        }, "image/webp", typeof quality === "number" ? quality : 0.95);
+      }, function (error) {
+        URL.revokeObjectURL(svgUrl);
+        reject(error);
+      });
+    });
+  }
+
+  function getTokenExportSizePx(diameterIn, dpi) {
+    var resolvedDpi = asPositiveInteger(dpi, 300);
+    return Math.max(1, Math.round(asPositiveNumber(diameterIn, 1) * resolvedDpi));
+  }
+
+  function sanitizeFilenamePart(value, fallback) {
+    var normalized = String(value || "")
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/gi, "-")
+      .replace(/^-+|-+$/g, "");
+    if (normalized) {
+      return normalized;
+    }
+    return fallback != null ? String(fallback) : "token";
+  }
+
+  function createStoredZip(entries) {
+    var encoder = runtimeGlobal.TextEncoder ? new runtimeGlobal.TextEncoder() : null;
+    if (!encoder) {
+      throw new Error("UTF-8 encoding is not available in this environment.");
+    }
+
+    var preparedEntries = (entries || []).map(function (entry) {
+      var name = String(entry && entry.name ? entry.name : "file");
+      var nameBytes = encoder.encode(name);
+      var dataBytes = toUint8Array(entry && entry.data ? entry.data : new Uint8Array(0));
+      return {
+        name: name,
+        nameBytes: nameBytes,
+        dataBytes: dataBytes,
+        crc32: computeCrc32(dataBytes)
+      };
+    });
+
+    var now = new Date();
+    var dosTime = toDosTime(now);
+    var dosDate = toDosDate(now);
+    var localOffset = 0;
+    var centralDirectorySize = 0;
+
+    preparedEntries.forEach(function (entry) {
+      entry.localOffset = localOffset;
+      localOffset += 30 + entry.nameBytes.length + entry.dataBytes.length;
+      centralDirectorySize += 46 + entry.nameBytes.length;
+    });
+
+    var totalSize = localOffset + centralDirectorySize + 22;
+    var archive = new Uint8Array(totalSize);
+    var view = new DataView(archive.buffer);
+    var offset = 0;
+
+    preparedEntries.forEach(function (entry) {
+      offset = writeLocalFileHeader(view, archive, offset, entry, dosTime, dosDate);
+    });
+
+    var centralDirectoryOffset = offset;
+    preparedEntries.forEach(function (entry) {
+      offset = writeCentralDirectoryHeader(view, archive, offset, entry, dosTime, dosDate);
+    });
+
+    writeEndOfCentralDirectory(view, offset, preparedEntries.length, centralDirectorySize, centralDirectoryOffset);
+    return archive;
+  }
+
+  function toUint8Array(value) {
+    if (value instanceof Uint8Array) {
+      return value;
+    }
+    if (typeof ArrayBuffer !== "undefined" && value instanceof ArrayBuffer) {
+      return new Uint8Array(value);
+    }
+    if (runtimeGlobal.Buffer && value instanceof runtimeGlobal.Buffer) {
+      return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    }
+    if (Array.isArray(value)) {
+      return Uint8Array.from(value);
+    }
+    if (typeof value === "string") {
+      return runtimeGlobal.TextEncoder ? new runtimeGlobal.TextEncoder().encode(value) : Uint8Array.from([]);
+    }
+    return new Uint8Array(0);
+  }
+
+  function writeLocalFileHeader(view, archive, offset, entry, dosTime, dosDate) {
+    writeUint32(view, offset, 0x04034b50); offset += 4;
+    writeUint16(view, offset, 20); offset += 2;
+    writeUint16(view, offset, 0x0800); offset += 2;
+    writeUint16(view, offset, 0); offset += 2;
+    writeUint16(view, offset, dosTime); offset += 2;
+    writeUint16(view, offset, dosDate); offset += 2;
+    writeUint32(view, offset, entry.crc32 >>> 0); offset += 4;
+    writeUint32(view, offset, entry.dataBytes.length); offset += 4;
+    writeUint32(view, offset, entry.dataBytes.length); offset += 4;
+    writeUint16(view, offset, entry.nameBytes.length); offset += 2;
+    writeUint16(view, offset, 0); offset += 2;
+    archive.set(entry.nameBytes, offset); offset += entry.nameBytes.length;
+    archive.set(entry.dataBytes, offset); offset += entry.dataBytes.length;
+    return offset;
+  }
+
+  function writeCentralDirectoryHeader(view, archive, offset, entry, dosTime, dosDate) {
+    writeUint32(view, offset, 0x02014b50); offset += 4;
+    writeUint16(view, offset, 20); offset += 2;
+    writeUint16(view, offset, 20); offset += 2;
+    writeUint16(view, offset, 0x0800); offset += 2;
+    writeUint16(view, offset, 0); offset += 2;
+    writeUint16(view, offset, dosTime); offset += 2;
+    writeUint16(view, offset, dosDate); offset += 2;
+    writeUint32(view, offset, entry.crc32 >>> 0); offset += 4;
+    writeUint32(view, offset, entry.dataBytes.length); offset += 4;
+    writeUint32(view, offset, entry.dataBytes.length); offset += 4;
+    writeUint16(view, offset, entry.nameBytes.length); offset += 2;
+    writeUint16(view, offset, 0); offset += 2;
+    writeUint16(view, offset, 0); offset += 2;
+    writeUint16(view, offset, 0); offset += 2;
+    writeUint16(view, offset, 0); offset += 2;
+    writeUint32(view, offset, 0); offset += 4;
+    writeUint32(view, offset, entry.localOffset); offset += 4;
+    archive.set(entry.nameBytes, offset); offset += entry.nameBytes.length;
+    return offset;
+  }
+
+  function writeEndOfCentralDirectory(view, offset, entryCount, centralDirectorySize, centralDirectoryOffset) {
+    writeUint32(view, offset, 0x06054b50); offset += 4;
+    writeUint16(view, offset, 0); offset += 2;
+    writeUint16(view, offset, 0); offset += 2;
+    writeUint16(view, offset, entryCount); offset += 2;
+    writeUint16(view, offset, entryCount); offset += 2;
+    writeUint32(view, offset, centralDirectorySize); offset += 4;
+    writeUint32(view, offset, centralDirectoryOffset); offset += 4;
+    writeUint16(view, offset, 0);
+  }
+
+  function writeUint16(view, offset, value) {
+    view.setUint16(offset, value, true);
+  }
+
+  function writeUint32(view, offset, value) {
+    view.setUint32(offset, value >>> 0, true);
+  }
+
+  function toDosTime(date) {
+    return ((date.getHours() & 0x1f) << 11) |
+      ((date.getMinutes() & 0x3f) << 5) |
+      Math.floor((date.getSeconds() & 0x3f) / 2);
+  }
+
+  function toDosDate(date) {
+    var year = Math.max(1980, date.getFullYear());
+    return (((year - 1980) & 0x7f) << 9) |
+      (((date.getMonth() + 1) & 0x0f) << 5) |
+      (date.getDate() & 0x1f);
+  }
+
+  var crc32Table = null;
+
+  function computeCrc32(bytes) {
+    if (!crc32Table) {
+      crc32Table = buildCrc32Table();
+    }
+    var crc = 0xffffffff;
+    for (var index = 0; index < bytes.length; index += 1) {
+      crc = (crc >>> 8) ^ crc32Table[(crc ^ bytes[index]) & 0xff];
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+
+  function buildCrc32Table() {
+    var table = new Uint32Array(256);
+    for (var index = 0; index < 256; index += 1) {
+      var value = index;
+      for (var bit = 0; bit < 8; bit += 1) {
+        value = (value & 1) ? (0xedb88320 ^ (value >>> 1)) : (value >>> 1);
+      }
+      table[index] = value >>> 0;
+    }
+    return table;
   }
 
   async function readImageAssetFile(file, options) {
@@ -754,10 +981,15 @@
     uid: uid,
     parseLineList: parseLineList,
     downloadTextFile: downloadTextFile,
+    downloadBlobFile: downloadBlobFile,
     readTextFile: readTextFile,
     readDataUrlFile: readDataUrlFile,
     loadImage: loadImage,
     loadImageDimensions: loadImageDimensions,
+    rasterizeSvgToWebp: rasterizeSvgToWebp,
+    getTokenExportSizePx: getTokenExportSizePx,
+    sanitizeFilenamePart: sanitizeFilenamePart,
+    createStoredZip: createStoredZip,
     findOpaqueBounds: findOpaqueBounds,
     estimateDataUrlBytes: estimateDataUrlBytes,
     compactProjectImageAssets: compactProjectImageAssets,

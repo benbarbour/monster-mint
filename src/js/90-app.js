@@ -963,6 +963,14 @@
 
     if (action === "print-layout") {
       PrintPanel.printCurrentLayout(mountedStore);
+      return;
+    }
+
+    if (action === "export-images") {
+      void PrintPanel.exportCurrentLayout(mountedStore).catch(function (error) {
+        runtimeGlobal.alert("Exporting preview images failed. Please try again.");
+        console.error(error);
+      });
     }
   }
 

@@ -49,7 +49,7 @@
     });
 
     return [
-      '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" data-preview-svg' + svgAttributes + '>',
+      '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" data-preview-svg="true"' + svgAttributes + '>',
       "  <defs>",
       '    <clipPath id="' + tokenClipId + '"><circle cx="50" cy="50" r="' + COMPONENT_CLIP_RADIUS + '"></circle></clipPath>',
       '    <clipPath id="' + underBorderClipId + '"><circle cx="50" cy="50" r="' + underBorderClipRadius + '"></circle></clipPath>',

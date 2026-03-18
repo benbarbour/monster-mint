@@ -1,4 +1,28 @@
 const { test, expect } = require("@playwright/test");
+const fs = require("node:fs/promises");
+
+function readStoredZipEntries(bytes) {
+  const archive = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const view = new DataView(archive.buffer, archive.byteOffset, archive.byteLength);
+  const entries = [];
+  let offset = 0;
+
+  while (offset + 4 <= archive.length && view.getUint32(offset, true) === 0x04034b50) {
+    const compressedSize = view.getUint32(offset + 18, true);
+    const nameLength = view.getUint16(offset + 26, true);
+    const extraLength = view.getUint16(offset + 28, true);
+    const nameStart = offset + 30;
+    const dataStart = nameStart + nameLength + extraLength;
+    const name = Buffer.from(archive.slice(nameStart, nameStart + nameLength)).toString("utf8");
+    entries.push({
+      name,
+      data: archive.slice(dataStart, dataStart + compressedSize)
+    });
+    offset = dataStart + compressedSize;
+  }
+
+  return entries;
+}
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/monster-mint.html");
@@ -723,6 +747,133 @@ test("latest example action imports the latest released sample project", async (
   await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toHaveValue("Sword");
   await expect(page.locator('[data-preview-stage] svg image[data-background-image="true"]')).toHaveCount(1);
   expect(dialogMessages).not.toContain("Loading the bundled example failed. Please try again later or import the example JSON manually.");
+});
+
+test("export images downloads one webp per preview item", async ({ page }) => {
+  const exportProject = {
+    version: 1,
+    meta: {
+      name: "Export Demo",
+      updatedAt: "2026-03-18T00:00:00.000Z"
+    },
+    settings: {
+      pagePresetId: "letter",
+      pageOrientation: "portrait",
+      pageMarginIn: 0.25,
+      cutlineGapMm: 0,
+      tokenDefaults: {
+        diameterIn: 1,
+        backgroundMode: "color",
+        backgroundColorMode: "manual",
+        backgroundColor: "#f3e7c9",
+        backgroundColorSequenceRef: null,
+        backgroundImageSource: "",
+        borderWidthRatio: 0.03,
+        borderColorMode: "manual",
+        borderColor: "#000000",
+        borderColorSequenceRef: null
+      },
+      textDefaults: {
+        fontFamily: "Times New Roman",
+        fontWeight: "700",
+        colorMode: "manual",
+        color: "#ffffff",
+        colorSequenceRef: null,
+        textBorder: {
+          width: 3,
+          colorMode: "manual",
+          color: "#000000",
+          colorSequenceRef: null
+        }
+      }
+    },
+    sequences: {
+      text: [],
+      color: []
+    },
+    tokens: [
+      {
+        id: "token_export",
+        name: "Export Token",
+        diameterIn: 1,
+        front: {
+          backgroundMode: "color",
+          backgroundColorMode: "manual",
+          backgroundColor: "#f3e7c9",
+          backgroundColorSequenceRef: null,
+          backgroundImageSource: "",
+          border: {
+            enabled: true,
+            widthRatio: 0.03,
+            colorMode: "manual",
+            color: "#000000",
+            colorSequenceRef: null
+          },
+          images: [],
+          texts: [
+            {
+              id: "text_export",
+              name: "Number",
+              x: 0,
+              y: 0,
+              width: 0.6,
+              height: 0.6,
+              contentMode: "numeric",
+              sequenceStart: 1,
+              sequencePad: 0,
+              fontFamily: "Times New Roman",
+              fontWeight: "700",
+              colorMode: "manual",
+              color: "#ffffff",
+              colorSequenceRef: null,
+              rotationDeg: 0,
+              zIndex: 1,
+              textBorder: {
+                width: 3,
+                colorMode: "manual",
+                color: "#000000",
+                colorSequenceRef: null
+              }
+            }
+          ]
+        }
+      }
+    ],
+    printSelections: [
+      {
+        tokenId: "token_export",
+        copies: 2,
+        sequenceStart: 3
+      }
+    ]
+  };
+
+  await page.locator("[data-import-input]").setInputFiles({
+    name: "export-demo.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(exportProject))
+  });
+
+  await page.getByRole("tab", { name: "Print" }).click();
+  const exportButton = page.getByRole("button", { name: "Export Images" });
+  await expect(exportButton).toBeEnabled();
+
+  const downloadPromise = page.waitForEvent("download");
+  await exportButton.click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("Export-Demo-images.zip");
+  const downloadPath = await download.path();
+  if (!downloadPath) {
+    throw new Error("Missing downloaded zip path");
+  }
+
+  const archive = await fs.readFile(downloadPath);
+  const entries = readStoredZipEntries(archive);
+  expect(entries.map((entry) => entry.name)).toEqual([
+    "Export-Token-3.webp",
+    "Export-Token-4.webp"
+  ]);
+  expect(entries.every((entry) => entry.data.length > 0)).toBe(true);
 });
 
 test("save failures are surfaced in the header", async ({ page }) => {

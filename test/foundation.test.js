@@ -36,6 +36,27 @@ function makeDataUrl(mimeType, byteLength) {
   return `data:${mimeType};base64,${payload}`;
 }
 
+function readStoredZipEntries(bytes) {
+  const archive = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const view = new DataView(archive.buffer, archive.byteOffset, archive.byteLength);
+  const entries = [];
+  let offset = 0;
+
+  while (offset + 4 <= archive.length && view.getUint32(offset, true) === 0x04034b50) {
+    const compressedSize = view.getUint32(offset + 18, true);
+    const nameLength = view.getUint16(offset + 26, true);
+    const extraLength = view.getUint16(offset + 28, true);
+    const nameStart = offset + 30;
+    const dataStart = nameStart + nameLength + extraLength;
+    const name = Buffer.from(archive.slice(nameStart, nameStart + nameLength)).toString("utf8");
+    const data = archive.slice(dataStart, dataStart + compressedSize);
+    entries.push({ name, data });
+    offset = dataStart + compressedSize;
+  }
+
+  return entries;
+}
+
 test("createDefaultProject returns the expected baseline structure", () => {
   const project = Schema.createDefaultProject();
 
@@ -202,6 +223,28 @@ test("UI color helpers preserve transparency in manual colors", () => {
 
 test("parseLineList trims and removes blank lines", () => {
   assert.deepEqual(Utils.parseLineList("one\n\n two \n"), ["one", "two"]);
+});
+
+test("sanitizeFilenamePart produces safe hyphenated names", () => {
+  assert.equal(Utils.sanitizeFilenamePart("Color Sample", "token"), "Color-Sample");
+  assert.equal(Utils.sanitizeFilenamePart("  ", "token"), "token");
+});
+
+test("getTokenExportSizePx converts token diameters to 300 DPI pixels", () => {
+  assert.equal(Utils.getTokenExportSizePx(1, 300), 300);
+  assert.equal(Utils.getTokenExportSizePx(2, 300), 600);
+});
+
+test("createStoredZip writes a readable archive with store entries", () => {
+  const archive = Utils.createStoredZip([
+    { name: "Sword-1.webp", data: Uint8Array.from([1, 2, 3]) },
+    { name: "Sword-2.webp", data: Uint8Array.from([4, 5]) }
+  ]);
+
+  const entries = readStoredZipEntries(archive);
+  assert.deepEqual(entries.map((entry) => entry.name), ["Sword-1.webp", "Sword-2.webp"]);
+  assert.deepEqual(Array.from(entries[0].data), [1, 2, 3]);
+  assert.deepEqual(Array.from(entries[1].data), [4, 5]);
 });
 
 test("estimateDataUrlBytes reports base64 payload size", () => {
