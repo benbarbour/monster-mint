@@ -5,6 +5,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "lint": "eslint .",
+    "publish:gh": "node scripts/publish.mjs",
     "test": "node --test test/foundation.test.js",
     "test:e2e": "playwright test"
   },
