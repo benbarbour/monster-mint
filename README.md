@@ -53,11 +53,11 @@ The app also has a `Load Latest Example` button in the header. The built HTML em
 
 The token artwork in that sample project uses AI-generated images made with Sora. The parchment background texture is from a Creative Commons source and was lightened slightly for this set before being included in the project.
 
-| Sword | Abberation |
-| --- | --- |
-| <img src="example/sword.png" alt="Sword token sample" width="180"> | <img src="example/abberation.png" alt="Abberation token sample" width="180"> |
-| Dragon | Minion 2 |
-| <img src="example/dragon.png" alt="Dragon token sample" width="180"> | <img src="example/minion-2.png" alt="Minion 2 token sample" width="180"> |
+| Sword | Abberation | Color Sample |
+| --- | --- | --- |
+| <img src="example/sword.png" alt="Sword token sample" width="180"> | <img src="example/abberation.png" alt="Abberation token sample" width="180"> | <img src="example/color-sample.png" alt="Color Sample token sample" width="180"> |
+| Dragon | Minion 2 | Artificer |
+| <img src="example/dragon.png" alt="Dragon token sample" width="180"> | <img src="example/minion-2.png" alt="Minion 2 token sample" width="180"> | <img src="example/artificer.png" alt="Artificer token sample" width="180"> |
 
 ## Build
 
