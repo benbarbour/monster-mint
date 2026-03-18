@@ -48,11 +48,9 @@ jobs:
         run: npm run test:e2e
 
       - name: Prepare release assets
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           mkdir -p release
-          cp dist/monster-mint.html "release/monster-mint-${RELEASE_TAG}.html"
+          cp dist/monster-mint.html release/monster-mint.html
           cp example/monster-mint.json release/monster-mint-example.json
           cp LICENSE release/LICENSE
 

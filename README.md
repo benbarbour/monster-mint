@@ -10,8 +10,8 @@ The project is built as modular source code, but the distributable is one self-c
 ## Quick Start
 
 - Live hosted copy: [Monster Mint on GitHub Pages](https://benbarbour.github.io/monster-mint/)
-- Download the app: [monster-mint-v1.0.0.html](https://github.com/benbarbour/monster-mint/releases/download/v1.0.0/monster-mint-v1.0.0.html)
-- Download the sample project: [monster-mint-example.json](https://github.com/benbarbour/monster-mint/releases/download/v1.0.0/monster-mint-example.json)
+- Download the app: [monster-mint.html](https://github.com/benbarbour/monster-mint/releases/latest/download/monster-mint.html)
+- Download the sample project: [monster-mint-example.json](https://github.com/benbarbour/monster-mint/releases/latest/download/monster-mint-example.json)
 
 All you need to do is download the HTML file and open it in a browser. If you want sample tokens to print or edit, download the example JSON and import it into the app.
 
