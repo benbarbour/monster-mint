@@ -54,6 +54,7 @@ jobs:
           mkdir -p release
           cp dist/monster-mint.html "release/monster-mint-${RELEASE_TAG}.html"
           cp example/monster-mint.json release/monster-mint-example.json
+          cp LICENSE release/LICENSE
 
       - name: Upload release asset artifact
         uses: actions/upload-artifact@v4
