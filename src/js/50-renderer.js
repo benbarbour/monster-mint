@@ -19,8 +19,8 @@
       colorSequences,
       sequenceIndex
     );
+    var borderColor = resolveBorderColor(face, colorSequences, sequenceIndex);
     var backgroundImageSource = Tokens.resolveImageSource(project, face.backgroundImageSource);
-    var tokenBaseFill = opts.tokenBaseFill || backgroundColor;
     var selectedComponentType = opts.selectedComponentType;
     var selectedComponentId = opts.selectedComponentId;
     var instanceSuffix = opts.instanceId ? "-" + String(opts.instanceId).replace(/[^a-z0-9_-]/gi, "") : "";
@@ -32,7 +32,8 @@
     var underBorderClipRadius = borderWidth > 0
       ? Math.max(0, 50 - borderWidth)
       : COMPONENT_CLIP_RADIUS;
-    var borderMarkup = renderBorder(face, colorSequences, sequenceIndex);
+    var tokenBaseFill = opts.tokenBaseFill || (borderWidth > 0 ? borderColor : backgroundColor);
+    var borderMarkup = renderBorder(face, borderColor);
     var backgroundInsetMarkup = renderBackgroundInset(face, backgroundColor, tokenBaseFill, underBorderClipRadius);
     var backgroundImageMarkup = renderBackgroundImage(backgroundImageSource, underBorderClipId);
     var outerSquareFill = opts.outerSquareFill || "#f6efe2";
@@ -97,18 +98,25 @@
       ].join("");
   }
 
-  function renderBorder(face, colorSequences, sequenceIndex) {
-    if (!face.border || face.border.widthRatio <= 0) {
-      return "";
+  function resolveBorderColor(face, colorSequences, sequenceIndex) {
+    if (!face.border) {
+      return "#000000";
     }
 
-    var color = Tokens.getColorValue(
+    return Tokens.getColorValue(
       face.border.colorMode,
       face.border.color,
       face.border.colorSequenceRef,
       colorSequences,
       sequenceIndex
     );
+  }
+
+  function renderBorder(face, color) {
+    if (!face.border || face.border.widthRatio <= 0) {
+      return "";
+    }
+
     var width = face.border.widthRatio * 100;
     var radius = 50 - width / 2;
     return '<circle cx="50" cy="50" r="' + radius + '" fill="none" stroke="' + escapeAttr(color) + '" stroke-width="' + width + '"></circle>';
