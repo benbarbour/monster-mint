@@ -124,7 +124,7 @@ async function promptForReleasePlan(currentVersion) {
     }
 
     if (selection === "1") {
-      const overwrite = await confirmOverwriteCurrentVersion(rl, currentVersion);
+      const overwrite = await confirmOverwriteVersion(rl, currentVersion);
       return {
         bumped: false,
         overwrite: overwrite,
@@ -137,8 +137,8 @@ async function promptForReleasePlan(currentVersion) {
       if (!isValidVersion(customVersion)) {
         throw new Error(`Invalid version: ${customVersion}`);
       }
-      const overwrite = customVersion === currentVersion
-        ? await confirmOverwriteCurrentVersion(rl, currentVersion)
+      const overwrite = versionAlreadyExists(customVersion)
+        ? await confirmOverwriteVersion(rl, customVersion)
         : false;
       return {
         bumped: customVersion !== currentVersion,
@@ -158,14 +158,18 @@ async function promptForReleasePlan(currentVersion) {
   }
 }
 
-async function confirmOverwriteCurrentVersion(rl, currentVersion) {
+async function confirmOverwriteVersion(rl, version) {
   const confirmation = (await rl.question(
-    `Overwrite the existing ${currentVersion} release and retag it to the current commit? [y/N]: `
+    `Overwrite the existing ${version} release and retag it to the current commit? [y/N]: `
   )).trim().toLowerCase();
   if (!["y", "yes"].includes(confirmation)) {
     throw new Error("Release overwrite cancelled.");
   }
   return true;
+}
+
+function versionAlreadyExists(version) {
+  return capture("git", ["tag", "--list", `v${version}`]).stdout.trim() === `v${version}`;
 }
 
 function bumpVersion(version, kind) {
