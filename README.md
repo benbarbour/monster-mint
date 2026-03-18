@@ -17,7 +17,7 @@ All you need to do is download the HTML file and open it in a browser. If you wa
 
 ## Disclaimer
 
-Everything in this repo, other than this Disclaimer (including the rest of this README), is AI generated. I am a software developer but I wanted to try it out. I could have built this myself from scratch, but:
+Everything in this repo, other than this disclaimer (including the rest of this README), is AI generated. I am a software developer but I wanted to try it out. I could have built this myself from scratch, but:
 
 1. My main goal was just to gain experience using an "agentic" AI, and see how it had improved since the last time I fiddled with it.
 2. I'm not a web developer and it would've taken me a lot of work that I find fiddly and annoying. It would've taken me longer too.
