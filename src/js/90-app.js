@@ -30,6 +30,7 @@
   var designerResizeQueued = false;
   var designerTransientPreview = null;
   var designerPreviewRenderQueued = false;
+  var imageHitTestCache = new Map();
   var appDelegatedHandlersBound = false;
   var mountedAppView = null;
   var CONDITIONAL_FIELD_PRESERVE = [
@@ -779,7 +780,7 @@
     appDelegatedHandlersBound = true;
 
     appElement.addEventListener("click", function (event) {
-      handleDelegatedClick(appElement, event);
+      void handleDelegatedClick(appElement, event);
     });
     appElement.addEventListener("mousedown", function (event) {
       handleDelegatedMouseDown(event);
@@ -790,7 +791,7 @@
     runtimeGlobal.addEventListener("keydown", handleGlobalKeyDown);
   }
 
-  function handleDelegatedClick(appElement, event) {
+  async function handleDelegatedClick(appElement, event) {
     if (!mountedStore) {
       return;
     }
@@ -809,7 +810,7 @@
 
     var previewStage = event.target.closest("[data-preview-stage]");
     if (previewStage && appElement.contains(previewStage)) {
-      handlePreviewSelection(event);
+      await handlePreviewSelection(event);
     }
   }
 
@@ -965,8 +966,9 @@
     }
   }
 
-  function handlePreviewSelection(event) {
-    var componentElement = event.target.closest("[data-component-id]");
+  async function handlePreviewSelection(event) {
+    var previewStage = event.target.closest("[data-preview-stage]");
+    var componentElement = await resolvePreviewSelectionTarget(previewStage, event);
     if (componentElement) {
       mountedStore.updateUi(function (ui) {
         ui.selectedComponentType = componentElement.getAttribute("data-component-type");
@@ -978,6 +980,168 @@
     mountedStore.updateUi(function (ui) {
       ui.selectedComponentType = null;
       ui.selectedComponentId = null;
+    });
+  }
+
+  async function resolvePreviewSelectionTarget(previewStage, event) {
+    var restorePointerEvents = [];
+    try {
+      var target = event.target;
+      while (target && previewStage && previewStage.contains(target)) {
+        var componentElement = target.closest("[data-component-id]");
+        if (!componentElement || !previewStage.contains(componentElement)) {
+          return null;
+        }
+
+        if (!(await isTransparentImageHit(componentElement, target, event.clientX, event.clientY))) {
+          return componentElement;
+        }
+
+        restorePointerEvents.push(disablePointerEvents(componentElement));
+        target = runtimeGlobal.document.elementFromPoint(event.clientX, event.clientY);
+      }
+      return null;
+    } finally {
+      restorePointerEvents.reverse().forEach(function (restore) {
+        restore();
+      });
+    }
+  }
+
+  function disablePointerEvents(element) {
+    var previous = element.style.pointerEvents;
+    element.style.pointerEvents = "none";
+    return function () {
+      element.style.pointerEvents = previous;
+    };
+  }
+
+  async function isTransparentImageHit(componentElement, target, clientX, clientY) {
+    if (
+      !componentElement ||
+      componentElement.getAttribute("data-component-type") !== "image" ||
+      !target ||
+      String(target.tagName || "").toLowerCase() !== "image"
+    ) {
+      return false;
+    }
+
+    var selection = getDesignerSelection(mountedStore.getState());
+    if (!selection.token || !selection.token.front) {
+      return false;
+    }
+
+    var componentId = componentElement.getAttribute("data-component-id");
+    var component = selection.token.front.images.find(function (candidate) {
+      return candidate.id === componentId;
+    });
+    if (!component) {
+      return false;
+    }
+
+    var alpha = await sampleImageAlphaAtClientPoint(target, Tokens.resolveImageSource(mountedStore.getState().project, component.source), clientX, clientY);
+    return alpha != null && alpha <= 1;
+  }
+
+  async function sampleImageAlphaAtClientPoint(imageElement, source, clientX, clientY) {
+    if (!imageElement || !source) {
+      return null;
+    }
+
+    var svg = imageElement.ownerSVGElement;
+    var ctm = imageElement.getScreenCTM();
+    if (!svg || !ctm || !ctm.inverse) {
+      return null;
+    }
+
+    var point = svg.createSVGPoint();
+    point.x = clientX;
+    point.y = clientY;
+
+    var localPoint;
+    try {
+      localPoint = point.matrixTransform(ctm.inverse());
+    } catch {
+      return null;
+    }
+
+    var displayWidth = Number(imageElement.getAttribute("width") || 0);
+    var displayHeight = Number(imageElement.getAttribute("height") || 0);
+    if (
+      !Number.isFinite(displayWidth) ||
+      !Number.isFinite(displayHeight) ||
+      displayWidth <= 0 ||
+      displayHeight <= 0 ||
+      localPoint.x < 0 ||
+      localPoint.y < 0 ||
+      localPoint.x > displayWidth ||
+      localPoint.y > displayHeight
+    ) {
+      return null;
+    }
+
+    var probe = await getImageHitTestProbe(source);
+    if (!probe || !probe.context || !probe.width || !probe.height) {
+      return null;
+    }
+
+    var sampleX = Math.min(probe.width - 1, Math.max(0, Math.floor((localPoint.x / displayWidth) * probe.width)));
+    var sampleY = Math.min(probe.height - 1, Math.max(0, Math.floor((localPoint.y / displayHeight) * probe.height)));
+
+    try {
+      return probe.context.getImageData(sampleX, sampleY, 1, 1).data[3];
+    } catch {
+      return null;
+    }
+  }
+
+  function getImageHitTestProbe(source) {
+    if (!imageHitTestCache.has(source)) {
+      imageHitTestCache.set(source, loadImageHitTestProbe(source));
+    }
+    return imageHitTestCache.get(source);
+  }
+
+  function loadImageHitTestProbe(source) {
+    return new Promise(function (resolve) {
+      if (
+        !runtimeGlobal.document ||
+        !runtimeGlobal.Image
+      ) {
+        resolve(null);
+        return;
+      }
+
+      var image = new runtimeGlobal.Image();
+      image.decoding = "async";
+      image.onload = function () {
+        try {
+          var canvas = runtimeGlobal.document.createElement("canvas");
+          canvas.width = image.naturalWidth || image.width || 0;
+          canvas.height = image.naturalHeight || image.height || 0;
+          if (!canvas.width || !canvas.height) {
+            resolve(null);
+            return;
+          }
+          var context = canvas.getContext("2d", { willReadFrequently: true });
+          if (!context) {
+            resolve(null);
+            return;
+          }
+          context.drawImage(image, 0, 0);
+          resolve({
+            context: context,
+            width: canvas.width,
+            height: canvas.height
+          });
+        } catch {
+          resolve(null);
+        }
+      };
+      image.onerror = function () {
+        resolve(null);
+      };
+      image.src = source;
     });
   }
 

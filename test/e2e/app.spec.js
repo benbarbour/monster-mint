@@ -161,6 +161,28 @@ test("can create and manipulate a token template", async ({ page }) => {
   await expect(page.locator('form[data-form="token-settings"] input[name="name"]')).toHaveValue("Untitled Token");
 });
 
+test("transparent image pixels fall through to the thing underneath", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole("button", { name: "Create Token" }).click();
+  await page.getByRole("button", { name: "Add Image" }).click();
+  await page.locator('[data-image-upload-input]').setInputFiles({
+    name: "transparent-token.svg",
+    mimeType: "image/svg+xml",
+    buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300"><path fill="#cc2222" fill-rule="evenodd" d="M0 0h300v300H0z M90 90h120v120H90z"/></svg>')
+  });
+
+  await expect(page.locator('form[data-form="image-component-settings"]')).toBeVisible();
+  const uploadedImage = page.locator('[data-preview-stage] svg g[data-component-type="image"] image').first();
+  const imageBox = await uploadedImage.boundingBox();
+  if (!imageBox) {
+    throw new Error("Missing uploaded image bounding box");
+  }
+
+  await page.mouse.click(imageBox.x + imageBox.width / 2, imageBox.y + imageBox.height / 2);
+  await expect(page.locator('form[data-form="token-settings"]')).toBeVisible();
+  await expect(page.locator('form[data-form="image-component-settings"]')).toHaveCount(0);
+});
+
 test("designer dropdowns are sorted", async ({ page }) => {
   await page.getByRole("button", { name: "Create Token" }).click();
   await page.locator('form[data-form="token-settings"] input[name="name"]').fill("Zulu");
