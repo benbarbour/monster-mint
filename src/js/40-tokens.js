@@ -40,7 +40,7 @@
       fontFamily: payload.fontFamily || "Georgia",
       fontWeight: payload.fontWeight || "700",
       colorMode: payload.colorMode === "sequence" ? "sequence" : "manual",
-      color: payload.color || "#111111",
+      color: typeof payload.color === "string" && payload.color.trim() ? payload.color : "#111111",
       colorSequenceRef: payload.colorSequenceRef || null,
       rotationDeg: asRotation(payload.rotationDeg, 0),
       zIndex: asComponentZ(payload.zIndex != null ? payload.zIndex : payload.z, 1),
@@ -126,7 +126,7 @@
         payload.enabled === true ? 1 : 0
       ),
       colorMode: payload.colorMode === "sequence" ? "sequence" : "manual",
-      color: isHexColor(payload.color) ? payload.color : "#111111",
+      color: typeof payload.color === "string" && payload.color.trim() ? payload.color : "#111111",
       colorSequenceRef: payload.colorSequenceRef || null
     };
   }
@@ -324,10 +324,6 @@
     }
 
     return null;
-  }
-
-  function isHexColor(value) {
-    return /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(value || "").trim());
   }
 
   function clamp(value, min, max) {

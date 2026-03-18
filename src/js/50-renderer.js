@@ -25,10 +25,16 @@
     var selectedComponentId = opts.selectedComponentId;
     var instanceSuffix = opts.instanceId ? "-" + String(opts.instanceId).replace(/[^a-z0-9_-]/gi, "") : "";
     var tokenSlug = token.id.replace(/[^a-z0-9_-]/gi, "") + instanceSuffix;
+    var tokenClipId = "token-clip-" + tokenSlug;
+    var underBorderClipId = "under-border-clip-" + tokenSlug;
     var svgAttributes = opts.svgAttributes ? " " + opts.svgAttributes : "";
+    var borderWidth = face.border && face.border.widthRatio > 0 ? face.border.widthRatio * 100 : 0;
+    var underBorderClipRadius = borderWidth > 0
+      ? Math.max(0, 50 - borderWidth)
+      : COMPONENT_CLIP_RADIUS;
     var borderMarkup = renderBorder(face, colorSequences, sequenceIndex);
-    var backgroundInsetMarkup = renderBackgroundInset(face, backgroundColor, tokenBaseFill);
-    var backgroundImageMarkup = renderBackgroundImage(backgroundImageSource, tokenSlug);
+    var backgroundInsetMarkup = renderBackgroundInset(face, backgroundColor, tokenBaseFill, underBorderClipRadius);
+    var backgroundImageMarkup = renderBackgroundImage(backgroundImageSource, underBorderClipId);
     var outerSquareFill = opts.outerSquareFill || "#f6efe2";
     var tokenBaseCircleMarkup = tokenBaseFill === outerSquareFill
       ? ""
@@ -44,16 +50,17 @@
     return [
       '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" data-preview-svg' + svgAttributes + '>',
       "  <defs>",
-      '    <clipPath id="token-clip-' + tokenSlug + '"><circle cx="50" cy="50" r="' + COMPONENT_CLIP_RADIUS + '"></circle></clipPath>',
+      '    <clipPath id="' + tokenClipId + '"><circle cx="50" cy="50" r="' + COMPONENT_CLIP_RADIUS + '"></circle></clipPath>',
+      '    <clipPath id="' + underBorderClipId + '"><circle cx="50" cy="50" r="' + underBorderClipRadius + '"></circle></clipPath>',
       renderTextClipPaths(face.texts, tokenSlug),
       "  </defs>",
       '  <rect x="0" y="0" width="100" height="100" fill="' + escapeAttr(outerSquareFill) + '"></rect>',
       tokenBaseCircleMarkup,
       backgroundInsetMarkup,
       backgroundImageMarkup,
-      renderOrderedComponents(lowerComponents, project, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
+      renderOrderedComponents(lowerComponents, project, textSequences, colorSequences, sequenceIndex, tokenSlug, underBorderClipId, opts.interactive, selectedComponentType, selectedComponentId),
       borderMarkup,
-      renderOrderedComponents(upperComponents, project, textSequences, colorSequences, sequenceIndex, tokenSlug, opts.interactive, selectedComponentType, selectedComponentId),
+      renderOrderedComponents(upperComponents, project, textSequences, colorSequences, sequenceIndex, tokenSlug, tokenClipId, opts.interactive, selectedComponentType, selectedComponentId),
       opts.interactive
         ? renderInteractiveOverlays(face, selectedComponentType, selectedComponentId)
         : "",
@@ -61,15 +68,15 @@
     ].join("");
   }
 
-  function renderOrderedComponents(entries, project, textSequences, colorSequences, sequenceIndex, tokenSlug, interactive, selectedComponentType, selectedComponentId) {
+  function renderOrderedComponents(entries, project, textSequences, colorSequences, sequenceIndex, tokenSlug, clipId, interactive, selectedComponentType, selectedComponentId) {
     return entries.map(function (entry) {
       return entry.type === "image"
-        ? renderImageComponent(entry.component, project, tokenSlug, interactive, selectedComponentType, selectedComponentId)
-        : renderTextComponent(entry.component, textSequences, colorSequences, sequenceIndex, tokenSlug, interactive, selectedComponentType, selectedComponentId);
+        ? renderImageComponent(entry.component, project, clipId, interactive, selectedComponentType, selectedComponentId)
+        : renderTextComponent(entry.component, textSequences, colorSequences, sequenceIndex, tokenSlug, clipId, interactive, selectedComponentType, selectedComponentId);
     }).join("");
   }
 
-  function renderImageComponent(component, project, tokenSlug, interactive, selectedComponentType, selectedComponentId) {
+  function renderImageComponent(component, project, clipId, interactive, selectedComponentType, selectedComponentId) {
       var box = toSvgRect(component, "image");
       var centerX = box.x + box.width / 2;
       var centerY = box.y + box.height / 2;
@@ -84,7 +91,7 @@
       var isSelected = interactive && selectedComponentType === "image" && selectedComponentId === component.id;
       var source = Tokens.resolveImageSource(project, component.source);
       return [
-        '<g clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="image"' + (isSelected ? ' data-drag-mode="move" cursor="grab"' : "") + '>',
+        '<g clip-path="url(#' + clipId + ')" data-component-id="' + component.id + '" data-component-type="image"' + (isSelected ? ' data-drag-mode="move" cursor="grab"' : "") + '>',
         '  <image href="' + escapeAttr(source) + '" width="' + box.width + '" height="' + box.height + '" preserveAspectRatio="none" transform="' + transform + '"></image>',
         "</g>"
       ].join("");
@@ -107,29 +114,27 @@
     return '<circle cx="50" cy="50" r="' + radius + '" fill="none" stroke="' + escapeAttr(color) + '" stroke-width="' + width + '"></circle>';
   }
 
-  function renderBackgroundImage(backgroundImageSource, tokenSlug) {
+  function renderBackgroundImage(backgroundImageSource, clipId) {
     if (!backgroundImageSource) {
       return "";
     }
 
     return [
-      '<g clip-path="url(#token-clip-' + tokenSlug + ')">',
+      '<g clip-path="url(#' + clipId + ')">',
       '  <image href="' + escapeAttr(backgroundImageSource) + '" x="0" y="0" width="100" height="100" preserveAspectRatio="xMidYMid slice" data-background-image="true"></image>',
       "</g>"
     ].join("");
   }
 
-  function renderBackgroundInset(face, background, tokenBaseFill) {
+  function renderBackgroundInset(face, background, tokenBaseFill, radius) {
     if (tokenBaseFill === background || !face.border || face.border.widthRatio <= 0) {
       return "";
     }
 
-    var borderWidth = face.border.widthRatio * 100;
-    var radius = Math.max(0, 50 - borderWidth);
     return '<circle cx="50" cy="50" r="' + radius + '" fill="' + escapeAttr(background) + '"></circle>';
   }
 
-  function renderTextComponent(component, textSequences, colorSequences, sequenceIndex, tokenSlug, previewMode, selectedComponentType, selectedComponentId) {
+  function renderTextComponent(component, textSequences, colorSequences, sequenceIndex, tokenSlug, clipId, previewMode, selectedComponentType, selectedComponentId) {
       var value = previewMode
         ? getPreviewTextValue(component, textSequences)
         : Tokens.getTextValue(component, textSequences, sequenceIndex);
@@ -158,7 +163,7 @@
         : "#111111";
       var isSelected = previewMode && selectedComponentType === "text" && selectedComponentId === component.id;
       return [
-        '<g clip-path="url(#token-clip-' + tokenSlug + ')" data-component-id="' + component.id + '" data-component-type="text"' + (isSelected ? ' data-drag-mode="move" cursor="default"' : "") + '>',
+        '<g clip-path="url(#' + clipId + ')" data-component-id="' + component.id + '" data-component-type="text"' + (isSelected ? ' data-drag-mode="move" cursor="default"' : "") + '>',
         '  <g clip-path="url(#text-clip-' + tokenSlug + "-" + component.id + ')">',
         '    <text x="' + centerX + '" y="' + baselineY + '" fill="' + escapeAttr(color) + '" stroke="' + (borderWidth > 0 ? escapeAttr(borderColor) : "none") + '" stroke-width="' + borderWidth + '" paint-order="stroke fill" stroke-linejoin="round" font-family="' + escapeAttr(component.fontFamily) + '" font-weight="' + escapeAttr(component.fontWeight) + '" font-style="normal" font-size="' + fontSize + '" text-anchor="middle"' + (Number(component.rotationDeg || 0) ? ' transform="rotate(' + Number(component.rotationDeg || 0) + " " + centerX + " " + centerY + ')"' : "") + '>' + escapeText(value) + "</text>",
         "  </g>",

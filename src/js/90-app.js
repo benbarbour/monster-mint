@@ -75,6 +75,7 @@
   var renderFontWeightOptions = AppHelpers.renderFontWeightOptions;
   var renderFontFamilyOptions = AppHelpers.renderFontFamilyOptions;
   var getSelectedSequence = AppHelpers.getSelectedSequence;
+  var readColorFormValue = AppHelpers.readColorFormValue;
   var SETTINGS_PANEL_HELPERS = {
     conditionalFieldPreserve: CONDITIONAL_FIELD_PRESERVE,
     getSelectedSequence: getSelectedSequence,
@@ -85,6 +86,7 @@
     renderColorSequenceForm: renderColorSequenceForm,
     syncConditionalFields: syncConditionalFields,
     parseColorSourceValue: parseColorSourceValue,
+    readColorFormValue: readColorFormValue,
     toNumberOrDefault: toNumberOrDefault,
     toNonNegativeNumberOrDefault: toNonNegativeNumberOrDefault,
     toAlphaThresholdOrDefault: toAlphaThresholdOrDefault,
@@ -105,6 +107,7 @@
     renderFontFamilyOptions: renderFontFamilyOptions,
     syncConditionalFields: syncConditionalFields,
     parseColorSourceValue: parseColorSourceValue,
+    readColorFormValue: readColorFormValue,
     toNumberOrDefault: toNumberOrDefault,
     toIntegerOrDefault: toIntegerOrDefault,
     toNonNegativeInteger: toNonNegativeInteger,

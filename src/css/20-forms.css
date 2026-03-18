@@ -68,7 +68,13 @@
   height: 1rem;
   border-radius: 999px;
   border: 1px solid rgba(43, 36, 25, 0.2);
-  background: var(--swatch);
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(var(--swatch), var(--swatch)),
+    linear-gradient(45deg, rgba(60, 56, 48, 0.16) 25%, transparent 25%, transparent 75%, rgba(60, 56, 48, 0.16) 75%, rgba(60, 56, 48, 0.16)),
+    linear-gradient(45deg, rgba(60, 56, 48, 0.16) 25%, transparent 25%, transparent 75%, rgba(60, 56, 48, 0.16) 75%, rgba(60, 56, 48, 0.16));
+  background-size: cover, 8px 8px, 8px 8px;
+  background-position: center, 0 0, 4px 4px;
   flex: 0 0 auto;
 }
 

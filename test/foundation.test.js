@@ -8,6 +8,7 @@ const State = require("../src/js/20-state.js");
 const Sequences = require("../src/js/30-sequences.js");
 const Tokens = require("../src/js/40-tokens.js");
 const Print = require("../src/js/60-print.js");
+const Ui = require("../src/js/70-ui.js");
 
 function createMemoryStorage() {
   const map = new Map();
@@ -186,6 +187,17 @@ test("createColorSequence filters invalid colors and reports finite lengths", ()
 
   assert.deepEqual(sequence.values, ["#ff0000", "#00ff00"]);
   assert.equal(Sequences.getFiniteLength(sequence, "color"), 2);
+});
+
+test("UI color helpers preserve transparency in manual colors", () => {
+  assert.equal(Ui.normalizeColorInput("#11223380"), "#112233");
+  assert.equal(Ui.getColorTransparencyInput("#11223380"), 50);
+  assert.equal(Ui.composeColorValue("#112233", 50), "#11223380");
+  assert.equal(Ui.resolveManualColorValue("#abcdef", "25", "#000000"), "#abcdefbf");
+  assert.deepEqual(Ui.decomposeColorValue("rgba(17, 34, 51, 0.5)"), {
+    hex: "#112233",
+    transparency: 50
+  });
 });
 
 test("parseLineList trims and removes blank lines", () => {

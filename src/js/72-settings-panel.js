@@ -101,11 +101,11 @@
           project.settings.tokenDefaults.diameterIn = Number(formData.get("defaultDiameterIn")) || project.settings.tokenDefaults.diameterIn;
           project.settings.tokenDefaults.backgroundMode = String(formData.get("defaultBackgroundMode")) === "image" ? "image" : "color";
           project.settings.tokenDefaults.backgroundColorMode = backgroundColorSelection.mode;
-          project.settings.tokenDefaults.backgroundColor = String(formData.get("defaultBackgroundColor") || project.settings.tokenDefaults.backgroundColor);
+          project.settings.tokenDefaults.backgroundColor = helpers.readColorFormValue(formData, "defaultBackgroundColor", project.settings.tokenDefaults.backgroundColor);
           project.settings.tokenDefaults.backgroundColorSequenceRef = backgroundColorSelection.sequenceRef;
           project.settings.tokenDefaults.borderWidthRatio = helpers.toNumberOrDefault(formData.get("defaultBorderWidthRatio"), project.settings.tokenDefaults.borderWidthRatio);
           project.settings.tokenDefaults.borderColorMode = borderColorSelection.mode;
-          project.settings.tokenDefaults.borderColor = String(formData.get("defaultBorderColor") || project.settings.tokenDefaults.borderColor);
+          project.settings.tokenDefaults.borderColor = helpers.readColorFormValue(formData, "defaultBorderColor", project.settings.tokenDefaults.borderColor);
           project.settings.tokenDefaults.borderColorSequenceRef = borderColorSelection.sequenceRef;
         });
       });
@@ -143,11 +143,11 @@
           project.settings.textDefaults.fontFamily = String(formData.get("fontFamily") || project.settings.textDefaults.fontFamily);
           project.settings.textDefaults.fontWeight = String(formData.get("fontWeight") || project.settings.textDefaults.fontWeight);
           project.settings.textDefaults.colorMode = textColorSelection.mode;
-          project.settings.textDefaults.color = String(formData.get("defaultTextColor") || project.settings.textDefaults.color);
+          project.settings.textDefaults.color = helpers.readColorFormValue(formData, "defaultTextColor", project.settings.textDefaults.color);
           project.settings.textDefaults.colorSequenceRef = textColorSelection.sequenceRef;
           project.settings.textDefaults.textBorder.width = helpers.toNonNegativeNumberOrDefault(formData.get("defaultTextBorderWidth"), project.settings.textDefaults.textBorder.width);
           project.settings.textDefaults.textBorder.colorMode = textBorderColorSelection.mode;
-          project.settings.textDefaults.textBorder.color = String(formData.get("defaultTextBorderColor") || project.settings.textDefaults.textBorder.color);
+          project.settings.textDefaults.textBorder.color = helpers.readColorFormValue(formData, "defaultTextBorderColor", project.settings.textDefaults.textBorder.color);
           project.settings.textDefaults.textBorder.colorSequenceRef = textBorderColorSelection.sequenceRef;
         });
       });

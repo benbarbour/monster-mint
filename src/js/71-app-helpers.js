@@ -21,9 +21,11 @@
     { value: "Impact", label: "Impact" }
   ];
   var escapeHtml = Ui.escapeHtml;
-  var renderConditionalField = Ui.renderConditionalField;
   var renderConditionalBlock = Ui.renderConditionalBlock;
+  var decomposeColorValue = Ui.decomposeColorValue;
   var normalizeColorInput = Ui.normalizeColorInput;
+  var getColorTransparencyInput = Ui.getColorTransparencyInput;
+  var resolveManualColorValue = Ui.resolveManualColorValue;
   var toNumberOrDefault = Ui.toNumberOrDefault;
 
   function naturalLabelCompare(left, right) {
@@ -155,11 +157,12 @@
       ? config.currentSequenceRef
       : "manual";
     var isManual = sourceValue === "manual";
+    var manualColor = decomposeColorValue(config.currentColor);
     var summary = isManual
-      ? (config.currentColor || "#000000")
+      ? manualColor.hex + (manualColor.transparency > 0 ? " · " + manualColor.transparency + "% transparent" : "")
       : "Sequence: " + getSequenceName(config.sequences, sourceValue);
     var swatch = isManual
-      ? (config.currentColor || "#000000")
+      ? resolveManualColorValue(manualColor.hex, manualColor.transparency, config.currentColor)
       : (config.currentColor || "#ffffff");
 
     return [
@@ -169,11 +172,22 @@
       '    <summary class="color-picker-summary"><span class="color-picker-swatch" style="--swatch:' + escapeHtml(swatch) + '"></span><span>' + escapeHtml(summary) + "</span></summary>",
       '    <div class="color-picker-panel">',
       '      <label class="field">Color<select name="' + config.sourceName + '">' + renderColorSourceOptions(config.sequences, sourceValue) + "</select></label>",
-      renderConditionalField(config.sourceName + ':manual', isManual, 'Custom color<input type="color" name="' + config.colorName + '" value="' + normalizeColorInput(config.currentColor) + '">'),
+      renderConditionalBlock(config.sourceName + ':manual', isManual, [
+        '<label class="field">Custom color<input type="color" name="' + config.colorName + 'Base" value="' + normalizeColorInput(config.currentColor) + '"></label>',
+        '<label class="field">Transparency<input type="range" min="0" max="100" step="1" name="' + config.colorName + 'Transparency" value="' + getColorTransparencyInput(config.currentColor) + '"><span class="field-help">' + getColorTransparencyInput(config.currentColor) + '% transparent</span></label>'
+      ].join("")),
       "    </div>",
       "  </details>",
       "</div>"
     ].join("");
+  }
+
+  function readColorFormValue(formData, colorName, fallback) {
+    return resolveManualColorValue(
+      formData.get(colorName + "Base"),
+      formData.get(colorName + "Transparency"),
+      fallback
+    );
   }
 
   function renderColorSourceOptions(sequences, selectedValue) {
@@ -458,6 +472,7 @@
     renderImageImportSettingsForm: renderImageImportSettingsForm,
     renderBackgroundControls: renderBackgroundControls,
     renderColorPicker: renderColorPicker,
+    readColorFormValue: readColorFormValue,
     getDesignerSelection: getDesignerSelection,
     getSelectedComponent: getSelectedComponent,
     findToken: findToken,

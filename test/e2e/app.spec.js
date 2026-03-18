@@ -245,6 +245,13 @@ test("token settings own appearance controls and color sequences show in preview
 
   await expect(page.locator('form[data-form="token-settings"] input[name="borderWidthRatio"]')).toHaveAttribute("max", "0.25");
   await expect(page.locator('[data-preview-stage] svg circle[stroke="#ff0000"]')).toHaveCount(1);
+  await page.locator('form[data-form="token-settings"] .color-picker-field').filter({ hasText: "Token border" }).locator("summary").click();
+  await expect(page.locator('form[data-form="token-settings"] input[name="borderColorTransparency"]')).toHaveValue("0");
+  await page.locator('form[data-form="token-settings"] input[name="borderColorTransparency"]').evaluate((element) => {
+    element.value = "50";
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await expect(page.locator('form[data-form="token-settings"] input[name="borderColorTransparency"]')).toHaveValue("50");
   const initialBackgroundHref = await page.locator('[data-preview-stage] svg image[data-background-image="true"]').first().getAttribute("href");
   await page.locator('form[data-form="token-settings"] select[name="backgroundMode"]').selectOption("image");
   await page.locator('[data-token-background-input]').setInputFiles({
@@ -275,6 +282,9 @@ test("token settings own appearance controls and color sequences show in preview
   await expect(page.locator('[data-component-type="image"] [data-drag-mode="resize-right"]').first()).toHaveAttribute("cursor", "ew-resize");
   const uploadedImage = page.locator('[data-preview-stage] svg g[data-component-type="image"] image').first();
   await expect(uploadedImage).toHaveAttribute("href", /data:image\/(jpeg|png|webp);base64,/);
+  await page.getByRole("button", { name: "Down" }).click();
+  await expect(page.locator('[data-preview-stage] svg g[data-component-type="image"]').first()).toHaveAttribute("clip-path", /under-border-clip-/);
+  await expect(page.locator('[data-preview-stage] svg clipPath[id^="under-border-clip-"] circle').first()).toHaveAttribute("r", "43");
   const uploadedDimensions = await uploadedImage.evaluate((node) => ({
     width: Number(node.getAttribute("width") || 0),
     height: Number(node.getAttribute("height") || 0)
@@ -358,14 +368,14 @@ test("token settings own appearance controls and color sequences show in preview
   const printCopiesInput = page.locator('input[name^="copies-"]').first();
   await printCopiesInput.fill("2");
   await printCopiesInput.blur();
-  const previewClippedImageCount = await page.locator('.preview-page-svg g[data-component-type="image"][clip-path*="token-clip-"] image').count();
+  const previewClippedImageCount = await page.locator('.preview-page-svg g[data-component-type="image"][clip-path*="token-clip-"] image, .preview-page-svg g[data-component-type="image"][clip-path*="under-border-clip-"] image').count();
   expect(previewClippedImageCount).toBeGreaterThan(0);
   const previewClipIds = await page.locator('.preview-page-svg clipPath[id^="token-clip-"]').evaluateAll((nodes) => nodes.map((node) => node.id));
   expect(new Set(previewClipIds).size).toBe(previewClipIds.length);
   await expect(page.locator('.preview-page-svg clipPath[id^="token-clip-"] circle').first()).toHaveAttribute("r", "49.75");
   await page.getByRole("button", { name: "Print", exact: true }).click();
   await expect(page.locator("iframe.print-frame")).toHaveCount(1);
-  const frameClippedImageCount = await page.frameLocator("iframe.print-frame").locator('g[data-component-type="image"][clip-path*="token-clip-"] image').count();
+  const frameClippedImageCount = await page.frameLocator("iframe.print-frame").locator('g[data-component-type="image"][clip-path*="token-clip-"] image, g[data-component-type="image"][clip-path*="under-border-clip-"] image').count();
   expect(frameClippedImageCount).toBeGreaterThan(0);
   await expect(page.frameLocator("iframe.print-frame").locator('clipPath[id^="token-clip-"] circle').first()).toHaveAttribute("r", "49.75");
 });
