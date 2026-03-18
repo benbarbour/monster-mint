@@ -1,16 +1,19 @@
 # Monster Mint
 
+[![CI](https://github.com/benbarbour/monster-mint/actions/workflows/ci.yml/badge.svg)](https://github.com/benbarbour/monster-mint/actions/workflows/ci.yml)
+[![Release](https://github.com/benbarbour/monster-mint/actions/workflows/release.yml/badge.svg)](https://github.com/benbarbour/monster-mint/actions/workflows/release.yml)
+
 Monster Mint is a single-page token designer for tabletop play. It lets you build circular token templates with images, text, borders, colors, and sequences, then lay those tokens out on printable pages with cut guides so they can be punched or cut out and glued to physical backing.
 
 The project is built as modular source code, but the distributable is one self-contained HTML file at `dist/monster-mint.html`.
 
-## GitHub
+## Quick Start
 
-[![CI](https://github.com/benbarbour/monster-mint/actions/workflows/ci.yml/badge.svg)](https://github.com/benbarbour/monster-mint/actions/workflows/ci.yml)
-[![Release](https://github.com/benbarbour/monster-mint/actions/workflows/release.yml/badge.svg)](https://github.com/benbarbour/monster-mint/actions/workflows/release.yml)
+- Live hosted copy: [Monster Mint on GitHub Pages](https://benbarbour.github.io/monster-mint/)
+- Download the app: [monster-mint-v1.0.0.html](https://github.com/benbarbour/monster-mint/releases/download/v1.0.0/monster-mint-v1.0.0.html)
+- Download the sample project: [monster-mint-example.json](https://github.com/benbarbour/monster-mint/releases/download/v1.0.0/monster-mint-example.json)
 
-- Live hosted copy: [https://benbarbour.github.io/monster-mint/](https://benbarbour.github.io/monster-mint/)
-- Versioned release downloads: [https://github.com/benbarbour/monster-mint/releases](https://github.com/benbarbour/monster-mint/releases)
+All you need to do is download the HTML file and open it in a browser. If you want sample tokens to print or edit, download the example JSON and import it into the app.
 
 ## Disclaimer
 
