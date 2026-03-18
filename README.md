@@ -46,7 +46,7 @@ A ready-to-print sample project is included as [example/monster-mint.json](examp
 
 You can download that JSON, import it into Monster Mint, and print the included token set directly, or use it as a starting point for your own edits.
 
-The app also has a `Load Latest Example` button in the header. It downloads the sample project directly from the latest GitHub release and replaces the current project, so you can try the shipped example without manually importing JSON first.
+The app also has a `Load Latest Example` button in the header. The built HTML embeds the sample project directly, so the button works without any extra network access and replaces the current project with the bundled example instantly.
 
 The token artwork in that sample project uses AI-generated images made with Sora. The parchment background texture is from a Creative Commons source and was lightened slightly for this set before being included in the project.
 

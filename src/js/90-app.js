@@ -17,10 +17,6 @@
   global.MonsterMintApp = api;
 })(typeof globalThis !== "undefined" ? globalThis : window, function (Schema, Storage, State, Sequences, Utils, Tokens, Renderer, Print, Ui, AppHelpers, SettingsPanel, DesignerPanel, PrintPanel) {
   var runtimeGlobal = typeof globalThis !== "undefined" ? globalThis : window;
-  var EXAMPLE_REPO_OWNER = "benbarbour";
-  var EXAMPLE_REPO_NAME = "monster-mint";
-  var EXAMPLE_PROJECT_PATH = "example/monster-mint.json";
-  var EXAMPLE_ASSET_NAMES = ["monster-mint-example.json", "monster-mint.json"];
   var TAB_CONFIG = [
     { id: "designer", label: "Designer" },
     { id: "print", label: "Print" }
@@ -1191,79 +1187,26 @@
   }
 
   async function loadLatestReleaseExample() {
-    if (!runtimeGlobal.fetch || typeof runtimeGlobal.atob !== "function") {
-      runtimeGlobal.alert("This browser cannot load the latest example project automatically.");
-      return;
-    }
-
-    if (!runtimeGlobal.confirm("Load the latest example project from GitHub? This will replace the current project.")) {
+    if (!runtimeGlobal.confirm("Load the bundled example project? This will replace the current project.")) {
       return;
     }
 
     try {
-      var latestRelease = await fetchJson("https://api.github.com/repos/" + EXAMPLE_REPO_OWNER + "/" + EXAMPLE_REPO_NAME + "/releases/latest");
-      var releaseTag = latestRelease && typeof latestRelease.tag_name === "string" ? latestRelease.tag_name.trim() : "";
-      if (!releaseTag) {
-        throw new Error("Missing release tag in GitHub API response.");
-      }
-
-      var exampleAsset = getLatestExampleAsset(latestRelease);
-      var projectText = exampleAsset
-        ? await fetchText(exampleAsset.url, "application/octet-stream")
-        : await fetchExampleProjectContents(releaseTag);
+      var projectText = getEmbeddedExampleProjectText();
       await replaceProjectFromImportedData(JSON.parse(projectText));
     } catch (error) {
-      runtimeGlobal.alert("Loading the latest example failed. Please try again later or import the example JSON manually.");
+      runtimeGlobal.alert("Loading the bundled example failed. Please try again later or import the example JSON manually.");
       console.error(error);
     }
   }
 
-  async function fetchJson(url) {
-    var response = await runtimeGlobal.fetch(url, {
-      headers: {
-        Accept: "application/vnd.github+json"
-      }
-    });
-    if (!response.ok) {
-      throw new Error("Request failed for " + url + " with status " + response.status);
+  function getEmbeddedExampleProjectText() {
+    var script = runtimeGlobal.document && runtimeGlobal.document.getElementById("embedded-example-project");
+    var projectText = script && typeof script.textContent === "string" ? script.textContent.trim() : "";
+    if (!projectText) {
+      throw new Error("Missing embedded example project.");
     }
-    return response.json();
-  }
-
-  async function fetchText(url, acceptHeader) {
-    var headers = {};
-    if (acceptHeader) {
-      headers.Accept = acceptHeader;
-    }
-    var response = await runtimeGlobal.fetch(url, { headers: headers });
-    if (!response.ok) {
-      throw new Error("Request failed for " + url + " with status " + response.status);
-    }
-    return response.text();
-  }
-
-  function getLatestExampleAsset(latestRelease) {
-    var assets = latestRelease && Array.isArray(latestRelease.assets) ? latestRelease.assets : [];
-    return assets.find(function (asset) {
-      return asset &&
-        typeof asset.name === "string" &&
-        EXAMPLE_ASSET_NAMES.indexOf(asset.name) !== -1 &&
-        typeof asset.url === "string" &&
-        asset.url;
-    }) || null;
-  }
-
-  async function fetchExampleProjectContents(releaseTag) {
-    var exampleResponse = await fetchJson(
-      "https://api.github.com/repos/" + EXAMPLE_REPO_OWNER + "/" + EXAMPLE_REPO_NAME + "/contents/" + EXAMPLE_PROJECT_PATH + "?ref=" + encodeURIComponent(releaseTag)
-    );
-    var encodedContents = exampleResponse && typeof exampleResponse.content === "string"
-      ? exampleResponse.content.replace(/\s+/g, "")
-      : "";
-    if (!encodedContents) {
-      throw new Error("Missing example project contents in GitHub API response.");
-    }
-    return runtimeGlobal.atob(encodedContents);
+    return projectText;
   }
 
   async function replaceProjectFromImportedData(parsedProject) {

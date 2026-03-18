@@ -4,6 +4,7 @@ import path from "node:path";
 const rootDir = process.cwd();
 const srcDir = path.join(rootDir, "src");
 const distDir = path.join(rootDir, "dist");
+const exampleProjectPath = path.join(rootDir, "example", "monster-mint.json");
 
 async function read(filePath) {
   return fs.readFile(filePath, "utf8");
@@ -18,12 +19,18 @@ async function build() {
   const template = await read(path.join(srcDir, "index.template.html"));
   const cssFiles = await getOrderedFiles(path.join(srcDir, "css"));
   const jsFiles = await getOrderedFiles(path.join(srcDir, "js"));
+  const embeddedExampleProject = await read(exampleProjectPath);
 
   const css = (await Promise.all(cssFiles.map(read))).join("\n\n");
   const js = (await Promise.all(jsFiles.map(read))).join("\n\n");
+  const escapedEmbeddedExampleProject = embeddedExampleProject
+    .replace(/</g, "\\u003c")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
 
   const html = template
     .replace("/*__INLINE_CSS__*/", css)
+    .replace("/*__EMBEDDED_EXAMPLE_PROJECT__*/", escapedEmbeddedExampleProject)
     .replace("/*__INLINE_JS__*/", js);
 
   await fs.mkdir(distDir, { recursive: true });
@@ -34,4 +41,3 @@ build().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
-
