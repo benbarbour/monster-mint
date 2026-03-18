@@ -13,6 +13,17 @@ test("can create and manipulate a token template", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Monster Mint" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Designer" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("link", { name: "GitHub Repository" })).toHaveAttribute("href", "https://github.com/benbarbour/monster-mint");
+  const headerActionOrder = await page.locator(".app-menu .app-menu-group .menu-button").evaluateAll((elements) =>
+    elements.map((element) => element.getAttribute("aria-label"))
+  );
+  expect(headerActionOrder).toEqual([
+    "Export JSON",
+    "Import JSON",
+    "Reset Project",
+    "Load Latest Example",
+    "Hotkey Help",
+    "Settings"
+  ]);
   await page.getByRole("button", { name: "Hotkey Help" }).click();
   await expect(page.getByRole("dialog", { name: "Hotkeys" })).toBeVisible();
   await expect(page.getByText("Delete the selected designer component.")).toBeVisible();

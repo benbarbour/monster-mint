@@ -66,6 +66,18 @@
   gap: 0.6rem;
 }
 
+.app-menu-group {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.app-menu-divider {
+  width: 1px;
+  height: 2rem;
+  background: rgba(184, 171, 150, 0.9);
+}
+
 .button {
   border: 1px solid var(--panel-border);
   border-radius: 999px;
@@ -103,6 +115,13 @@
   color: var(--accent-strong);
 }
 
+.menu-link-github {
+  border-color: rgba(20, 24, 28, 0.92);
+  background: rgba(20, 24, 28, 0.96);
+  box-shadow: 0 10px 20px rgba(20, 24, 28, 0.22);
+  color: #f6f8fa;
+}
+
 .menu-link:hover,
 .menu-link:focus-visible,
 .menu-button:hover,
@@ -110,6 +129,13 @@
   border-color: var(--accent);
   color: var(--accent-strong);
   outline: none;
+}
+
+.menu-link-github:hover,
+.menu-link-github:focus-visible {
+  border-color: #24292f;
+  background: #24292f;
+  color: #ffffff;
 }
 
 .menu-icon {
