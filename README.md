@@ -14,20 +14,20 @@ The project is built as modular source code, but the distributable is one self-c
 
 ## Disclaimer
 
-Everything in this repo, other than this Disclaimer (including the rest of this README), is AI generated. I am a software developer, so this is slightly embarrassing/worrying, but I wanted to try it out. I could have built this myself from scratch, but:
+Everything in this repo, other than this Disclaimer (including the rest of this README), is AI generated. I am a software developer but I wanted to try it out. I could have built this myself from scratch, but:
 
-1. My main goal was just to gain experience using an "aseptic" AI, and see how it had improved since the last time I fiddled with it.
-2. I'm not a web developer and it would've taken me a lot of work that I find fiddly and annoying.
+1. My main goal was just to gain experience using an "agentic" AI, and see how it had improved since the last time I fiddled with it.
+2. I'm not a web developer and it would've taken me a lot of work that I find fiddly and annoying. It would've taken me longer too.
 
-That being said, I chose this project because monster-mint is a tool I wanted to use and I'm happy with the result.
+That being said, I chose this project because Monster Mint is a tool I wanted to use and I'm happy with the result.
 
 > [!WARNING]
 > Run at your own risk!
-> I purposefully avoided looking at a single line of code; that was a goal when I started this project. I haven't even viewed, let alone reviewed or edited anything in here. I know what it does when I use the tool, but I have *no idea* what else it might be doing behind the screen. The chances that it does anything other than let you build and print monster tokens is negligible, but if you notice it doing anything naughty, please let me know and I'll take it down!
+> I purposefully avoided looking at a single line of code; that was a goal when I started this project. I haven't even viewed, let alone reviewed or edited anything in here. I know what it does when I use the tool, but I have *no idea* what else it might be doing behind the scene or what bugs might be lurking. The chances that it does anything other than let you build and print monster tokens is negligible, but if you notice it doing anything naughty, please let me know and I'll take it down!
 
-I used OpenAI but if I did it again I'd use Claude / Anthropic because they seem to be the only AI company out there doing the bare minimum for ethical human behavior.
+I used OpenAI but if I did it again I'd use Claude / Anthropic because they seem to be the only AI company out there doing the bare minimum for ethical behavior and OpenAI isn't.
 
-If you're curious it took about 100 prompts to get it into this state, and I had it commit after each prompt. Honestly, 80% of the functionality was there after 2 or 3 prompts though; the rest was layout tweaks, and minor improvements interspersed with requests to fix some pretty large bugs, but it did that well.
+If you're curious it took about 100 prompts to get it into this state. I had it commit after each prompt so go ahead and take a gander and my meandering vibe coding if you want.
 
 ## Purpose
 
