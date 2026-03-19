@@ -250,7 +250,7 @@ test("designer dropdowns are sorted", async ({ page }) => {
     'Mint 2 (1")',
     'Zulu (1")'
   ]);
-  await expect(page.locator(".panel-toggle-meta").filter({ hasText: "3 designs" })).toBeVisible();
+  await expect(page.locator(".panel-toggle-meta").filter({ hasText: "3 designs · 0 tokens · 0 pages" })).toHaveCount(2);
 });
 
 test("token settings own appearance controls and color sequences show in preview", async ({ page }) => {
@@ -499,8 +499,7 @@ test("built-in text modes and color sequences drive live print preview", async (
   await expect(copiesInput).toHaveValue("24");
   await expect(page.getByRole("button", { name: "Print", exact: true })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Page 5", exact: true })).toBeVisible();
-  await expect(page.locator(".panel-toggle-meta").filter({ hasText: "24 tokens" })).toBeVisible();
-  await expect(page.locator(".panel-toggle-meta").filter({ hasText: "page" })).toBeVisible();
+  await expect(page.locator(".panel-toggle-meta").filter({ hasText: /1 design · 24 tokens · \d+ pages?/ })).toHaveCount(2);
   const pageTabCount = await page.locator('[data-action="select-preview-page"]').count();
   expect(pageTabCount).toBeGreaterThan(1);
   await expect(page.getByRole("tab", { name: "Page 1", exact: true })).toBeVisible();
@@ -516,6 +515,127 @@ test("built-in text modes and color sequences drive live print preview", async (
 
   await page.getByRole("button", { name: "Print", exact: true }).click();
   await expect(page.locator("iframe.print-frame")).toHaveCount(1);
+});
+
+test("print selections bulk controls update all rows and both section summaries", async ({ page }) => {
+  const importProject = {
+    version: 1,
+    meta: {
+      name: "Bulk Demo",
+      updatedAt: "2026-03-18T00:00:00.000Z"
+    },
+    settings: {
+      pagePresetId: "letter",
+      pageOrientation: "portrait",
+      pageMarginIn: 0.25,
+      cutlineGapMm: 0,
+      tokenDefaults: {
+        diameterIn: 1,
+        backgroundMode: "color",
+        backgroundColorMode: "manual",
+        backgroundColor: "#f3e7c9",
+        backgroundColorSequenceRef: null,
+        backgroundImageSource: "",
+        borderWidthRatio: 0.03,
+        borderColorMode: "manual",
+        borderColor: "#000000",
+        borderColorSequenceRef: null
+      },
+      textDefaults: {
+        fontFamily: "Times New Roman",
+        fontWeight: "700",
+        colorMode: "manual",
+        color: "#ffffff",
+        colorSequenceRef: null,
+        textBorder: {
+          width: 3,
+          colorMode: "manual",
+          color: "#000000",
+          colorSequenceRef: null
+        }
+      }
+    },
+    sequences: {
+      text: [],
+      color: []
+    },
+    tokens: [
+      {
+        id: "token_bulk_1",
+        name: "Alpha",
+        diameterIn: 1,
+        front: {
+          backgroundMode: "color",
+          backgroundColorMode: "manual",
+          backgroundColor: "#f3e7c9",
+          backgroundColorSequenceRef: null,
+          backgroundImageSource: "",
+          border: {
+            enabled: true,
+            widthRatio: 0.03,
+            colorMode: "manual",
+            color: "#000000",
+            colorSequenceRef: null
+          },
+          images: [],
+          texts: []
+        }
+      },
+      {
+        id: "token_bulk_2",
+        name: "Beta",
+        diameterIn: 1,
+        front: {
+          backgroundMode: "color",
+          backgroundColorMode: "manual",
+          backgroundColor: "#f3e7c9",
+          backgroundColorSequenceRef: null,
+          backgroundImageSource: "",
+          border: {
+            enabled: true,
+            widthRatio: 0.03,
+            colorMode: "manual",
+            color: "#000000",
+            colorSequenceRef: null
+          },
+          images: [],
+          texts: []
+        }
+      }
+    ],
+    printSelections: [
+      {
+        tokenId: "token_bulk_1",
+        copies: 1,
+        sequenceStart: 2
+      },
+      {
+        tokenId: "token_bulk_2",
+        copies: 2,
+        sequenceStart: 3
+      }
+    ]
+  };
+
+  await page.locator("[data-import-input]").setInputFiles({
+    name: "bulk-demo.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(importProject))
+  });
+
+  await page.getByRole("tab", { name: "Print" }).click();
+  await expect(page.locator(".panel-toggle-meta").filter({ hasText: "2 designs · 3 tokens · 1 page" })).toHaveCount(2);
+
+  await page.locator('input[name="bulkCopies"]').fill("4");
+  await page.getByRole("button", { name: "Apply" }).first().click();
+  await expect(page.locator('input[name="copies-token_bulk_1"]')).toHaveValue("4");
+  await expect(page.locator('input[name="copies-token_bulk_2"]')).toHaveValue("4");
+  await expect(page.locator(".panel-toggle-meta").filter({ hasText: "2 designs · 8 tokens · 1 page" })).toHaveCount(2);
+
+  await page.locator('input[name="bulkStart"]').fill("7");
+  await page.getByRole("button", { name: "Apply" }).nth(1).click();
+  await expect(page.locator('input[name="start-token_bulk_1"]')).toHaveValue("7");
+  await expect(page.locator('input[name="start-token_bulk_2"]')).toHaveValue("7");
 });
 
 test("json import normalizes embedded image assets", async ({ page }) => {

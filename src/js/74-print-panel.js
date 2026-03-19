@@ -28,6 +28,8 @@
     var previewItemCount = layout.pages.reduce(function (total, page) {
       return total + page.items.length;
     }, 0);
+    var previewPageCount = previewItemCount ? layout.pages.length : 0;
+    var summaryText = formatPrintSummary(rows.length, previewItemCount, previewPageCount);
     return [
       '<div class="print-layout">',
       renderPrintSection({
@@ -39,14 +41,14 @@
       renderPrintSection({
         key: "selections",
         title: "Print Selections",
-        metaText: formatSelectionSummary(rows.length),
+        metaText: summaryText,
         isOpen: printPanels.selections !== false,
         content: renderPrintSelectionForm(rows)
       }),
       renderPrintSection({
         key: "preview",
         title: "Preview",
-        metaText: formatPreviewSummary(previewItemCount, layout.pages.length),
+        metaText: summaryText,
         isOpen: printPanels.preview !== false,
         actions: [
           '<div class="button-row">',
@@ -102,6 +104,12 @@
           project.printSelections = Print.normalizeSelections(project, rows);
         });
       };
+      var applyBulkValue = function (prefix, rawValue) {
+        var inputs = Array.from(printForm.querySelectorAll('input[name^="' + prefix + '-"]'));
+        inputs.forEach(function (input) {
+          input.value = rawValue;
+        });
+      };
       var normalizeCommittedField = function (field) {
         if (!field || !field.name) {
           return;
@@ -126,6 +134,30 @@
       printForm.addEventListener("focusout", function (event) {
         if (event.target && event.target.name) {
           flushPrintSelections(event);
+        }
+      });
+      printForm.addEventListener("click", function (event) {
+        var button = event.target.closest("[data-bulk-apply]");
+        if (!button) {
+          return;
+        }
+        var mode = button.getAttribute("data-bulk-apply");
+        if (mode === "copies") {
+          var bulkCopiesInput = printForm.querySelector('[name="bulkCopies"]');
+          if (!bulkCopiesInput) {
+            return;
+          }
+          applyBulkValue("copies", bulkCopiesInput.value);
+          commitPrintSelections();
+          return;
+        }
+        if (mode === "start") {
+          var bulkStartInput = printForm.querySelector('[name="bulkStart"]');
+          if (!bulkStartInput) {
+            return;
+          }
+          applyBulkValue("start", bulkStartInput.value);
+          commitPrintSelections();
         }
       });
     }
@@ -208,6 +240,10 @@
 
     return [
       '<form class="form-grid" data-form="print-selections" novalidate>',
+      '  <div class="field-row two-up bulk-print-row">',
+      '    <div class="field field-with-action"><label>All copies<input type="number" min="0" step="1" name="bulkCopies" value=""></label><button class="button" type="button" data-bulk-apply="copies">Apply</button></div>',
+      '    <div class="field field-with-action"><label>All starts<input type="number" min="0" step="1" name="bulkStart" value=""></label><button class="button" type="button" data-bulk-apply="start">Apply</button></div>',
+      "  </div>",
       '  <table class="print-table">',
       "    <thead><tr><th>Token</th><th>Copies</th><th>Start</th></tr></thead>",
       "    <tbody>",
@@ -236,12 +272,10 @@
     });
   }
 
-  function formatPreviewSummary(tokenCount, pageCount) {
-    return tokenCount + " token" + (tokenCount === 1 ? "" : "s") + " · " + pageCount + " page" + (pageCount === 1 ? "" : "s");
-  }
-
-  function formatSelectionSummary(designCount) {
-    return designCount + " design" + (designCount === 1 ? "" : "s");
+  function formatPrintSummary(designCount, tokenCount, pageCount) {
+    return designCount + " design" + (designCount === 1 ? "" : "s") +
+      " · " + tokenCount + " token" + (tokenCount === 1 ? "" : "s") +
+      " · " + pageCount + " page" + (pageCount === 1 ? "" : "s");
   }
 
   function renderPreviewTabs(layout, project, activeIndex) {

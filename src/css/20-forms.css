@@ -127,6 +127,17 @@
   gap: 0.6rem;
 }
 
+.field-with-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.6rem;
+}
+
+.field-with-action > label {
+  min-width: 0;
+}
+
 .project-actions {
   align-items: center;
 }
